@@ -1,6 +1,7 @@
 // What a project's simulator gives the Simulator page (owner: Anaís). One per task id (registry.ts).
 
-/** A ground-truth action the simulator saw the person do, at `t` seconds since `start()`. */
+/** A ground-truth action the simulator saw the person do, at `t` seconds of simulator time since `start()`.
+ * Simulator time stops while the tab is hidden; anything aligned with a video re-stamps on the video's clock. */
 export type SimEvent = { t: number; action: string };
 
 export interface Simulator {
