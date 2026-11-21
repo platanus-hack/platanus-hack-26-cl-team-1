@@ -112,6 +112,8 @@ with a pointer to their replacement; nothing is ever deleted from §3.
 ### D-012 — Perception: Qwen3-VL-8B FP8 on vLLM behind a keyed tunnel (2026-11-21)
 - **Update:** the model and the client stand; where it is served (the 3090 behind a keyed tunnel) is replaced by
   D-014 (the 5090 over an SSH port-forward). The 3090 setup stays as a fallback.
+- **Update (D-017):** the live call policy is now 3 frames over 1.1 s, a call every 0.75 s, and the prompt
+  describes the hands before deciding.
 - **Context:** the scripted fake must give way to a real video-language model behind `Perception`; the 3090 is
   on a private network and the server may run on a laptop.
 - **Decision:** `SUP_PERCEPTION=vlm` → `VlmPerception` (`server/app/perception/vlm.py`) calls Qwen3-VL-8B-Instruct-FP8
@@ -210,7 +212,9 @@ with a pointer to their replacement; nothing is ever deleted from §3.
     model hallucinated early rinses.
   - Numbers: `training/results/perception.md`.
 - **Consequences:** a deliberate out-of-order action that lasts more than about 3 s gets accepted after one
-  warning. Fine-tuning (`training/vlm`) is the next lever, and it needs more labelled runs.
+  warning. A forbidden action more than one step before its step is ignored. 3 frames per call need vLLM
+  started with `VLM_MAX_IMAGES` ≥ 3 (`gpu/vllm-5090.sh` defaults to 4); an older vLLM rejects every call
+  loudly. Fine-tuning (`training/vlm`) is the next lever, and it needs more labelled runs.
 
 ## §2 Open (decide in block 1, see docs/VISION.md)
 

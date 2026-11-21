@@ -82,11 +82,12 @@ class RulesController:
             if transition.kind is MistakeKind.REPEATED:
                 return self._decision(Event.NONE)  # perception often reports an ongoing action twice
             legal = self.automaton.legal_next(self.done)
-            if transition.kind is MistakeKind.WRONG_ACTION and transition.step not in (None, *legal):
-                # A forbidden action for a step that isn't due yet (opening the faucet bare-handed at the
-                # start is fine; closing it bare-handed at the end isn't).
+            if transition.kind is MistakeKind.WRONG_ACTION and not self._near(transition.step, legal):
+                # A forbidden action for a step that is far from due (opening the faucet bare-handed at the
+                # start is fine; closing it bare-handed near the end isn't, even a step early).
                 return self._decision(Event.NONE)
-            if out_of_order and count >= self.infer_after and (inferred := self._infer(transition.step)):
+            inferred = self._infer(transition.step, observation.t_ms) if count >= self.infer_after else None
+            if out_of_order and inferred:
                 return inferred
             text = self._correction_text(transition)
             mistake_id = transition.mistake.id if transition.mistake else None
@@ -138,7 +139,13 @@ class RulesController:
 
     # ── helpers ──────────────────────────────────────────────────────────────
 
-    def _infer(self, step_id: str | None) -> Decision | None:
+    def _near(self, step_id: str | None, legal: list[str]) -> bool:
+        """The step is due now, or each of its prerequisites is done or due now (one step away)."""
+        if step_id is None or step_id in legal:
+            return True
+        return all(r in self.done or r in legal for r in self.task.step(step_id).requires)
+
+    def _infer(self, step_id: str | None, t_ms: int) -> Decision | None:
         """Mark `step_id` done together with its one missing prerequisite, if that prerequisite could be
         done now. Returns None (keep warning) when more than one step is missing or it isn't due yet."""
         if step_id is None:
@@ -154,6 +161,7 @@ class RulesController:
         self.mistake_step = None
         self.open_mistake = None
         self.streak = None
+        self.last_progress_ms = t_ms
         assumed = f"Bien, doy por hecho: {skipped.title_es.lower()}."
         if transition.outcome is Outcome.TASK_DONE:
             text = f"{assumed} ¡Listo! Terminaste la tarea."

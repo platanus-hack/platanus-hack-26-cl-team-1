@@ -63,3 +63,15 @@ def test_never_infers_more_than_one_missing_step(task):
     controller, decisions = run(task, ["wet_hands", *["rinse_hands"] * 6])
     assert all(d.event is not Event.STEP_DONE for d in decisions[1:])
     assert controller.done == frozenset({"wet"})
+
+
+def test_closing_the_faucet_bare_handed_one_step_early_is_still_a_mistake(task):
+    """After rinsing, before drying: closing is one step away, so a bare hand on the faucet is corrected."""
+    steps = ["wet_hands", "apply_soap", "rub_palms", "rub_backs", "rinse_hands"]
+    _, decisions = run(task, [*steps, "touch_faucet_bare"])
+    assert decisions[-1].event is Event.MISTAKE and decisions[-1].mistake_id == "bare_faucet"
+
+
+def test_an_inferred_step_counts_as_progress_for_reminders(task):
+    controller, _ = run(task, ["wet_hands", *["rub_palms"] * 4])
+    assert controller.tick(5 * 1000 + 1000) is None  # no reminder right after "doy por hecho"
