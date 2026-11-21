@@ -1,0 +1,116 @@
+.asm { flex: 1; min-width: 0; display: flex; flex-direction: column; height: 100%; min-height: 0; background: var(--bg); }
+.asm-bar {
+  display: flex; align-items: center; gap: 12px; padding: 8px 14px;
+  border-bottom: 1px solid var(--border); background: var(--surface);
+}
+.asm-title { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; white-space: nowrap; }
+.asm-title svg { color: var(--accent); }
+.asm-project { color: var(--text-muted); font-weight: 400; overflow: hidden; text-overflow: ellipsis; }
+.asm-bar-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.asm-select {
+  height: 30px; max-width: 220px; background: var(--surface-2); color: var(--text);
+  border: 1px solid var(--border-strong); border-radius: var(--radius-sm); padding: 0 8px; font: inherit;
+}
+.asm-badges { display: flex; gap: 6px; }
+.asm-badge {
+  display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 9px; border-radius: 999px;
+  font-size: 12px; background: var(--surface-2); border: 1px solid var(--border-strong); color: var(--text-muted);
+}
+.asm-badge.ok { color: var(--accent); background: var(--accent-soft); border-color: rgba(61, 220, 151, 0.35); }
+.asm-badge.warn { color: var(--warning); background: var(--warning-soft); border-color: rgba(255, 181, 71, 0.35); }
+
+.asm-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 380px; }
+@media (max-width: 1000px) { .asm-body { grid-template-columns: minmax(0, 1fr) 300px; } }
+.asm-stage {
+  min-width: 0; min-height: 0; display: flex; flex-direction: column; align-items: center;
+  padding: 14px; gap: 10px; overflow: auto;
+}
+/* 4:3 like the 640×480 frames, as large as the height allows (topbar + bar + debug bar + padding). */
+.asm-video-box {
+  position: relative; flex: none; border-radius: var(--radius-lg); overflow: hidden;
+  background: var(--bg-sunken); border: 1px solid var(--border); aspect-ratio: 4 / 3;
+  width: min(100%, calc((100dvh - var(--topbar-h) - 120px) * 4 / 3));
+}
+.asm-video, .asm-overlay { position: absolute; inset: 0; width: 100%; height: 100%; }
+.asm-video { object-fit: fill; background: #000; }
+.asm-overlay { pointer-events: none; }
+.asm-overlay.clicking { pointer-events: auto; cursor: crosshair; }
+
+.asm-issue {
+  position: absolute; top: 12px; left: 12px; right: 12px; display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px; border-radius: var(--radius); background: rgba(40, 10, 14, 0.92);
+  border: 1px solid var(--danger); color: #ffd7db; font-size: 15px; font-weight: 600; box-shadow: var(--shadow);
+}
+.asm-issue svg { color: var(--danger); flex: none; }
+.asm-subtitle {
+  position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); max-width: calc(100% - 28px);
+  display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px;
+  background: rgba(10, 13, 17, 0.88); border: 1px solid var(--border-strong); font-size: 14px;
+  animation: asm-fade 12s forwards;
+}
+.asm-subtitle.error { border-color: rgba(255, 92, 108, 0.6); }
+.asm-subtitle svg { color: var(--accent); flex: none; }
+.asm-subtitle.speaking svg { animation: asm-pulse 0.9s infinite; }
+@keyframes asm-fade { 0%, 85% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes asm-pulse { 50% { opacity: 0.35; } }
+.asm-paused {
+  position: absolute; bottom: 60px; left: 12px; padding: 4px 10px; border-radius: 999px; font-size: 12px;
+  background: var(--warning-soft); color: var(--warning); border: 1px solid rgba(255, 181, 71, 0.4);
+}
+.asm-calib-hint {
+  position: absolute; top: 12px; left: 50%; transform: translateX(-50%); padding: 6px 12px; border-radius: 999px;
+  background: var(--blue-soft); color: var(--blue); border: 1px solid rgba(76, 194, 255, 0.4); font-size: 13px;
+}
+.asm-latency {
+  position: absolute; right: 10px; top: 10px; font-size: 11px; padding: 3px 8px; border-radius: 6px;
+  background: rgba(0, 0, 0, 0.7); color: var(--text-muted);
+}
+.asm-start {
+  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 12px; padding: 24px; text-align: center; background: rgba(14, 18, 23, 0.92);
+}
+.asm-start h2 { margin: 0; font-size: 20px; }
+.asm-start p { margin: 0; max-width: 460px; color: var(--text-muted); }
+.asm-start-ico { color: var(--accent); }
+.asm-warn { color: var(--warning) !important; }
+.asm-field { display: flex; flex-direction: column; gap: 4px; width: min(460px, 100%); text-align: left; }
+.asm-field span { font-size: 12px; color: var(--text-dim); }
+.asm-field input {
+  height: 32px; padding: 0 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-strong);
+  background: var(--surface-2); color: var(--text); font-size: 12px;
+}
+.asm-debugbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.asm-debug-note { margin-left: auto; color: var(--text-dim); font-size: 12px; }
+.asm-keys { gap: 14px; font-size: 12px; color: var(--text-muted); }
+.asm-keys kbd {
+  display: inline-block; min-width: 18px; padding: 1px 5px; border-radius: 4px; text-align: center;
+  background: var(--surface-3); border: 1px solid var(--border-strong); color: var(--text); font-family: var(--font-mono);
+}
+
+.asm-checklist {
+  display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--border);
+  background: var(--surface); padding: 14px 0 10px;
+}
+.asm-checklist-head { display: flex; align-items: baseline; justify-content: space-between; padding: 0 16px; }
+.asm-checklist-head h2 { margin: 0; font-size: 14px; }
+.asm-progress { color: var(--text-muted); font-size: 12px; }
+.asm-progressbar { height: 4px; margin: 10px 16px 8px; border-radius: 4px; background: var(--surface-3); overflow: hidden; }
+.asm-progressbar div { height: 100%; background: var(--accent); transition: width 0.4s; }
+.asm-steps { list-style: none; margin: 0; padding: 0 8px; overflow-y: auto; flex: 1; }
+.asm-step { display: flex; gap: 10px; padding: 9px 8px; border-radius: var(--radius); border: 1px solid transparent; }
+.asm-step.current { background: var(--surface-2); border-color: var(--border-strong); }
+.asm-step.error.current { border-color: rgba(255, 92, 108, 0.55); }
+.asm-step.done .asm-step-title { color: var(--text-muted); }
+.asm-step-body { min-width: 0; }
+.asm-step-title { font-weight: 500; }
+.asm-step-n { color: var(--text-dim); font-size: 11px; margin-right: 2px; }
+.asm-step-detail { margin-top: 4px; color: var(--text-muted); font-size: 13px; }
+.asm-step-tip { margin-top: 6px; padding: 6px 8px; border-radius: var(--radius-sm); background: var(--blue-soft); color: var(--blue); font-size: 12px; }
+.asm-ico { flex: none; margin-top: 1px; }
+.asm-ico.pending { color: var(--text-dim); }
+.asm-ico.active { color: var(--accent); animation: asm-pulse 1.4s infinite; }
+.asm-ico.done { color: var(--accent); }
+.asm-ico.error { color: var(--danger); }
+.asm-step-actions { display: flex; gap: 8px; padding: 10px 16px 0; border-top: 1px solid var(--border); justify-content: space-between; }
+.spin { animation: asm-spin 1s linear infinite; }
+@keyframes asm-spin { to { transform: rotate(360deg); } }

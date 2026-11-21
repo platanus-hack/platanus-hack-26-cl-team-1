@@ -23,6 +23,8 @@ gpu = [
   "phonemizer-fork>=3.3",
   "soundfile>=0.12",
   "openai>=1.50",
+  # YOLO-World text encoder (ultralytics would pip-install it at runtime; uv venvs have no pip)
+  "clip @ git+https://github.com/ultralytics/CLIP.git",
 ]
 
 [dependency-groups]

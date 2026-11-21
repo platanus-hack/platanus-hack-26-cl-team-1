@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Revisión de etiquetas</title>
+<style>
+  :root {
+    --bg: #0E1217; --panel: #151B23; --panel-2: #1B232D; --line: #263241;
+    --text: #E6EDF3; --muted: #8B98A5; --accent: #3DDC97; --danger: #FF5C5C;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--text); overflow: hidden;
+    font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: grid; grid-template-rows: auto 1fr;
+  }
+  header {
+    display: flex; align-items: center; gap: 16px; padding: 10px 16px;
+    background: var(--panel); border-bottom: 1px solid var(--line); min-width: 0;
+  }
+  header h1 { font-size: 15px; margin: 0; white-space: nowrap; }
+  header h1 span { color: var(--accent); }
+  .progress { flex: 0 1 260px; min-width: 120px; }
+  .progress .bar { height: 6px; background: var(--panel-2); border-radius: 3px; overflow: hidden; }
+  .progress .fill { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+  .progress .txt { font-size: 12px; color: var(--muted); margin-top: 3px; font-variant-numeric: tabular-nums; }
+  #file { flex: 1; min-width: 0; color: var(--muted); font: 12px ui-monospace, SFMono-Regular, Menlo, monospace;
+          overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #file b { color: var(--text); font-weight: 600; }
+  .badge { font-size: 12px; padding: 2px 8px; border-radius: 10px; border: 1px solid var(--line); color: var(--muted);
+           white-space: nowrap; }
+  .badge.ok { color: var(--bg); background: var(--accent); border-color: var(--accent); font-weight: 600; }
+  .badge.dirty { color: #FFD84D; border-color: #FFD84D; }
+  button {
+    background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 6px;
+    padding: 4px 10px; font: inherit; cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); }
+  main { display: grid; grid-template-columns: 1fr 260px; min-height: 0; }
+  #stage { position: relative; min-width: 0; min-height: 0; overflow: hidden; display: grid; place-items: center; padding: 12px; }
+  canvas { display: block; cursor: crosshair; border-radius: 4px; box-shadow: 0 0 0 1px var(--line); }
+  #empty { color: var(--muted); text-align: center; max-width: 420px; }
+  #empty code { color: var(--text); }
+  aside { background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto; padding: 12px; }
+  aside h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 4px 0 8px; }
+  .cls {
+    display: grid; grid-template-columns: 18px 12px 1fr auto; align-items: center; gap: 8px;
+    padding: 5px 6px; border-radius: 6px; border: 1px solid transparent; cursor: pointer; user-select: none;
+  }
+  .cls:hover { background: var(--panel-2); }
+  .cls.cur { border-color: var(--accent); background: var(--panel-2); }
+  .cls.sel { outline: 2px dashed currentColor; outline-offset: -2px; }
+  .cls kbd { font: 11px ui-monospace, monospace; color: var(--muted); text-align: center; }
+  .cls .sw { width: 12px; height: 12px; border-radius: 3px; }
+  .cls .n { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .cls .n b { color: var(--text); }
+  .cls .n .low { color: var(--danger); }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 14px; border-top: 1px solid var(--line); padding-top: 10px; }
+  .hint label { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; color: var(--text); cursor: pointer; }
+  .overlay { position: fixed; inset: 0; background: rgba(5, 8, 12, .78); display: none; place-items: center; z-index: 10; }
+  .overlay.on { display: grid; }
+  .help { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px 22px;
+          max-width: 560px; width: calc(100% - 32px); }
+  .help h3 { margin: 0 0 10px; color: var(--accent); }
+  .help table { border-collapse: collapse; width: 100%; }
+  .help td { padding: 4px 6px; vertical-align: top; }
+  .help td:first-child { white-space: nowrap; color: var(--muted); }
+  kbd.k { font: 12px ui-monospace, monospace; background: var(--panel-2); border: 1px solid var(--line);
+          border-radius: 4px; padding: 0 5px; color: var(--text); }
+  #toast {
+    position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); padding: 8px 14px; border-radius: 8px;
+    background: var(--panel-2); border: 1px solid var(--line); opacity: 0; transition: opacity .2s; pointer-events: none;
+  }
+  #toast.on { opacity: 1; }
+  #toast.err { border-color: var(--danger); color: var(--danger); }
+  @media (max-width: 760px) {
+    main { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
+    aside { border-left: 0; border-top: 1px solid var(--line); max-height: 40vh; }
+    .progress { display: none; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Revisión <span>YOLO</span></h1>
+  <div class="progress"><div class="bar"><div class="fill" id="fill"></div></div><div class="txt" id="prog">—</div></div>
+  <div id="file">Cargando…</div>
+  <span class="badge" id="state">—</span>
+  <button id="helpBtn" title="Atajos (H)">Atajos · H</button>
+</header>
+<main>
+  <div id="stage"><canvas id="cv" hidden></canvas><div id="empty" hidden></div></div>
+  <aside>
+    <h2>Clases · imagen / total</h2>
+    <div id="classes"></div>
+    <div class="hint">
+      <label><input type="checkbox" id="skipRev"> Saltar las ya revisadas</label>
+      <div id="clsHint"></div>
+    </div>
+  </aside>
+</main>
+<div class="overlay" id="help">
+  <div class="help">
+    <h3>Atajos de teclado</h3>
+    <table>
+      <tr><td><kbd class="k">←</kbd> <kbd class="k">→</kbd> · <kbd class="k">A</kbd> <kbd class="k">D</kbd></td><td>Imagen anterior / siguiente (guarda los cambios)</td></tr>
+      <tr><td><kbd class="k">Enter</kbd></td><td>Aceptar la imagen como revisada y pasar a la siguiente</td></tr>
+      <tr><td>Arrastrar</td><td>Dibujar una caja con la clase activa (<kbd class="k">Shift</kbd> fuerza dibujar encima de otra)</td></tr>
+      <tr><td>Clic</td><td>Seleccionar caja (clic de nuevo: la de abajo). Arrastrar la seleccionada la mueve; sus esquinas la redimensionan</td></tr>
+      <tr><td><kbd class="k">0</kbd>–<kbd class="k">9</kbd></td><td>Clase de la caja seleccionada, o de la próxima caja que dibujes</td></tr>
+      <tr><td><kbd class="k">Supr</kbd> · <kbd class="k">⌫</kbd></td><td>Borrar la caja seleccionada</td></tr>
+      <tr><td><kbd class="k">Tab</kbd></td><td>Seleccionar la caja siguiente (<kbd class="k">Shift</kbd>: anterior)</td></tr>
+      <tr><td><kbd class="k">Esc</kbd></td><td>Quitar la selección</td></tr>
+      <tr><td><kbd class="k">Z</kbd></td><td>Deshacer</td></tr>
+      <tr><td><kbd class="k">U</kbd></td><td>Ir a la próxima imagen sin revisar</td></tr>
+      <tr><td><kbd class="k">X</kbd></td><td>Borrar la imagen y su etiqueta (pide confirmación)</td></tr>
+      <tr><td><kbd class="k">H</kbd></td><td>Mostrar / ocultar esta ayuda</td></tr>
+    </table>
+  </div>
+</div>
+<div id="toast"></div>
+<script>
+"use strict";
+const API = location.pathname.replace(/\/+$/, "") + "/api";
+const $ = (id) => document.getElementById(id);
+const cv = $("cv"), ctx = cv.getContext("2d");
+const S = {
+  classes: [], items: [], idx: 0, img: null, w: 0, h: 0, boxes: [], sel: -1, cur: 0,
+  dirty: false, undo: [], scale: 1, drag: null, loadSeq: 0,
+};
+let queue = Promise.resolve();
+const run = (fn) => (queue = queue.then(fn).catch((e) => toast(e.message || String(e), true)));
+
+function toast(msg, err = false) {
+  const t = $("toast");
+  t.textContent = msg; t.className = "on" + (err ? " err" : "");
+  clearTimeout(toast.t); toast.t = setTimeout(() => (t.className = ""), err ? 3500 : 1200);
+}
+
+async function api(method, path, query, body) {
+  const url = API + path + (query ? "?path=" + encodeURIComponent(query) : "");
+  const r = await fetch(url, {
+    method, headers: body ? { "Content-Type": "application/json" } : {}, body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!r.ok) {
+    let detail = r.statusText;
+    try { detail = (await r.json()).detail || detail; } catch (_) { /* not JSON */ }
+    throw new Error(`Error ${r.status}: ${detail}`);
+  }
+  return r.json();
+}
+
+// ---------- data ----------
+const item = () => S.items[S.idx];
+const totals = () => S.classes.map((_, i) => S.items.reduce((a, it) => a + it.counts[i], 0));
+const imgCounts = () => S.classes.map((_, i) => S.boxes.filter((b) => b.cls === i).length);
+
+async function init() {
+  const data = await api("GET", "/images");
+  S.classes = data.classes; S.items = data.images;
+  if (!S.items.length) {
+    $("empty").hidden = false;
+    $("empty").innerHTML = `No hay imágenes en <code>${data.root}/images</code>.<br><br>` +
+      "Primero: <code>python -m vision.tools.autolabel</code>";
+    $("file").textContent = "Sin imágenes"; renderSide(); return;
+  }
+  const first = S.items.findIndex((it) => !it.reviewed);
+  S.idx = first >= 0 ? first : 0;
+  await load();
+}
+
+async function load() {
+  const seq = ++S.loadSeq, it = item();
+  if (!it) return;
+  const src = API + "/image?path=" + encodeURIComponent(it.path);
+  const [lbl, img] = await Promise.all([
+    api("GET", "/labels", it.path),
+    new Promise((ok, ko) => { const im = new Image(); im.onload = () => ok(im); im.onerror = () => ko(new Error("No se pudo cargar la imagen")); im.src = src; }),
+  ]);
+  if (seq !== S.loadSeq) return;
+  Object.assign(S, { img, w: lbl.width, h: lbl.height, boxes: lbl.boxes, sel: -1, dirty: false, undo: [] });
+  it.reviewed = lbl.reviewed;
+  const next = S.items[S.idx + 1];
+  if (next) new Image().src = API + "/image?path=" + encodeURIComponent(next.path);  // prefetch
+  $("cv").hidden = false; $("empty").hidden = true;
+  layout(); render();
+}
+
+async function save(reviewed) {
+  const it = item();
+  if (!it || (!S.dirty && reviewed === undefined)) return;
+  const res = await api("PUT", "/labels", it.path, { boxes: S.boxes, reviewed: reviewed ?? null });
+  it.counts = res.counts; it.reviewed = res.reviewed; S.dirty = false;
+  render();
+}
+
+function step(delta, onlyPending = $("skipRev").checked) {
+  let i = S.idx;
+  do { i += delta; } while (onlyPending && i >= 0 && i < S.items.length && S.items[i].reviewed);
+  if (i < 0 || i >= S.items.length) {
+    toast(delta > 0 ? "No hay más imágenes" + (onlyPending ? " sin revisar" : "") : "Es la primera");
+    return false;
+  }
+  S.idx = i; return true;
+}
+
+const go = (delta, onlyPending) => run(async () => { await save(); if (step(delta, onlyPending)) await load(); });
+
+const accept = () => run(async () => {
+  await save(true);
+  toast("Revisada ✓");
+  if (step(1)) await load(); else render();
+});
+
+const removeImage = () => run(async () => {
+  const it = item();
+  if (!it || !confirm(`¿Borrar ${it.path} y su etiqueta? No se puede deshacer.`)) return;
+  await api("DELETE", "/image", it.path);
+  S.items.splice(S.idx, 1); S.dirty = false;
+  toast("Imagen borrada");
+  if (!S.items.length) return init();
+  S.idx = Math.min(S.idx, S.items.length - 1);
+  await load();
+});
+
+// ---------- editing ----------
+function edit(fn) {
+  S.undo.push(JSON.stringify(S.boxes)); if (S.undo.length > 100) S.undo.shift();
+  fn(); S.dirty = true; render();
+}
+function undo() {
+  if (!S.undo.length) return;
+  S.boxes = JSON.parse(S.undo.pop()); S.sel = -1; S.dirty = true; render();
+}
+function setClass(c) {
+  if (c >= S.classes.length) return;
+  if (S.sel >= 0) { if (S.boxes[S.sel].cls !== c) edit(() => (S.boxes[S.sel].cls = c)); }
+  else { S.cur = c; render(); }
+}
+const norm = (b) => ({ cls: b.cls, x1: Math.min(b.x1, b.x2), y1: Math.min(b.y1, b.y2), x2: Math.max(b.x1, b.x2), y2: Math.max(b.y1, b.y2) });
+const clampPt = (p) => ({ x: Math.max(0, Math.min(S.w, p.x)), y: Math.max(0, Math.min(S.h, p.y)) });
+const area = (b) => (b.x2 - b.x1) * (b.y2 - b.y1);
+const inside = (b, p) => p.x >= b.x1 && p.x <= b.x2 && p.y >= b.y1 && p.y <= b.y2;
+
+function pickAt(p) {
+  const hits = S.boxes.map((b, i) => i).filter((i) => inside(S.boxes[i], p)).sort((a, b) => area(S.boxes[a]) - area(S.boxes[b]));
+  if (!hits.length) return -1;
+  const at = hits.indexOf(S.sel);
+  return at >= 0 ? hits[(at + 1) % hits.length] : hits[0];
+}
+function handleAt(b, p) {  // corner under the pointer → the opposite corner stays fixed
+  const tol = 8 / S.scale;
+  for (const [cx, cy, ox, oy] of [["x1", "y1", "x2", "y2"], ["x2", "y1", "x1", "y2"], ["x1", "y2", "x2", "y1"], ["x2", "y2", "x1", "y1"]])
+    if (Math.abs(p.x - b[cx]) <= tol && Math.abs(p.y - b[cy]) <= tol) return { ax: b[ox], ay: b[oy] };
+  return null;
+}
+
+function pointer(e) {
+  const r = cv.getBoundingClientRect();
+  return { x: (e.clientX - r.left) / S.scale, y: (e.clientY - r.top) / S.scale };
+}
+
+cv.addEventListener("mousedown", (e) => {
+  if (e.button !== 0 || !S.img) return;
+  const p = pointer(e), b = S.boxes[S.sel];
+  const h = b && !e.shiftKey ? handleAt(b, p) : null;
+  if (h) S.drag = { mode: "resize", ...h, start: p, snap: JSON.stringify(S.boxes) };
+  else if (b && !e.shiftKey && inside(b, p)) S.drag = { mode: "move", start: p, orig: { ...b }, snap: JSON.stringify(S.boxes) };
+  else S.drag = { mode: e.shiftKey ? "draw" : "pending", start: clampPt(p), cur: clampPt(p) };
+});
+window.addEventListener("mousemove", (e) => {
+  const d = S.drag; if (!d) return;
+  const p = pointer(e);
+  if (d.mode === "pending" && Math.hypot(p.x - d.start.x, p.y - d.start.y) * S.scale > 4) d.mode = "draw";
+  if (d.mode === "draw") d.cur = clampPt(p);
+  else if (d.mode === "resize") {
+    const q = clampPt(p); S.boxes[S.sel] = norm({ cls: S.boxes[S.sel].cls, x1: d.ax, y1: d.ay, x2: q.x, y2: q.y }); d.moved = true;
+  } else if (d.mode === "move") {
+    const o = d.orig, bw = o.x2 - o.x1, bh = o.y2 - o.y1;
+    const x1 = Math.max(0, Math.min(S.w - bw, o.x1 + p.x - d.start.x)), y1 = Math.max(0, Math.min(S.h - bh, o.y1 + p.y - d.start.y));
+    S.boxes[S.sel] = { cls: o.cls, x1, y1, x2: x1 + bw, y2: y1 + bh }; d.moved = true;
+  }
+  render();
+});
+window.addEventListener("mouseup", (e) => {
+  const d = S.drag; if (!d) return;
+  S.drag = null;
+  if (d.mode === "pending") { S.sel = pickAt(pointer(e)); render(); return; }
+  if (d.mode === "draw") {
+    const b = norm({ cls: S.cur, x1: d.start.x, y1: d.start.y, x2: d.cur.x, y2: d.cur.y });
+    if (b.x2 - b.x1 >= 3 && b.y2 - b.y1 >= 3) edit(() => { S.boxes.push(b); S.sel = S.boxes.length - 1; });
+    else render();
+    return;
+  }
+  if (d.moved) {
+    const b = S.boxes[S.sel];
+    if (b.x2 - b.x1 < 3 || b.y2 - b.y1 < 3) S.boxes[S.sel] = d.orig || JSON.parse(d.snap)[S.sel];
+    S.undo.push(d.snap); S.dirty = true; render();
+  }
+});
+
+// ---------- keyboard ----------
+document.addEventListener("keydown", (e) => {
+  if (e.target instanceof HTMLInputElement && e.key !== "Enter") return;
+  const help = $("help").classList.contains("on");
+  const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  if (help && k !== "h" && k !== "?" && k !== "Escape") return;
+  if (e.metaKey || e.ctrlKey) { if (k === "z") { e.preventDefault(); undo(); } return; }
+  if (/^[0-9]$/.test(k)) { setClass(+k); return; }
+  const actions = {
+    ArrowLeft: () => go(-1), a: () => go(-1), ArrowRight: () => go(1), d: () => go(1),
+    Enter: accept, x: removeImage, u: () => go(1, true), z: undo,
+    h: () => $("help").classList.toggle("on"), "?": () => $("help").classList.toggle("on"),
+    Escape: () => { if (help) $("help").classList.remove("on"); else { S.sel = -1; render(); } },
+    Delete: () => S.sel >= 0 && edit(() => { S.boxes.splice(S.sel, 1); S.sel = -1; }),
+    Tab: () => { const n = S.boxes.length; if (n) { S.sel = ((S.sel < 0 ? (e.shiftKey ? 0 : -1) : S.sel) + (e.shiftKey ? n - 1 : 1)) % n; render(); } },
+  };
+  actions.Backspace = actions.Delete;
+  if (!actions[k]) return;
+  e.preventDefault();
+  if (!e.repeat) actions[k]();
+});
+$("helpBtn").onclick = () => $("help").classList.toggle("on");
+$("help").onclick = (e) => { if (e.target.id === "help") $("help").classList.remove("on"); };
+$("skipRev").onchange = (e) => e.target.blur();
+window.addEventListener("resize", () => { layout(); render(); });
+window.addEventListener("beforeunload", (e) => { if (S.dirty) { e.preventDefault(); e.returnValue = ""; } });
+
+// ---------- drawing ----------
+function layout() {
+  if (!S.img) return;
+  const st = $("stage"), pad = 24;
+  S.scale = Math.min((st.clientWidth - pad) / S.w, (st.clientHeight - pad) / S.h, 3);
+  const dpr = window.devicePixelRatio || 1;
+  cv.style.width = S.w * S.scale + "px"; cv.style.height = S.h * S.scale + "px";
+  cv.width = Math.round(S.w * S.scale * dpr); cv.height = Math.round(S.h * S.scale * dpr);
+  ctx.setTransform(dpr * S.scale, 0, 0, dpr * S.scale, 0, 0);
+}
+
+function drawBox(b, selected, dashed) {
+  const c = S.classes[b.cls], lw = (selected ? 3 : 2) / S.scale;
+  ctx.save();
+  ctx.lineWidth = lw; ctx.strokeStyle = c.color;
+  if (dashed) ctx.setLineDash([6 / S.scale, 4 / S.scale]);
+  if (selected) { ctx.fillStyle = c.color + "26"; ctx.fillRect(b.x1, b.y1, b.x2 - b.x1, b.y2 - b.y1); }
+  ctx.strokeRect(b.x1, b.y1, b.x2 - b.x1, b.y2 - b.y1);
+  ctx.setLineDash([]);
+  const fs = 12 / S.scale, label = `${b.cls} ${c.es}`;
+  ctx.font = `600 ${fs}px system-ui, sans-serif`;
+  const tw = ctx.measureText(label).width + 8 / S.scale, th = fs + 4 / S.scale;
+  const ty = b.y1 - th >= 0 ? b.y1 - th : b.y1, tx = Math.max(0, Math.min(b.x1 - lw / 2, S.w - tw));
+  ctx.fillStyle = c.color; ctx.fillRect(tx, ty, tw, th);
+  ctx.fillStyle = "#0E1217"; ctx.textBaseline = "top"; ctx.fillText(label, tx + 4 / S.scale, ty + 2 / S.scale);
+  if (selected) {
+    const hs = 7 / S.scale;
+    ctx.fillStyle = "#fff";
+    for (const [x, y] of [[b.x1, b.y1], [b.x2, b.y1], [b.x1, b.y2], [b.x2, b.y2]]) ctx.fillRect(x - hs / 2, y - hs / 2, hs, hs);
+  }
+  ctx.restore();
+}
+
+function render() {
+  renderSide();
+  const it = item();
+  if (!it || !S.img) return;
+  ctx.clearRect(0, 0, S.w, S.h);
+  ctx.drawImage(S.img, 0, 0, S.w, S.h);
+  S.boxes.forEach((b, i) => i !== S.sel && drawBox(b, false));
+  if (S.sel >= 0 && S.boxes[S.sel]) drawBox(S.boxes[S.sel], true);
+  const d = S.drag;
+  if (d && d.mode === "draw") drawBox(norm({ cls: S.cur, x1: d.start.x, y1: d.start.y, x2: d.cur.x, y2: d.cur.y }), false, true);
+  const done = S.items.filter((x) => x.reviewed).length, n = S.items.length;
+  $("fill").style.width = (100 * done / n).toFixed(1) + "%";
+  $("prog").textContent = `Revisadas ${done} / ${n} (${Math.round(100 * done / n)} %)`;
+  $("file").innerHTML = `<b>${S.idx + 1}</b> / ${n} · ${it.path.replace(/[<>&]/g, "")} · ${S.boxes.length} cajas`;
+  const st = $("state");
+  st.textContent = S.dirty ? "sin guardar" : it.reviewed ? "revisada" : "pendiente";
+  st.className = "badge" + (S.dirty ? " dirty" : it.reviewed ? " ok" : "");
+}
+
+function renderSide() {
+  const tot = totals(), here = imgCounts(), selCls = S.sel >= 0 && S.boxes[S.sel] ? S.boxes[S.sel].cls : -1;
+  $("classes").innerHTML = S.classes.map((c, i) =>
+    `<div class="cls${i === S.cur ? " cur" : ""}${i === selCls ? " sel" : ""}" data-i="${i}" style="color:${c.color}">
+      <kbd>${i}</kbd><span class="sw" style="background:${c.color}"></span>
+      <span style="color:var(--text)">${c.es}</span>
+      <span class="n"><b>${here[i] || "·"}</b> / <span class="${tot[i] < 80 ? "low" : ""}">${tot[i]}</span></span>
+    </div>`).join("");
+  $("clsHint").innerHTML = S.classes.length
+    ? `Clase activa: <b style="color:${S.classes[S.cur].color}">${S.cur} ${S.classes[S.cur].es}</b>. ` +
+      "En rojo, las clases con menos de 80 instancias (meta F4)."
+    : "";
+}
+$("classes").addEventListener("click", (e) => {
+  const row = e.target.closest(".cls"); if (row) setClass(+row.dataset.i);
+});
+
+run(init);
+</script>
+</body>
+</html>

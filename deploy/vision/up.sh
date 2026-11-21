@@ -42,5 +42,11 @@ done
 curl -fsS --max-time 10 "$url/health" || bad "el túnel no responde"; echo
 ok "túnel $url"
 echo
-echo "Voz: $(curl -fsS 127.0.0.1:8100/health | python3 -c 'import sys,json; print(json.load(sys.stdin).get("voice","?"))' 2>/dev/null || echo '?')"
+curl -fsS 127.0.0.1:8100/health | python3 -c '
+import sys, json
+h = json.load(sys.stdin)
+print("Voz:      ", h.get("voice") or "sin TTS (el navegador lee el texto)")
+print("Detector: ", h.get("detector") or "ninguno (solo VLM)")
+' 2>/dev/null || true
+echo "VLM:       $(curl -fsS 127.0.0.1:8001/v1/models | python3 -c 'import sys,json; print(", ".join(m["id"] for m in json.load(sys.stdin)["data"]))' 2>/dev/null || echo '?')"
 echo "Abrir:  ${APP_URL}/?vision=${url/https:/wss:}/ws/session"
