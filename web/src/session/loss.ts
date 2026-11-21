@@ -21,3 +21,11 @@ export function describeLoss(loss: Loss): string {
       return `No pude empezar: ${loss.error}`;
   }
 }
+
+/**
+ * The server error that explains a close, if any. The server closes on its own only while rejecting
+ * the handshake (before `ready`); errors after `ready` are non-fatal and don't explain a later close.
+ */
+export function closingServerError(serverError: string | null, gotReady: boolean): string | null {
+  return gotReady ? null : serverError;
+}

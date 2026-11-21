@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { TaskSummary } from '../contracts/task_summary';
 import type { Debug, Issue, Task, WsServerMessage } from '../contracts/ws_server_message';
 import { SessionClient } from '../session/client';
-import { describeLoss, type Loss } from '../session/loss';
+import { closingServerError, describeLoss, type Loss } from '../session/loss';
 import { apiUrl, serverUrls } from '../session/server';
 import { VoicePlayer } from '../session/voice';
 import { cameraForReconnect, cameraToOpen, loadCameraId, saveCameraId } from '../source/camera';
@@ -38,7 +38,8 @@ export function SupervisorPage() {
   const sessionRef = useRef(0); // bumped on every start/stop: events from an older session are ignored
   const voiceRef = useRef(new VoicePlayer());
   const chosenCameraRef = useRef<string | null>(null); // picked in this page; wins whenever it's connected
-  const serverErrorRef = useRef<string | null>(null); // the server sends `error`, then closes
+  const serverErrorRef = useRef<string | null>(null); // the last `error` from the server
+  const gotReadyRef = useRef(false); // the server accepted the handshake
   const sessionCameraRef = useRef<string | null>(null); // the camera "Reconectar" goes back to
   const runningRef = useRef(false);
   const pendingRefreshRef = useRef(false); // a camera list change arrived during a session
@@ -127,6 +128,7 @@ export function SupervisorPage() {
   function onMessage(message: WsServerMessage) {
     switch (message.type) {
       case 'ready':
+        gotReadyRef.current = true;
         setTask(message.task);
         setConnection('live');
         setStatus('Conectado');
@@ -198,6 +200,7 @@ export function SupervisorPage() {
     setDebug(null);
     setLostReason('');
     serverErrorRef.current = null;
+    gotReadyRef.current = false;
     setStatusError(false);
     setConnection('connecting');
     setStatus('Conectando…');
@@ -216,7 +219,9 @@ export function SupervisorPage() {
         {
           onMessage: (message) => current() && onMessage(message),
           onAudio: (id, audio) => current() && voiceRef.current.play(id, audio),
-          onClose: (reason) => current() && lose({ kind: 'closed', reason, serverError: serverErrorRef.current }),
+          onClose: (reason) =>
+            current() &&
+            lose({ kind: 'closed', reason, serverError: closingServerError(serverErrorRef.current, gotReadyRef.current) }),
         },
       );
       stopRef.current = [() => client.close(), closeCamera];
