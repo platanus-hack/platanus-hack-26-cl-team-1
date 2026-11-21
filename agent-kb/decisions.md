@@ -108,12 +108,26 @@ with a pointer to their replacement; nothing is ever deleted from §3.
   reports alongside `observed_action`/`observed_confidence`.
 - **Consequences:** backward compatible (defaulted); schemas and TS types regenerated. No other consumer yet.
 
+### D-012 — Perception: Qwen3-VL-8B FP8 on vLLM behind a keyed tunnel (2026-11-21)
+- **Context:** the scripted fake must give way to a real video-language model behind `Perception`; the 3090 is
+  on a private network and the server may run on a laptop.
+- **Decision:** `SUP_PERCEPTION=vlm` → `VlmPerception` (`server/app/perception/vlm.py`) calls Qwen3-VL-8B-Instruct-FP8
+  on vLLM (OpenAI-compatible, `openai` SDK) through a Cloudflare tunnel straight to vLLM, protected by vLLM's
+  `--api-key` (in `~/sup/env` on the box, never in git). Per call: the newest frame + one ~1 s older (≤640 px),
+  the task's actions with `visual_cue`/`label_es`, objects, next steps and mistakes; guided decoding with
+  `vlm_output_json_schema()` narrowed to the task's actions/objects; `parse_vlm_output` still validates. ≤1 call
+  in flight and ≥1.5 s between calls. A bad answer → uncertain observation; transport failures raise. GPU
+  scripts live in `gpu/` (`gpu/deploy.sh`), reusing the previous project's venv and weights.
+- **Consequences:** the session server stays on a laptop for development; the tunnel URL changes when a quick
+  tunnel restarts (named tunnel via `SUP_TUNNEL_TOKEN` if that hurts). Resolves the M_VL proposal in §2 for the
+  main model; the API labeller/fallback stays open.
+
 ## §2 Open (decide in block 1, see docs/VISION.md)
 
 - **D-?? Demo scenario.** Direction: physical assembly in robotics (a contact who assembles robots will give a
   testimonial and a pitch framing). Exact task to pick when their input arrives; candidates in `docs/VISION.md`
   § Demo scenario. Build task-agnostic until then.
-- **D-?? M_VL.** Proposal: Qwen3-VL-8B FP8 on vLLM (3090) as the main model; a Gemini Flash-class API as labeller/fallback.
+- **D-?? M_VL labeller/fallback.** Main model decided (D-012); proposal: a Gemini Flash-class API as labeller/fallback.
 - **D-?? M_C.** Proposal: automaton tracker (rules) as baseline + a small model trained from scratch on simulator
   trajectories, output masked to legal actions.
 - **D-?? Visual simulator.** Proposal: Runway Gen-4.5 image-to-video (and Aleph for mistake variants) per step,
