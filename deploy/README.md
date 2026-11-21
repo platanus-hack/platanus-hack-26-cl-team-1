@@ -94,6 +94,40 @@ rate limit). The ack time depends on which Cloudflare edge the quick tunnel land
 In the browser, open the link, pick a task, choose the webcam, and press the debug key (D) to see the
 observations.
 
+## Continuous deployment (D-016)
+
+`.github/workflows/cd-demo.yml` runs `deploy/up-demo.sh` on a GitHub runner **every time CI passes on a push to
+`main`**, for exactly the commit CI tested, as long as it's still the tip of `main` (CI runs can finish out of
+order). Deploys queue in order, and the link stays the same because only the
+server restarts. The runner builds `web/` before it writes the SSH key (then runs `up-demo.sh` with
+`DEMO_PREBUILT_WEB=1`), so no npm code runs while the key is on disk. The job summary shows the deployed commit and the link. Actions → *CD demo* → *Run workflow*
+deploys `main` by hand (other branches are refused).
+
+- **Pause it** while judges use the demo: on the box, `touch ~/sup/cd-paused`. Runs then end green with a
+  "paused" notice. If SSH fails during that check, the run fails rather than deploying.
+  `rm ~/sup/cd-paused` resumes. A manual `deploy/up-demo.sh` ignores the switch.
+- Each deploy takes the page down for a few seconds. A merge during judging is visible, so pause first.
+- If a merge breaks the demo, revert the PR, or redeploy a good commit by hand.
+
+**One-time setup** (only a repo admin can do it). With none of the secrets set, the job ends green with a
+"Demo deploy skipped" warning. With only some of them set, it fails.
+1. *Settings → Environments → `demo`* (the first run creates it): under *Deployment branches and tags*, choose
+   **Selected branches** and add **`main` only**. This is what keeps the key away from other branches: anyone
+   with write access can run a workflow file from their own branch, and repo-level secrets would reach it.
+2. Add these as **environment secrets of `demo`**, not repository secrets:
+
+| Secret | Value |
+|---|---|
+| `GPU5090` | `root@<host>` (the box address, as in the team chat) |
+| `GPU5090_PORT` | the SSH port |
+| `DEMO_SSH_KEY` | the private half of a key used **only** by CD |
+| `DEMO_SSH_KNOWN_HOSTS` | `ssh-keyscan -p <port> -t ed25519 <host>`, so the runner checks the box's identity |
+
+The CD key's public half is in the box's `~/.ssh/authorized_keys` with the `restrict` option: no port
+forwarding, agent or pty. It can still run commands as root, which is the same power as the team's own login.
+To revoke it, delete the line marked `sup-demo-cd` on the box. To rotate it: generate a new key, replace that
+line, and update `DEMO_SSH_KEY`.
+
 ## Why not Render (D-015)
 
 The old project put the static web app on Render and pointed it at the GPU tunnel with `?server=`. That doesn't

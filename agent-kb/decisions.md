@@ -18,6 +18,7 @@ with a pointer to their replacement; nothing is ever deleted from §3.
   pins its last commit `2e9da7c`, and maps what to reuse and how (`git show 2e9da7c:<path>`).
 - **Consequences:** CI/CD and `render.yaml` are gone too, so pushes to `main` no longer deploy; the old Render
   services keep serving the old build until someone turns them off.
+- **Amended by D-016:** green pushes to `main` deploy again, now to the demo on the 5090 (D-015), not Render.
 
 ### D-003 — Lightweight agent-kb: backlog, decisions, per-session files (2026-11-21)
 - **Context:** three people plus parallel agents; ~18 h left. A heavier protocol (per-file decisions, generated index,
@@ -163,6 +164,19 @@ with a pointer to their replacement; nothing is ever deleted from §3.
   restarts: `deploy/up-demo.sh --url` prints the current one. A stable link needs a named tunnel from someone
   with a Cloudflare account. If the box goes down, so does the demo (fallback: `make dev` on a laptop +
   `gpu/up-5090.sh`).
+
+### D-016 — Continuous deployment of the demo from GitHub Actions over SSH (2026-11-21)
+- **Context:** D-002 removed the old CI/CD, and D-015's deploy was manual, so merged PRs (e.g. #31's new task) didn't reach the public link until
+  someone remembered to run `deploy/up-demo.sh`.
+- **Decision:** `.github/workflows/cd-demo.yml` runs `deploy/up-demo.sh` on a runner after CI passes on a push to
+  `main` (`workflow_run`, from main only, for the tested commit), queued, never cancelled halfway. It logs in
+  with a key used only by CD, `restrict`ed on the box, and checks the pinned host key. Secrets: `GPU5090`,
+  `GPU5090_PORT`, `DEMO_SSH_KEY`, `DEMO_SSH_KNOWN_HOSTS`, stored in the `demo` environment, restricted to `main`.
+  A file on the box (`~/sup/cd-paused`) pauses it
+  without needing repo admin.
+- **Consequences:** GitHub holds a key that can run commands as root on the GPU box. Every merge restarts the
+  demo server for a few seconds, so pause CD during judging. A broken merge reaches the demo once CI passes;
+  revert it, or redeploy a good commit by hand. vLLM is never touched.
 
 ## §2 Open (decide in block 1, see docs/VISION.md)
 
