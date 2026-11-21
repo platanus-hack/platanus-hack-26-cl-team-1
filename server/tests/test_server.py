@@ -125,8 +125,8 @@ def test_reminder_after_inactivity(task):
 
 def test_session_runs_a_scripted_task_end_to_end():
     settings = Settings(
-        tasks_dir=TASKS_DIR, perception=PerceptionMode.SCRIPTED, scripted_every_ms=100, scripted_mistake=None,
-        voice=VoiceMode.BROWSER, cors_origins=(),
+        tasks_dir=TASKS_DIR, perception=PerceptionMode.SCRIPTED, scripted_every_ms=5000,
+        scripted_mistake=None, voice=VoiceMode.BROWSER, cors_origins=(),
     )  # fmt: skip
     client = TestClient(create_app(settings))
     with client.websocket_connect("/ws/session") as ws:
@@ -135,8 +135,8 @@ def test_session_runs_a_scripted_task_end_to_end():
         )
         assert ws.receive_json()["type"] == "ready"
         received = []
-        for seq in range(40):
-            ws.send_bytes(pack_frame(seq, seq * 50, b"\xff\xd8fake"))
+        for seq in range(40):  # 20 s of client time: a step every 5 s leaves room for each line
+            ws.send_bytes(pack_frame(seq, seq * 500, b"\xff\xd8fake"))
             while True:
                 message = ws.receive_json()
                 received.append(message)
@@ -317,7 +317,20 @@ def test_reset_with_an_open_issue_sends_issue_clear():
         after = []
         while not after or after[-1]["type"] != "say":
             after.append(ws.receive_json())
-    assert [m["type"] for m in after if m["type"] != "debug"] == ["issue_clear", "state", "say"]
+    assert [m["type"] for m in after if m["type"] != "debug"] == ["issue_clear", "cancel_say", "state", "say"]
+
+
+def test_fixing_a_mistake_cancels_its_correction_if_still_playing():
+    with scripted_client(mistake="touch_faucet_bare").websocket_connect("/ws/session") as ws:
+        ws.send_text(hello())
+        ws.receive_json()  # ready
+        # wet at 100 ms, the mistake at 200 ms, soap at 300 ms (clears the issue while the line plays)
+        messages = run_frames(ws, 0, 14)
+    types = [m["type"] for m in messages]
+    urgent = next(m for m in messages if m["type"] == "say" and m["priority"] == "urgent")
+    cancel = next(m for m in messages if m["type"] == "cancel_say")
+    assert cancel["id"] == urgent["id"]
+    assert types.index("cancel_say") == types.index("issue_clear") + 1
 
 
 def test_reset_drops_a_perception_result_from_before_the_reset(task):

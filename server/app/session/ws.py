@@ -15,8 +15,9 @@ import logging
 from collections import deque
 from collections.abc import Callable
 
-from contracts import Controller, Decision, Event, Frame, Perception, Task, Voice
+from contracts import Controller, Decision, Event, Frame, Perception, SayRequest, Task, Voice
 from contracts.protocol import (
+    CancelSay,
     Debug,
     Error,
     Hello,
@@ -37,6 +38,7 @@ from fastapi import WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, ValidationError
 
 from ..library.store import TaskLibrary
+from ..voice.queue import VoiceQueue
 
 log = logging.getLogger(__name__)
 
@@ -54,6 +56,7 @@ class Session:
         make_perception: Callable[[Task], Perception],
         controller: Controller,
         voice: Voice,
+        voice_queue: VoiceQueue | None = None,
     ) -> None:
         self.ws, self.task, self.hello = ws, task, hello
         self.make_perception = make_perception
@@ -68,6 +71,8 @@ class Session:
         self.last_t_ms = 0
         self.last_tick_ms: int | None = None
         self.say_ids = itertools.count(1)
+        self.voice_queue = voice_queue or VoiceQueue()
+        self.voice_lock = asyncio.Lock()  # one line decided + synthesized at a time
         self.latest: Decision | None = None
 
     async def send(self, message: BaseModel) -> None:
@@ -91,17 +96,33 @@ class Session:
         elif self.issue_open and decision.event in (Event.STEP_DONE, Event.MISTAKE_FIXED, Event.TASK_DONE):
             self.issue_open = False
             await self.send(IssueClear(step=decision.step))
+            playing = self.voice_queue.mistake_fixed(self.last_t_ms)
+            if playing is not None:
+                await self.send(CancelSay(id=playing))
         if decision.say is not None and not self.muted:
-            say_id = f"s{next(self.say_ids)}"
-            audio = await self.voice.synthesize(decision.say)
-            await self.send(
-                Say(
-                    id=say_id, text=decision.say.text, priority=decision.say.priority, audio=audio is not None
-                )
-            )
-            if audio is not None:
-                async with self.send_lock:
-                    await self.ws.send_bytes(pack_audio(say_id, audio))
+            async with self.voice_lock:
+                request = self.voice_queue.offer(decision.say, self.last_t_ms)
+                if request is not None:
+                    await self.speak(request)
+
+    async def speak(self, request: SayRequest) -> None:
+        """Synthesize and send one line the voice queue let through (caller holds `voice_lock`)."""
+        say_id = f"s{next(self.say_ids)}"
+        audio = await self.voice.synthesize(request)
+        await self.send(Say(id=say_id, text=request.text, priority=request.priority, audio=audio is not None))
+        if audio is not None:
+            async with self.send_lock:
+                await self.ws.send_bytes(pack_audio(say_id, audio))
+        self.voice_queue.spoken(say_id, request, self.last_t_ms, audio)
+
+    async def flush_voice(self, now_ms: int) -> None:
+        """Speak the waiting line once the queue allows it."""
+        if self.muted:
+            return
+        async with self.voice_lock:
+            request = self.voice_queue.due(now_ms)
+            if request is not None:
+                await self.speak(request)
 
     async def on_frame(self, data: bytes) -> None:
         seq, t_ms, jpeg = unpack_frame(data)
@@ -115,6 +136,7 @@ class Session:
             decision = self.controller.tick(t_ms)
             if decision is not None:
                 await self.emit(decision)
+            await self.flush_voice(t_ms)
 
     async def perceive(self, frames: list[Frame], generation: int) -> None:
         try:
@@ -146,9 +168,13 @@ class Session:
         self.frames.clear()
         self.perception = self.make_perception(self.task)
         self.last_tick_ms = None
+        playing = self.voice_queue.mistake_fixed(self.last_t_ms)
+        self.voice_queue.reset()
         if self.issue_open:
             self.issue_open = False
             await self.send(IssueClear(step=None))
+        if playing is not None:
+            await self.send(CancelSay(id=playing))
         await self.emit(self.controller.start(self.task))
 
     async def on_text(self, text: str) -> None:
@@ -171,6 +197,7 @@ async def run_session(
     make_perception: Callable[[Task], Perception],
     make_controller: Callable[[], Controller],
     voice: Voice,
+    make_voice_queue: Callable[[], VoiceQueue] = VoiceQueue,
 ) -> None:
     await ws.accept()
     try:
@@ -198,7 +225,7 @@ async def run_session(
 
         controller = make_controller()
         try:
-            session = Session(ws, task, hello, make_perception, controller, voice)
+            session = Session(ws, task, hello, make_perception, controller, voice, make_voice_queue())
         except ValueError as error:  # misconfigured component (e.g. a bad SUP_ setting): say so
             await ws.send_text(Error(code="internal", message=str(error)[:500]).model_dump_json())
             return

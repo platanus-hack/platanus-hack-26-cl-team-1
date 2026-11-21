@@ -3,16 +3,11 @@ import { useEffect, useRef, useState } from 'react';
 import type { TaskSummary } from './contracts/task_summary';
 import type { Debug, Issue, Say, Task, WsServerMessage } from './contracts/ws_server_message';
 import { SessionClient } from './session/client';
+import { VoicePlayer } from './session/voice';
 import { openClip, openWebcam, startCapture } from './source/capture';
 
 type SourceKind = 'webcam' | 'sim';
 const FPS = 6;
-
-function speak(text: string) {
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = 'es-CL';
-  speechSynthesis.speak(utterance);
-}
 
 export function App() {
   const [tasks, setTasks] = useState<TaskSummary[]>([]);
@@ -29,6 +24,7 @@ export function App() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const stopRef = useRef<(() => void)[]>([]);
   const sessionRef = useRef(0); // bumped on every start/stop: events from an older session are ignored
+  const voiceRef = useRef(new VoicePlayer());
 
   useEffect(() => {
     fetch('/api/tasks')
@@ -68,18 +64,14 @@ export function App() {
         setStatus(`Error: ${message.message}`);
         break;
       case 'cancel_say':
+        voiceRef.current.cancel(message.id);
         break;
     }
   }
 
   function onSay(message: Say) {
     setSubtitle(message.text);
-    if (!message.audio) speak(message.text); // with audio, the binary frame follows (onAudio)
-  }
-
-  function playAudio(_id: string, audio: Uint8Array) {
-    const url = URL.createObjectURL(new Blob([audio.slice()], { type: 'audio/mpeg' }));
-    void new Audio(url).play().finally(() => URL.revokeObjectURL(url));
+    voiceRef.current.say(message);
   }
 
   async function start() {
@@ -108,7 +100,7 @@ export function App() {
         { type: 'hello', protocol: 1, task_id: taskId, source, debug: true, record: false },
         {
           onMessage: (message) => current() && onMessage(message),
-          onAudio: (id, audio) => current() && playAudio(id, audio),
+          onAudio: (id, audio) => current() && voiceRef.current.play(id, audio),
           onClose: (reason) => current() && setStatus(`Desconectado: ${reason}`),
         },
       );
@@ -123,7 +115,7 @@ export function App() {
     sessionRef.current += 1;
     stopRef.current.forEach((f) => f());
     stopRef.current = [];
-    speechSynthesis.cancel();
+    voiceRef.current.stop();
     setStatus('Detenido');
   }
 
