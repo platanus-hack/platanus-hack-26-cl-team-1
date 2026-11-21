@@ -75,3 +75,24 @@ def test_closing_the_faucet_bare_handed_one_step_early_is_still_a_mistake(task):
 def test_an_inferred_step_counts_as_progress_for_reminders(task):
     controller, _ = run(task, ["wet_hands", *["rub_palms"] * 4])
     assert controller.tick(5 * 1000 + 1000) is None  # no reminder right after "doy por hecho"
+
+
+def test_a_defined_out_of_order_mistake_is_never_inferred_away():
+    """The task says doing this step early *is* the mistake: full power with the parking brake still set
+    keeps the warning however long it's held, instead of "doy por hecho: soltar el freno"."""
+    plane = TaskLibrary.load(TASKS_DIR).get("c172_takeoff")
+    ready = ["turn_master_on", "set_fuel_both", "set_mixture_rich", "start_engine", "set_flaps_takeoff"]
+    controller, decisions = run(plane, [*ready, "turn_landing_light_on", *["apply_full_throttle"] * 8])
+    assert decisions[6].event is Event.MISTAKE and decisions[6].mistake_id == "power_with_brake"
+    assert all(d.event is Event.NONE for d in decisions[7:])  # said once, never assumed done
+    assert "brake_release" not in controller.done and "full_power" not in controller.done
+
+
+def test_a_step_without_a_defined_out_of_order_mistake_is_still_inferred():
+    """flaps_10 has no out-of-order MistakeDef: seen four times before the engine start, the start is
+    taken as done (the inference D-017 added still works where the task doesn't forbid it)."""
+    plane = TaskLibrary.load(TASKS_DIR).get("c172_takeoff")
+    controller, decisions = run(
+        plane, ["turn_master_on", "set_fuel_both", "set_mixture_rich", *["set_flaps_takeoff"] * 4]
+    )
+    assert decisions[-1].event is Event.STEP_DONE and {"engine_start", "flaps_10"} <= controller.done
