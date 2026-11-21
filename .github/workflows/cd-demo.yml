@@ -79,7 +79,7 @@ jobs:
           if [ "$tip" = "$SHA" ]; then
             echo "go=true" >> "$GITHUB_OUTPUT"
           else
-            echo "::notice title=Demo deploy skipped::${SHA:0:7} is no longer the tip of main (${tip:0:7}); its own run deploys it."
+            echo "::notice title=Demo deploy skipped::${SHA:0:7} is no longer the tip of main (${tip:0:7}); that commit deploys once its CI passes (if it fails, run CD by hand after the fix)."
             echo "go=false" >> "$GITHUB_OUTPUT"
           fi
 
