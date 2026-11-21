@@ -9,7 +9,7 @@ from contracts import Task, TaskSummary
 from fastapi import FastAPI, HTTPException, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 
-from .controller.rules import RulesController
+from .controller.factory import make_controller_factory
 from .library.store import TaskLibrary
 from .perception.factory import make_perception
 from .session.ws import run_session
@@ -22,13 +22,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings.from_env()
     library = TaskLibrary.load(settings.tasks_dir)
     voice = make_voice(settings)
+    make_controller = make_controller_factory(settings, library)
 
     app = FastAPI(title="Supervisor")
     app.add_middleware(CORSMiddleware, allow_origins=list(settings.cors_origins), allow_methods=["GET"])
 
     @app.get("/api/health")
     def health() -> dict:
-        return {"ok": True, "perception": settings.perception, "voice": settings.voice}
+        return {
+            "ok": True,
+            "perception": settings.perception,
+            "controller": settings.controller,
+            "voice": settings.voice,
+        }
 
     @app.get("/api/tasks")
     def tasks() -> list[TaskSummary]:
@@ -47,7 +53,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             ws,
             library,
             lambda t: make_perception(settings, t),
-            RulesController,
+            make_controller,
             voice,
             lambda: VoiceQueue(min_gap_ms=settings.voice_min_gap_ms),
         )

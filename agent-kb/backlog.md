@@ -14,18 +14,19 @@ Owner in brackets once someone takes an item. Blocks refer to the plan in `docs/
 ## Next (block 2 · vertical slice, until ~18:00)
 - [ ] Session WebSocket server per `contracts.protocol`: frames + `hello` in; `ready` / `state` / `issue` / `say` out. Port `vision/vision/session.py`. [Alonso]
 - [ ] M_VL call: frames + task context → `VlmOutput` via `parse_vlm_output`, on events, ≤1 in flight. [Cote]
-- [ ] Rule controller on `TaskAutomaton`: `Observation` → `Decision` (advance / mistake / reminder). [Cote]
 - [ ] Web UI: task picker, source toggle (sim / webcam), live checklist, subtitles, debug overlay; port `frontend/src/assembly/*`. [Anaís]
 
 ## Later (blocks 3–5)
-- [ ] Symbolic simulator on `TaskAutomaton`: `Trajectory` records with injected mistakes + perception noise. [Anaís]
 - [ ] Visual simulator: Runway clips per (step, correct / mistake) + `ClipRecord` manifest. [Anaís]
 - [ ] Label sim clips (Gemini or Claude as teacher); eval set split by run.
-- [ ] Learned controller from scratch; table rules vs learned under noise. [Cote]
+- [ ] Learned controller: improve mistake recall under noise (it trades recall for 4-5x fewer false alarms; see
+  `training/results/controller.md`), e.g. a hybrid that lets the rules flag high-confidence mistakes. [Cote]
+- [ ] Calibrate `symsim.NOISE_LEVELS` against the real M_VL's confusion matrix once it runs on sim clips. [Cote]
 - [ ] [Cote] M_VL eval base vs fine-tuned (QLoRA pipeline from `training/vlm/` at `2e9da7c`).
 - [ ] Demo rehearsal ×3, backup video, `platanus-hack-project.jsonc`, `project-description.md`, README.
 
 ## Done
+- [x] Symbolic simulator `sim/symbolic` (D-011 `observed_quality`), learned controller + eval + `SUP_CONTROLLER` (D-012). [Cote]
 - [x] Robot assembly ontology v0, first task `servo_scout_robot`, Claude task generator (https://github.com/platanus-hack/platanus-hack-26-cl-team-1/pull/17).
 - [x] ElevenLabs voice + anti-spam voice queue on the client clock, `cancel_say` honored by the web player (this session's voice PR).
 - [x] Interfaces + fakes (`contracts.interfaces`, `contracts.fakes`); skeleton `server/` + `web/` running end to end on fakes; `make dev/test/check`; CI jobs (D-010).
