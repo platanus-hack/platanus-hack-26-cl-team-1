@@ -160,7 +160,7 @@ class Session:
         elif isinstance(message, Mute):
             self.muted = message.on
         elif isinstance(message, Label):
-            pass  # dataset recording: not implemented yet
+            raise ValueError("dataset recording is not implemented yet: label ignored")
         elif isinstance(message, Hello):
             raise ValueError("hello was already received")
 
@@ -185,6 +185,10 @@ async def run_session(
                 Error(code="bad_message", message="first message must be hello").model_dump_json()
             )
             return
+        if hello.record:
+            message = "dataset recording is not implemented yet: reconnect with record=false"
+            await ws.send_text(Error(code="bad_message", message=message).model_dump_json())
+            return
         task = library.get(hello.task_id)
         if task is None:
             await ws.send_text(
@@ -193,7 +197,11 @@ async def run_session(
             return
 
         controller = make_controller()
-        session = Session(ws, task, hello, make_perception, controller, voice)
+        try:
+            session = Session(ws, task, hello, make_perception, controller, voice)
+        except ValueError as error:  # misconfigured component (e.g. a bad SUP_ setting): say so
+            await ws.send_text(Error(code="internal", message=str(error)[:500]).model_dump_json())
+            return
         await session.send(Ready(session_id=f"s{next(_session_ids)}", task=task))
         await session.emit(controller.start(task))
 

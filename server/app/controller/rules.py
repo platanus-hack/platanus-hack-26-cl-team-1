@@ -39,6 +39,7 @@ class RulesController:
         self.automaton = TaskAutomaton(task)
         self.done: frozenset[str] = self.automaton.start
         self.mistake_step: str | None = None
+        self.open_mistake: tuple | None = None  # (kind, step, mistake_id) already announced
         self.seq = 0
         self.last_progress_ms: int | None = None
         self.last_reminder_ms: int | None = None
@@ -73,6 +74,7 @@ class RulesController:
 
         self.done = transition.done
         self.mistake_step = None
+        self.open_mistake = None
         self.last_progress_ms = observation.t_ms
         step = self.task.step(transition.step)
         if transition.outcome is Outcome.TASK_DONE:
@@ -105,6 +107,7 @@ class RulesController:
         transition = self.automaton.apply(self.done, observation_action)
         self.done = transition.done
         self.mistake_step = None
+        self.open_mistake = None
         self.last_progress_ms = now_ms
         if transition.outcome is Outcome.TASK_DONE:
             return self._decision(
@@ -124,6 +127,11 @@ class RulesController:
         return f"Ojo, eso no va ahora. {nxt.instruction_es}"
 
     def _mistake(self, step: str | None, kind: MistakeKind, mistake_id: str | None, text: str) -> Decision:
+        key = (kind, step, mistake_id)
+        if key == self.open_mistake:
+            # The same mistake seen again before any progress: it's already on screen and was said once.
+            return self._decision(Event.NONE)
+        self.open_mistake = key
         self.mistake_step = self.automaton.legal_next(self.done)[0]
         return self._decision(
             Event.MISTAKE,

@@ -23,6 +23,7 @@ class Settings:
     tasks_dir: Path
     perception: PerceptionMode
     scripted_every_ms: int
+    scripted_mistake: str | None  # action id injected before the 2nd step of the scripted run
     voice: VoiceMode
     cors_origins: tuple[str, ...]
 
@@ -32,6 +33,7 @@ class Settings:
             tasks_dir=Path(os.environ.get("SUP_TASKS_DIR", REPO_ROOT / "tasks")),
             perception=PerceptionMode(os.environ.get("SUP_PERCEPTION", "scripted")),
             scripted_every_ms=int(os.environ.get("SUP_SCRIPTED_EVERY_MS", "4000")),
+            scripted_mistake=os.environ.get("SUP_SCRIPTED_MISTAKE") or None,
             voice=VoiceMode(os.environ.get("SUP_VOICE", "browser")),
             cors_origins=tuple(
                 o for o in os.environ.get("SUP_CORS_ORIGINS", "http://localhost:5173").split(",") if o
