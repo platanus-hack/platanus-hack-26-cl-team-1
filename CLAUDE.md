@@ -41,7 +41,8 @@ _Add server/web commands here as soon as the skeleton exists._
    contracts: change them only with a decision entry and update every side in the same PR.
 4. **UI copy in Spanish; code, identifiers and docs in English.**
 5. **Conventional commits** (`feat:`, `fix:`, `docs:`, `chore:`, …) in commit and PR titles.
-6. **No secrets in the repo**, ever, including in `agent-kb/`.
+6. **No secrets in the repo**, ever, including in `agent-kb/`. **The repo is public:** don't name or quote
+   private repos or other private sources (say "a private repo").
 
 ## Engineering practices (trimmed for a hackathon)
 

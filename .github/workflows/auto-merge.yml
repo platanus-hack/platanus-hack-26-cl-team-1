@@ -3,7 +3,7 @@ name: Auto-merge
 # Arms GitHub auto-merge (squash) on pull requests to main. The merge still waits
 # for the required checks, `CI OK` and `Agent reviews OK`: that is how the two
 # agent reviewers "approve". Drafts stay unarmed, which is how to hold a PR.
-# Bot and fork PRs merge by hand. Ported from personal-fitness-app; D-007.
+# Bot and fork PRs merge by hand. Ported from a private repo; D-007.
 #
 # Safety: if main had no required checks, arming auto-merge on a clean PR would
 # merge it at once. So this only arms a PR that GitHub reports as BLOCKED

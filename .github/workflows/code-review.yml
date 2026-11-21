@@ -4,7 +4,7 @@ name: Code review
 # following the base branch's docs/PR_REVIEW_FOCUS.md, and post one review each.
 # They run independently and never see each other's output. A blocking finding
 # fails that reviewer's job, and `Agent reviews OK` aggregates both. Ported from
-# josecannete/personal-fitness-app; decision D-006 in agent-kb/decisions.md.
+# a private repo; decision D-006 in agent-kb/decisions.md.
 #
 # Trust model: `pull_request_target` runs this file from the base branch, with
 # secrets, so a PR can't edit its own review. That is safe only because nothing
