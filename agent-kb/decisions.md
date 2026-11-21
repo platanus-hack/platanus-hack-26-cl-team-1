@@ -99,7 +99,7 @@ with a pointer to their replacement; nothing is ever deleted from §3.
   and no API keys; each owner replaces a fake behind its interface. Message and output schemas are exported in
   serialization mode so TypeScript sees `type` as required.
 
-### D-011 — Perception: Qwen3-VL-8B FP8 on vLLM behind a keyed tunnel (2026-11-21)
+### D-012 — Perception: Qwen3-VL-8B FP8 on vLLM behind a keyed tunnel (2026-11-21)
 - **Context:** the scripted fake must give way to a real video-language model behind `Perception`; the 3090 is
   on a private network and the server may run on a laptop.
 - **Decision:** `SUP_PERCEPTION=vlm` → `VlmPerception` (`server/app/perception/vlm.py`) calls Qwen3-VL-8B-Instruct-FP8
@@ -118,7 +118,7 @@ with a pointer to their replacement; nothing is ever deleted from §3.
 - **D-?? Demo scenario.** Direction: physical assembly in robotics (a contact who assembles robots will give a
   testimonial and a pitch framing). Exact task to pick when their input arrives; candidates in `docs/VISION.md`
   § Demo scenario. Build task-agnostic until then.
-- **D-?? M_VL labeller/fallback.** Main model decided (D-011); proposal: a Gemini Flash-class API as labeller/fallback.
+- **D-?? M_VL labeller/fallback.** Main model decided (D-012); proposal: a Gemini Flash-class API as labeller/fallback.
 - **D-?? M_C.** Proposal: automaton tracker (rules) as baseline + a small model trained from scratch on simulator
   trajectories, output masked to legal actions.
 - **D-?? Visual simulator.** Proposal: Runway Gen-4.5 image-to-video (and Aleph for mistake variants) per step,

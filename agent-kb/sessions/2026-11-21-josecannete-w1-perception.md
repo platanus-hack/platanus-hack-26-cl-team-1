@@ -22,7 +22,7 @@
   and a WebSocket session running on the VLM path.
 
 ## Decisions
-- Perception stack and tunnel layout (→ decisions.md D-011).
+- Perception stack and tunnel layout (→ decisions.md D-012).
 
 ## Open / blocked
 - **`ssh 172.16.0.204` → "Connection refused" on port 22** (the host answers ping). GPU part not run:

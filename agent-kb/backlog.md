@@ -27,7 +27,7 @@ Owner in brackets once someone takes an item. Blocks refer to the plan in `docs/
 - [ ] Demo rehearsal ×3, backup video, `platanus-hack-project.jsonc`, `project-description.md`, README.
 
 ## Done
-- [x] `VlmPerception` (`SUP_PERCEPTION=vlm`): Qwen3-VL on vLLM via the OpenAI SDK, task prompt, guided JSON, uncertain on bad answers, rate limit; `gpu/` scripts and units (D-011). [Cote] https://github.com/platanus-hack/platanus-hack-26-cl-team-1/pull/21
+- [x] `VlmPerception` (`SUP_PERCEPTION=vlm`): Qwen3-VL on vLLM via the OpenAI SDK, task prompt, guided JSON, uncertain on bad answers, rate limit; `gpu/` scripts and units (D-012). [Cote] https://github.com/platanus-hack/platanus-hack-26-cl-team-1/pull/21
 - [x] Interfaces + fakes (`contracts.interfaces`, `contracts.fakes`); skeleton `server/` + `web/` running end to end on fakes; `make dev/test/check`; CI jobs (D-010).
 - [x] Contracts package (`contracts/`, `docs/CONTRACTS.md`), ownership (D-008, D-009).
 - [x] CI (`CI OK`) and two-agent review (`Agent reviews OK`), auto-merge, review guide, PR template, stack proposal (D-006, D-007).
