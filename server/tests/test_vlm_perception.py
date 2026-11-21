@@ -177,6 +177,7 @@ def test_context_says_what_each_action_acts_on():
     ("action", "objects"),
     [
         ("rotate", ["attitude_indicator", "airspeed_indicator"]),  # the sim draws no yoke: the panel shows it
+        ("start_engine", ["ignition_key", "master_switch"]),  # the key turns before the propeller spins
         ("establish_climb", []),  # acts on no object: nothing to check
     ],
 )

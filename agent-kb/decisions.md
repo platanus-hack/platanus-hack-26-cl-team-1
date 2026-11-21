@@ -206,7 +206,7 @@ with a pointer to their replacement; nothing is ever deleted from §3.
 - **Consequences:** an action's ontology `object` must be what the camera sees being handled.
   `robot_assembly`'s `connect_motor_wires` now acts on `dc_motor` (its cue shows the motor's own leads), not on
   `jumper_wire`; `aviation`'s `rotate` / `rotate_early` act on `attitude_indicator` with the `yoke` as target
-  (the simulator draws no yoke). An action with no object (`establish_climb`) is never rejected. The guard can cost recall when the object is hidden (a finger on a small button); measure it with
+  (the simulator draws no yoke), and `start_engine` acts on `ignition_key` with the `engine` as target. An action with no object (`establish_climb`) is never rejected. The guard can cost recall when the object is hidden (a finger on a small button); measure it with
   `app.perception.bench` and read the WARNING lines. Not done here: the learned controller can still complete a
   step from timing alone, with no observation of it (follow-up), and the rules controller still accepts a single
   observation.

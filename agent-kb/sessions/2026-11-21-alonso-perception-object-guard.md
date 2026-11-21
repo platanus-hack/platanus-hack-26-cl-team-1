@@ -17,7 +17,8 @@
   workflow showed the guard would otherwise reject correct motor-wiring answers in the default demo task. Weights
   are unaffected (they record task version, actions and steps).
 - `aviation` ontology: `rotate` / `rotate_early` act on `attitude_indicator` (target `yoke`): the C172 page draws
-  no yoke, so the guard would have rejected every rotation.
+  no yoke, so the guard would have rejected every rotation. `start_engine` acts on `ignition_key` (target `engine`):
+  the key turns before the propeller spins (from the PR #39 Haiku review).
 - Rebased on main after #34 (run recording): its VLM log line now also carries next steps, quality and objects,
   and `deploy/demo_app.py` configures logging so it reaches the box log. The decision is D-017 (D-016 was taken twice on main).
 - Tests: guard (hand hygiene, the breadboard case, robot motor wiring, cockpit rotate and establish_climb),
