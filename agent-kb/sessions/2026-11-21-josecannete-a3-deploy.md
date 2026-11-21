@@ -2,7 +2,8 @@
 
 - **Who:** josecannete (+ agent, workspace A3). A3 is Alonso's item in `docs/PLAN.md`; Cote handed it to this
   workspace.
-- **Branch / PRs:** `josecannete/sb191` → see the PR "feat(deploy): public demo on the 5090 behind a Cloudflare tunnel"
+- **Branch / PRs:** `josecannete/a3-deploy-demo` → https://github.com/platanus-hack/platanus-hack-26-cl-team-1/pull/29;
+  `josecannete/a3-deploy-hardening` → the follow-up for #29's non-blocking review findings
 - **Goal:** a public link that runs a webcam session against the 5090's vLLM, with no laptop in the loop.
 
 ## Done

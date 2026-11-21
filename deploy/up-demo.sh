@@ -44,10 +44,16 @@ if [ "$MODE" != --url ]; then
   "${SSH[@]}" "MODE=$MODE bash -s" <<'REMOTE'
 set -euo pipefail
 export PATH="$HOME/.local/bin:$PATH"
-rm -rf ~/sup/app && mv ~/sup/app.new ~/sup/app
-if [ ! -x ~/.local/bin/cloudflared ]; then
-  wget -qO ~/.local/bin/cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
-  chmod +x ~/.local/bin/cloudflared
+# cloudflared pinned + checksummed (it runs as root and may hold the tunnel token). To bump: take the version
+# and the linux-amd64 SHA-256 from https://github.com/cloudflare/cloudflared/releases.
+CF_VERSION=2026.11.1
+CF_SHA256=97bb3b02d23a5980fc9c15a1a270e692da1923f103f920d5b16d4931d5ab55e7
+if ! ~/.local/bin/cloudflared --version 2>/dev/null | grep -q "version $CF_VERSION "; then
+  wget -qO ~/.local/bin/cloudflared.new \
+    "https://github.com/cloudflare/cloudflared/releases/download/$CF_VERSION/cloudflared-linux-amd64"
+  echo "$CF_SHA256  $HOME/.local/bin/cloudflared.new" | sha256sum -c --quiet \
+    || { rm -f ~/.local/bin/cloudflared.new; echo "✘ cloudflared checksum mismatch"; exit 1; }
+  chmod +x ~/.local/bin/cloudflared.new && mv ~/.local/bin/cloudflared.new ~/.local/bin/cloudflared
 fi
 if [ ! -f ~/sup/demo.env ]; then  # defaults; edit on the box for ElevenLabs or a named tunnel (deploy/README.md)
   umask 077
@@ -59,16 +65,18 @@ SUP_VOICE=browser
 ENV
 fi
 chmod 600 ~/sup/demo.env
-(cd ~/sup/app/server && UV_PROJECT_ENVIRONMENT=~/sup/venvs/server uv sync --no-dev --frozen -q)
 set -a; . ~/sup/demo.env; set +a
 if [ "${SUP_PERCEPTION:-}" = vlm ] && [ "${SUP_VLM_BASE_URL:-}" = http://127.0.0.1:8001/v1 ]; then
   python3 -c 'import urllib.request as u; u.urlopen("http://127.0.0.1:8001/v1/models", timeout=5)' \
     || { echo "✘ vLLM is not answering on 127.0.0.1:8001: start it with gpu/up-5090.sh first"; exit 1; }
 fi
 # The server always restarts (new code); the tunnel only with --new-url, so the link survives redeploys.
+# Stop the old server BEFORE swapping the code, so it never serves a deleted web/dist: the page is down only
+# for the swap + uv sync + startup (seconds). Don't redeploy while a judge is using it.
 tmux kill-session -t sup-demo-server 2>/dev/null || true
 pkill -f "[u]vicorn --app-dir ../deploy demo_app:app" || true
-sleep 1
+rm -rf ~/sup/app && mv ~/sup/app.new ~/sup/app
+(cd ~/sup/app/server && UV_PROJECT_ENVIRONMENT=~/sup/venvs/server uv sync --no-dev --frozen -q)
 tmux new-session -d -s sup-demo-server "bash ~/sup/app/deploy/box/run-server.sh >> ~/sup/logs/demo-server.log 2>&1"
 # Also restart it when the kind changed (a named tunnel was added to or removed from demo.env).
 want="quick"; [ -n "${SUP_TUNNEL_TOKEN:-}" ] && want="named"
