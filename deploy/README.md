@@ -12,7 +12,8 @@ browser ──https/wss──▶ cloudflared (*.trycloudflare.com) ──▶ dem
   no `?server=` and no second host.
 - Only the demo server goes through the tunnel. vLLM stays on `127.0.0.1` and has no API key.
 - The link has no login, and every session drives the GPU. `demo_app.py` therefore caps open sessions at
-  `SUP_DEMO_MAX_SESSIONS` (default 4). Extra tabs are closed with 1013 and the reason "Demo ocupada…".
+  `SUP_DEMO_MAX_SESSIONS` (default 4; `deploy/session_cap.py`). A connection takes a slot only once it sends
+  its hello, which must arrive within 10 s. Extra tabs are closed with 1013 and the reason "Demo ocupada…".
 - Webcam access needs HTTPS. The tunnel gives us that.
 
 ## One command
@@ -33,7 +34,8 @@ What `up-demo.sh` does:
 2. Copies the repo's `contracts server tasks deploy training/controller/weights` and `web/dist` to `~/sup/app`.
    It tars git-tracked and untracked-but-not-ignored files (so no `.env`), because the box has no rsync or git.
    `~/sup/app/REVISION` holds the commit.
-3. Installs the pinned, checksummed `cloudflared` if it isn't there yet, and runs `uv sync` into `~/sup/venvs/server`.
+3. Installs the pinned, checksummed `cloudflared` if it isn't there yet. Runs `uv sync --no-editable` into
+   `~/sup/venvs/server` while the old server still runs, so a failed install leaves the demo up.
 4. Checks vLLM answers on `:8001`, and fails if it doesn't.
 5. Restarts the server in tmux and waits for `/api/health`.
 6. Reads the tunnel URL and checks `/api/health` and the page through it.

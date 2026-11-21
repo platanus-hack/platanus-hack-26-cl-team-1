@@ -70,13 +70,21 @@ if [ "${SUP_PERCEPTION:-}" = vlm ] && [ "${SUP_VLM_BASE_URL:-}" = http://127.0.0
   python3 -c 'import urllib.request as u; u.urlopen("http://127.0.0.1:8001/v1/models", timeout=5)' \
     || { echo "✘ vLLM is not answering on 127.0.0.1:8001: start it with gpu/up-5090.sh first"; exit 1; }
 fi
+# Install while the old server still serves: if this fails, the demo stays up on the old code. --no-editable
+# copies `contracts` into the venv, so nothing points into ~/sup/app.new after the rename below.
+(cd ~/sup/app.new/server && UV_PROJECT_ENVIRONMENT=~/sup/venvs/server uv sync --no-dev --frozen --no-editable -q)
 # The server always restarts (new code); the tunnel only with --new-url, so the link survives redeploys.
-# Stop the old server BEFORE swapping the code, so it never serves a deleted web/dist: the page is down only
-# for the swap + uv sync + startup (seconds). Don't redeploy while a judge is using it.
+# Stop the old server BEFORE swapping the code, so it never serves a deleted web/dist, and wait until it has
+# exited (it drains open sockets first) so the new one can bind :8000. Down for a few seconds: don't redeploy
+# while a judge is using it.
 tmux kill-session -t sup-demo-server 2>/dev/null || true
 pkill -f "[u]vicorn --app-dir ../deploy demo_app:app" || true
+for i in $(seq 30); do
+  pgrep -f "[u]vicorn --app-dir ../deploy demo_app:app" >/dev/null || break
+  [ "$i" = 30 ] && { echo "✘ the old demo server did not exit within 15 s"; exit 1; }
+  sleep 0.5
+done
 rm -rf ~/sup/app && mv ~/sup/app.new ~/sup/app
-(cd ~/sup/app/server && UV_PROJECT_ENVIRONMENT=~/sup/venvs/server uv sync --no-dev --frozen -q)
 tmux new-session -d -s sup-demo-server "bash ~/sup/app/deploy/box/run-server.sh >> ~/sup/logs/demo-server.log 2>&1"
 # Also restart it when the kind changed (a named tunnel was added to or removed from demo.env).
 want="quick"; [ -n "${SUP_TUNNEL_TOKEN:-}" ] && want="named"
