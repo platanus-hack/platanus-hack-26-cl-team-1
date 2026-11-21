@@ -34,6 +34,24 @@ def test_normal_line_waits_for_the_gap_and_the_newest_wins():
     assert queue.due(5000) is None  # nothing left
 
 
+def test_a_line_spoken_directly_drops_an_older_waiting_line():
+    """Review finding on PR #22: B waited, C was spoken when the queue freed up, then B played after C."""
+    queue = VoiceQueue(min_gap_ms=4000)
+    speak(queue, NEXT, 0)
+    assert queue.offer(OTHER, 1000) is None  # waits
+    newer = SayRequest(text="Ahora conecta el sensor.")
+    assert queue.offer(newer, 5200) == newer
+    assert queue.due(20_000) is None
+
+
+def test_urgent_line_drops_the_waiting_instruction():
+    queue = VoiceQueue(min_gap_ms=4000)
+    speak(queue, NEXT, 0)
+    assert queue.offer(OTHER, 1000) is None
+    assert queue.offer(OOPS, 1500) == OOPS
+    assert queue.due(20_000) is None
+
+
 def test_line_waits_until_the_previous_one_ended():
     queue = VoiceQueue(min_gap_ms=1000)
     speak(queue, NEXT, 0, audio=ONE_SECOND_OF_MP3 * 3)  # 3 s of audio

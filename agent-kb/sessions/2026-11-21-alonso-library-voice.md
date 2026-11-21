@@ -16,7 +16,9 @@
   `cancel_say` when a mistake is fixed or on reset). Web: `web/src/session/voice.ts` plays one line at a time.
 
 ## Decisions
-- None new. Voice queue runs on the client clock (frames' `t_ms`), so it pauses with the video and tests need no sleeps.
+- None new. Voice queue runs on the frames' `t_ms` (browser `performance.now()`, wall time), so tests need no sleeps;
+  it does not pause when a clip is paused. Speech runs in background tasks so slow TTS never blocks frames.
+- Agent review fixes: a line spoken directly (normal or urgent) drops an older waiting line; TTS moved off the frame loop.
 
 ## Open / blocked
 - No `ANTHROPIC_API_KEY` or `ELEVENLABS_API_KEY` on this machine: the generator and ElevenLabs were only tested with

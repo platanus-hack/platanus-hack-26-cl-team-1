@@ -4,11 +4,13 @@ Rules, in order:
 - The same line is not repeated within `repeat_window_ms` (15 s).
 - Urgent lines (mistakes) are spoken at once, even over a line that is still playing.
 - A normal line waits until the previous line has ended and `min_gap_ms` (4 s) has passed since it
-  started. Only the newest waiting normal line is kept: a newer instruction supersedes an older one.
+  started. Only the newest line counts: a line that is spoken (normal or urgent) drops any older
+  waiting line, and a newer waiting line replaces an older one.
 - When a mistake is fixed, the open mistake line is cancelled if it may still be playing.
 
-The queue decides; the session synthesizes and sends. It runs on the client clock (`t_ms` of the frames),
-so it is deterministic in tests and pauses with the video.
+The queue decides; the session synthesizes and sends. It runs on the frames' `t_ms` (the browser's
+`performance.now()`, wall time since the page loaded), so tests are deterministic; it does not pause
+when a clip is paused, but it does stop advancing when frames stop arriving.
 """
 
 from __future__ import annotations
@@ -48,6 +50,7 @@ class VoiceQueue:
         if self._repeated(request.text, now_ms):
             return None
         if request.priority is Priority.URGENT or self._free(now_ms):
+            self.pending = None  # older than this line: it would be stale after it
             return request
         self.pending = request
         return None

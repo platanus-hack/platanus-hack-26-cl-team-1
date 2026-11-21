@@ -424,3 +424,24 @@ def test_unknown_scripted_mistake_is_reported():
         ws.send_text(hello())
         message = ws.receive_json()
     assert message["type"] == "error" and "touch_faucet_bar" in message["message"]
+
+
+def test_slow_voice_does_not_block_frames(monkeypatch):
+    """Review finding on PR #22: a slow TTS call stalled the frame loop."""
+    import asyncio
+    import time
+
+    class SlowVoice:
+        async def synthesize(self, request):
+            await asyncio.sleep(30)
+
+    monkeypatch.setattr("app.main.make_voice", lambda settings: SlowVoice())
+    with scripted_client().websocket_connect("/ws/session") as ws:
+        ws.send_text(hello())
+        ws.receive_json()  # ready; the greeting is now stuck in synthesis
+        started = time.monotonic()
+        messages = run_frames(ws, 0, 5)
+        elapsed = time.monotonic() - started
+    assert elapsed < 2
+    assert [m["seq"] for m in messages if m["type"] == "debug"] == [0, 1, 2, 3, 4]
+    assert not any(m["type"] == "say" for m in messages)
