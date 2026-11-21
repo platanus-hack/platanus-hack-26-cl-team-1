@@ -274,4 +274,7 @@ _(El ejecutor anota aquí cada decisión que se aparte del plan, con su hora y s
 | sáb 06:51 | Docker 29 existe pero sin runtime NVIDIA → todo sin Docker, con `uv` (como decía el plan). | — |
 | sáb 06:55 | VLM: `Qwen/Qwen3-VL-8B-Instruct-FP8` (oficial de Qwen) en vez de AWQ. vLLM 0.34.0 + torch 2.14 cu132. | No hay AWQ oficial; el FP8 oficial tiene 1,2 M de descargas y en Ampere corre como W8A16 (Marlin). 10,1 GB de pesos, cabe en 0,62. |
 | sáb 06:56 | Calibración: un **tapete A4** impreso con los 4 ArUco en posiciones conocidas alrededor de los contornos del Uno y de la protoboard, en vez de 4 marcadores sueltos. Además, calibración fina con 4 clics en los huecos a1, a30, j1, j30. | La superficie de la protoboard está ~9 mm sobre la mesa: con la cámara en ángulo eso corre la grilla casi un hueco. Los clics fijan el plano real de los huecos; los ArUco solo siguen los movimientos de la cámara. |
+| sáb 07:05 | Servicios como `systemd --user` (con `loginctl enable-linger`, que funcionó sin sudo) en vez de unidades de sistema. Unidades en `deploy/vision/systemd/`. | Sin sudo. Mismo efecto: `Restart=always` y arranque al reiniciar. |
+| sáb 07:05 | Túnel: quick tunnel de Cloudflare (`*.trycloudflare.com`). Si alguien pone `CV_TUNNEL_TOKEN` en `~/cv/env`, la unidad usa el túnel con nombre. | 🧑 HUMANO no definió dominio todavía; el quick tunnel funciona con `?vision=`. |
+| sáb 07:05 | Voz por defecto `ef_dora` hasta que 🧑 HUMANO elija (muestras enviadas: `ef_dora`, `em_alex`, `em_santa`). | Kokoro solo trae esas 3 voces en español. |
 
