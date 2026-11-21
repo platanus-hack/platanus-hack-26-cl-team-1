@@ -60,6 +60,36 @@ holds `SUP_VLM_API_KEY` and optionally `VLM_MODEL`, `VLM_SERVED`, `VLM_GPU_UTIL`
 | `SUP_VLM_MAX_SIDE_PX` | `640` | frames are downscaled to this longest side |
 | `SUP_VLM_SPAN_MS` | `1000` | the model sees the newest frame + one about this much older |
 
+## Local on a Mac (prototype, no GPU box)
+
+The same `VlmPerception` code runs against **Ollama** on Apple silicon, using the small sibling
+**Qwen3-VL-2B-Instruct**. Use it to test the loop and the prompt, not to judge accuracy.
+
+```bash
+brew install ollama && ollama serve &          # needs Ollama ≥ 0.12.7 for Qwen3-VL
+ollama pull qwen3-vl:2b-instruct               # 1.9 GB
+cd server && SUP_PERCEPTION=vlm SUP_VLM_BASE_URL=http://localhost:11434/v1 \
+  SUP_VLM_MODEL=qwen3-vl:2b-instruct SUP_VLM_TIMEOUT_S=60 uv run uvicorn app.main:app --port 8000
+```
+
+No API key is needed (Ollama only listens on localhost). Ollama respects the JSON schema we send, so every
+answer parsed.
+
+Measured on an **M1 with 8 GB** (2026-11-21, `app.perception.bench`, single public photos):
+
+| Task (prompt size) | Warm latency per frame | First call |
+|---|---|---|
+| `hand_hygiene_basic` (8 actions) | 2.0–2.2 s | 12.9 s |
+| `servo_scout_robot` (12 actions) | 4.4–9.6 s | 14.2 s |
+
+Caveats seen in those runs:
+- **Not usable for judging.** With the robot task, a photo of hands washing with soap came back as
+  `mount_dc_motor` with confidence 0.95.
+- **Confidence means nothing.** It answers 0.95 whether it's right or not.
+- **`objects` repeats the prompt's list** instead of what is visible.
+- It's fine on obvious cases: it said "uncertain" for a paper-towel dispenser with nobody using it.
+- On 8 GB the Mac swaps (about 10 GB of swap used during the run), so close other apps.
+
 ## Training needs the GPU
 
 vLLM and QLoRA don't fit together: `systemctl --user stop sup-vllm` before training, `start` after. To serve a
