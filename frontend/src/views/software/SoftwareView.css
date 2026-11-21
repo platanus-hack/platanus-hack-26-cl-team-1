@@ -18,6 +18,8 @@
   flex: 1;
   min-width: 240px;
   overflow: hidden;
+  /* Own stacking context: Blockly's scrollbars/toolbox (z 20-70) stay below the top bar's menus. */
+  isolation: isolate;
 }
 .sw-blockly {
   position: absolute;
@@ -85,7 +87,9 @@ body.sw-resizing .sw-blockly { pointer-events: none; }
 .sw-side {
   flex: none;
   min-width: 0;
-  max-width: calc(100% - 300px);
+  /* Safety net only: SoftwareView caps the width in JS (room for toolbox + flyout). */
+  max-width: calc(100% - 240px);
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   background: var(--surface);
@@ -96,6 +100,8 @@ body.sw-resizing .sw-blockly { pointer-events: none; }
   flex-direction: column;
   height: 100%;
   min-height: 0;
+  /* Only when the minimums below do not fit (long issue list, short window): scroll, never hide. */
+  overflow-y: auto;
 }
 .sw-panel-head {
   flex: none;
@@ -172,7 +178,16 @@ body.sw-resizing .sw-blockly { pointer-events: none; }
   cursor: pointer;
   text-align: left;
 }
-.sw-issues-toggle em { font-style: normal; font-weight: 500; opacity: 0.85; }
+.sw-issues-count { flex: none; }
+.sw-issues-peek {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-weight: 400;
+  color: var(--text);
+  opacity: 0.85;
+}
 .sw-issues-chevron { margin-left: auto; transition: transform 0.15s; }
 .sw-issues.is-open .sw-issues-chevron { transform: rotate(180deg); }
 .sw-issues-list {
@@ -218,8 +233,9 @@ body.sw-resizing .sw-blockly { pointer-events: none; }
   position: relative;
   display: flex;
   flex-direction: column;
-  flex: 1 1 auto;
-  min-height: 180px;
+  /* Basis 0: the code takes what is left, so a long program never squeezes the compile panel. */
+  flex: 1 1 0;
+  min-height: 112px;
   margin: 0 14px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -338,7 +354,9 @@ body.sw-resizing .sw-blockly { pointer-events: none; }
 /* ---------------------------- compile panel ---------------------------- */
 
 .sw-compile {
-  flex: none;
+  /* Shrinks (and scrolls inside) instead of spilling over the simulation dock. */
+  flex: 0 1 auto;
+  min-height: 120px;
   max-height: 46%;
   overflow: auto;
   border-top: 1px solid var(--border);

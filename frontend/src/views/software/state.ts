@@ -6,18 +6,34 @@
 import { create } from 'zustand';
 import { useUI } from '@/store/ui';
 
+/** Editor zoom/scroll when it was last unmounted, and the program it was showing. */
+export interface SavedEditorView {
+  scale: number;
+  scrollX: number;
+  scrollY: number;
+  workspace: unknown;
+}
+
 export interface SoftwareViewState {
   /** Selected block id in the editor. */
   selected: string | null;
   /** Selected block + all its descendants (ids). */
   selectedIds: string[];
   setSelection: (selected: string | null, ids: string[]) => void;
+  /** Restored when the editor mounts again (switching back from the Hardware tab). */
+  savedView: SavedEditorView | null;
+  /** Whether the issue list under the code header is expanded (survives tab switches). */
+  issuesOpen: boolean;
+  setIssuesOpen: (open: boolean) => void;
 }
 
 export const useSoftwareView = create<SoftwareViewState>((set) => ({
   selected: null,
   selectedIds: [],
   setSelection: (selected, selectedIds) => set({ selected, selectedIds }),
+  savedView: null,
+  issuesOpen: false,
+  setIssuesOpen: (issuesOpen) => set({ issuesOpen }),
 }));
 
 /* ------------------------- window 'cv:focus-block' ------------------------ */

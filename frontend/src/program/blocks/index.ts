@@ -16,7 +16,8 @@ import { buildToolbox as toolbox, type ToolboxDef } from './toolbox';
 import { workspaceToIR as toIR } from './toIR';
 import { irToWorkspace as fromIR } from './fromIR';
 import { validateIR as validate } from './validate';
-import { getProgramErrors as memoErrors, getProgramIR as memoIR } from './memo';
+import { getProgramErrors as memoErrors, getProgramIR as memoIR, getProgramIssues as memoIssues } from './memo';
+import type { ProgramIssue } from './toIR';
 import type { WorkspaceState } from './types';
 
 /** Register all custom block definitions with Blockly (idempotent). */
@@ -30,7 +31,7 @@ export function buildToolbox(ctx: ProgramContext): ToolboxDef {
 }
 
 /** Blockly workspace JSON → Block IR (headless; works without a DOM workspace). */
-export function workspaceToIR(workspace: unknown | null, ctx: ProgramContext | null): { ir: ProgramIR; errors: string[] } {
+export function workspaceToIR(workspace: unknown | null, ctx: ProgramContext | null): { ir: ProgramIR; errors: string[]; issues: ProgramIssue[] } {
   return toIR(workspace, ctx);
 }
 
@@ -57,6 +58,12 @@ export function getProgramIR(project: ProjectModel): ProgramIR {
 export function getProgramErrors(project: ProjectModel): string[] {
   return memoErrors(project);
 }
+
+/** The same errors for the editor UI: with the block each is about, without IR paths. */
+export function getProgramIssues(project: ProjectModel): ProgramIssue[] {
+  return memoIssues(project);
+}
+export type { ProgramIssue };
 
 /* ---- extras for the editor view and tests ---- */
 export type { ToolboxDef, ToolboxCategory, ToolboxItem, ToolboxBlock } from './toolbox';

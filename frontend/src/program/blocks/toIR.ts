@@ -3,6 +3,8 @@
  * Blockly.Workspace (events disabled, disposed afterwards) and the setup/loop
  * hats and function definitions are walked. Every IR node gets id = block id.
  * Stray top-level blocks are ignored and reported in `errors` (Spanish).
+ * `issues` carries the same errors with the block they are about (for the editor UI).
+ * A disabled «al iniciar» / «repetir para siempre» contributes nothing (it is greyed out).
  */
 import * as Blockly from 'blockly';
 import type { BinOp, Expr, FunctionDecl, ProgramIR, Stmt, VarDecl } from '@/contracts';
@@ -16,6 +18,12 @@ import { getVarMeta } from './varMeta';
 import { isWorkspaceState } from './types';
 
 type Block = Blockly.Block;
+
+/** An error about the program, with the block it refers to when there is one. */
+export interface ProgramIssue {
+  message: string;
+  blockId?: string;
+}
 
 const PART_EXPR_TYPES: Record<string, PartExprKind> = {
   [B.buttonPressed]: 'buttonPressed',
@@ -54,6 +62,14 @@ export function loadSilently(ws: Blockly.Workspace, state: unknown, ctx?: Progra
 
 class Walker {
   readonly errors: string[] = [];
+  /** `errors` with the block each one is about. */
+  readonly issues: ProgramIssue[] = [];
+
+  error(message: string, blockId?: string): void {
+    this.errors.push(message);
+    this.issues.push(blockId ? { message, blockId } : { message });
+  }
+
   /** var name → values assigned with "dar a … el valor" (for type inference). */
   readonly assigned = new Map<string, Expr[]>();
   /** vars used as numbers by construction (for counters, "sumar"). */
@@ -81,7 +97,7 @@ class Walker {
   private expr(parent: Block, input: string, fallback: Expr): Expr {
     const child = parent.getInputTargetBlock(input);
     if (!child) {
-      this.errors.push(`Falta un valor en «${this.label(parent)}» (se usa ${describeFallback(fallback)}).`);
+      this.error(`Falta un valor en «${this.label(parent)}» (se usa ${describeFallback(fallback)}).`, parent.id);
       return fallback;
     }
     return this.toExpr(child);
@@ -194,7 +210,7 @@ class Walker {
       case B.onboardRgb:
         return { k: 'onboardRgb', id, r: this.num(b, 'R'), g: this.num(b, 'G'), b: this.num(b, 'B') };
       default:
-        this.errors.push(`El bloque «${this.label(b)}» no se puede usar como instrucción y se ignora.`);
+        this.error(`El bloque «${this.label(b)}» no se puede usar como instrucción y se ignora.`, b.id);
         return null;
     }
   }
@@ -235,7 +251,7 @@ class Walker {
         const fn = SINGLE_OPS[this.field(b, 'OP')];
         const a = this.num(b, 'NUM');
         if (!fn) {
-          this.errors.push(`Operación desconocida en «${this.label(b)}» (se usa valor absoluto).`);
+          this.error(`Operación desconocida en «${this.label(b)}» (se usa valor absoluto).`, b.id);
           return { k: 'math', id, fn: 'abs', a };
         }
         return fn === 'neg' ? { k: 'neg', id, a } : { k: 'math', id, fn, a };
@@ -263,7 +279,7 @@ class Walker {
       default: {
         const kind = PART_EXPR_TYPES[b.type];
         if (kind) return { k: kind, id, part: this.field(b, 'PART') };
-        this.errors.push(`El bloque «${this.label(b)}» no se puede usar como valor (se usa 0).`);
+        this.error(`El bloque «${this.label(b)}» no se puede usar como valor (se usa 0).`, b.id);
         return { k: 'num', id, v: 0 };
       }
     }
@@ -271,7 +287,7 @@ class Walker {
 
   functionDecl(b: Block): FunctionDecl {
     const params = (b as unknown as { getVars?: () => string[] }).getVars?.call(b) ?? [];
-    if (params.length) this.errors.push(`La función «${this.field(b, 'NAME')}» tiene parámetros: no están soportados y se ignoran.`);
+    if (params.length) this.error(`La función «${this.field(b, 'NAME')}» tiene parámetros: no están soportados y se ignoran.`, b.id);
     return { id: b.id, name: this.field(b, 'NAME'), body: this.body(b, 'STACK') };
   }
 
@@ -326,21 +342,26 @@ function describeFallback(e: Expr): string {
 }
 
 /** Convert an already-loaded workspace (headless or rendered) to IR. */
-export function irFromBlocklyWorkspace(ws: Blockly.Workspace, board: ProgramIR['board']): { ir: ProgramIR; errors: string[] } {
+export function irFromBlocklyWorkspace(ws: Blockly.Workspace, board: ProgramIR['board']): { ir: ProgramIR; errors: string[]; issues: ProgramIssue[] } {
   const w = new Walker();
   const ir = emptyProgram(board);
   let setupSeen = false;
   let loopSeen = false;
   const stray: string[] = [];
+  let firstStray: string | undefined;
   for (const top of ws.getTopBlocks(true)) {
-    if (top.type === B.setup) {
-      if (setupSeen) w.errors.push('Hay más de un bloque «al iniciar»: se unen en orden.');
-      setupSeen = true;
-      ir.setup.push(...w.stmts(top.getInputTargetBlock('DO')));
-    } else if (top.type === B.loop) {
-      if (loopSeen) w.errors.push('Hay más de un bloque «repetir para siempre»: se unen en orden.');
-      loopSeen = true;
-      ir.loop.push(...w.stmts(top.getInputTargetBlock('DO')));
+    if (top.type === B.setup || top.type === B.loop) {
+      const isSetup = top.type === B.setup;
+      const name = isSetup ? '«al iniciar»' : '«repetir para siempre»';
+      if (isSetup ? setupSeen : loopSeen) w.error(`Hay más de un bloque ${name}: se unen en orden.`, top.id);
+      if (isSetup) setupSeen = true;
+      else loopSeen = true;
+      // Greyed out with "Desactivar bloque": like a disabled function, its blocks do not run.
+      if (!top.isEnabled()) {
+        w.error(`${name} está desactivado: sus bloques no se ejecutan. Actívalo con clic derecho → «Activar bloque».`, top.id);
+        continue;
+      }
+      (isSetup ? ir.setup : ir.loop).push(...w.stmts(top.getInputTargetBlock('DO')));
     } else if (top.type === BI.procDef) {
       if (top.isEnabled()) ir.functions.push(w.functionDecl(top));
     } else if (!top.isShadow()) {
@@ -351,34 +372,44 @@ export function irFromBlocklyWorkspace(ws: Blockly.Workspace, board: ProgramIR['
         text = top.type;
       }
       stray.push(text);
+      firstStray ??= top.id;
     }
   }
   if (stray.length) {
     const list = stray.slice(0, 3).map((s) => `«${s}»`).join(', ');
     const more = stray.length > 3 ? ` y ${stray.length - 3} más` : '';
-    w.errors.push(
+    w.error(
       `${stray.length === 1 ? 'Hay 1 grupo de bloques suelto' : `Hay ${stray.length} grupos de bloques sueltos`} fuera de «al iniciar» y «repetir para siempre» (${list}${more}): no se ejecuta${stray.length === 1 ? '' : 'n'}.`,
+      firstStray,
     );
   }
   const names = new Map<string, number>();
-  for (const f of ir.functions) names.set(f.name, (names.get(f.name) ?? 0) + 1);
-  for (const [name, n] of names) if (n > 1) w.errors.push(`Hay ${n} funciones llamadas «${name}».`);
+  const firstFn = new Map<string, string | undefined>();
+  for (const f of ir.functions) {
+    names.set(f.name, (names.get(f.name) ?? 0) + 1);
+    if (!firstFn.has(f.name)) firstFn.set(f.name, f.id);
+  }
+  for (const [name, n] of names) if (n > 1) w.error(`Hay ${n} funciones llamadas «${name}».`, firstFn.get(name));
   ir.variables = w.variables(ws);
-  return { ir, errors: w.errors };
+  return { ir, errors: w.errors, issues: w.issues };
 }
 
-export function workspaceToIR(workspace: unknown | null, ctx: ProgramContext | null): { ir: ProgramIR; errors: string[] } {
+export function workspaceToIR(workspace: unknown | null, ctx: ProgramContext | null): { ir: ProgramIR; errors: string[]; issues: ProgramIssue[] } {
   const board = ctx?.board?.id ?? null;
-  if (!isWorkspaceState(workspace)) return { ir: emptyProgram(board), errors: [] };
+  if (!isWorkspaceState(workspace)) return { ir: emptyProgram(board), errors: [], issues: [] };
   let ws: Blockly.Workspace | null = null;
   try {
     ws = createHeadlessWorkspace();
     const loadError = loadSilently(ws, workspace, ctx);
     const result = withContext(ctx, () => irFromBlocklyWorkspace(ws!, board));
-    if (loadError) result.errors.unshift(loadError);
+    if (loadError) {
+      result.errors.unshift(loadError);
+      result.issues.unshift({ message: loadError });
+    }
     return result;
   } catch (e) {
-    return { ir: emptyProgram(board), errors: [`No se pudo leer el programa: ${e instanceof Error ? e.message : String(e)}`] };
+    const message = `No se pudo leer el programa: ${e instanceof Error ? e.message : String(e)}`;
+    return { ir: emptyProgram(board), errors: [message], issues: [{ message }] };
   } finally {
     ws?.dispose();
   }

@@ -26,6 +26,28 @@ export interface ProjectState {
   undoGroup: (group: string) => boolean;
 }
 
+/* ------------------------------ pending edits ------------------------------ */
+
+const flushers = new Set<() => void>();
+
+/**
+ * Editors that debounce their writes (the block editor waits 300 ms) register a flush here.
+ * It runs before every dispatch, undo and redo, so a pending edit lands as its own history
+ * step instead of being overwritten (or merged into the wrong step) by the outside change.
+ * Returns the unregister function.
+ */
+export function registerPendingFlush(fn: () => void): () => void {
+  flushers.add(fn);
+  return () => {
+    flushers.delete(fn);
+  };
+}
+
+/** Run every registered flush (re-entrant safe: a flush that dispatches finds nothing pending). */
+export function flushPendingEdits(): void {
+  for (const fn of [...flushers]) fn();
+}
+
 function loadInitial(): ProjectModel {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -46,6 +68,7 @@ export const useProject = create<ProjectState>((set, get) => ({
   dispatch: (opOrOps, meta = {}) => {
     const ops = Array.isArray(opOrOps) ? opOrOps : [opOrOps];
     if (ops.length === 0) return { ok: true };
+    flushPendingEdits();
     const { project, past } = get();
     const r = applyOps(project, ops);
     if ('error' in r) return { ok: false, error: r.error };
@@ -73,6 +96,7 @@ export const useProject = create<ProjectState>((set, get) => ({
     return { ok: true };
   },
   undo: () => {
+    flushPendingEdits();
     const { past, future, project } = get();
     const entry = past[past.length - 1];
     if (!entry) return;
@@ -85,6 +109,7 @@ export const useProject = create<ProjectState>((set, get) => ({
     set({ project: r.model, past: past.slice(0, -1), future: [entry, ...future] });
   },
   redo: () => {
+    flushPendingEdits();
     const { past, future, project } = get();
     const entry = future[0];
     if (!entry) return;
@@ -98,6 +123,7 @@ export const useProject = create<ProjectState>((set, get) => ({
   },
   replaceProject: (p) => set({ project: p, past: [], future: [] }),
   undoGroup: (group) => {
+    flushPendingEdits();
     const last = get().past[get().past.length - 1];
     if (!last || last.group !== group) return false;
     get().undo();
@@ -129,18 +155,29 @@ export function describeOps(ops: Op[]): string {
 export const getProject = () => useProject.getState().project;
 export const dispatch = (ops: Op | Op[], meta?: DispatchMeta) => useProject.getState().dispatch(ops, meta);
 
-/* Autosave (debounced). */
+/* Autosave (debounced; written right away when the page is hidden or closed). */
 if (typeof window !== 'undefined') {
   let t: ReturnType<typeof setTimeout> | undefined;
+  const persist = (p: ProjectModel) => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(p));
+    } catch {
+      /* quota / private mode */
+    }
+  };
   useProject.subscribe((s, prev) => {
     if (s.project === prev.project) return;
     clearTimeout(t);
-    t = setTimeout(() => {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(s.project));
-      } catch {
-        /* quota / private mode */
-      }
-    }, 400);
+    t = setTimeout(() => persist(s.project), 400);
+  });
+  // A reload or tab close within the debounce windows used to lose the last edit.
+  const persistNow = () => {
+    flushPendingEdits();
+    clearTimeout(t);
+    persist(useProject.getState().project);
+  };
+  window.addEventListener('pagehide', persistNow);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') persistNow();
   });
 }

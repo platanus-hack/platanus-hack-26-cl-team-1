@@ -57,3 +57,36 @@ export function codeLine(code: string | null, line: number): string | null {
   const l = code.split('\n')[line - 1];
   return l === undefined ? null : l.replace(/\s+$/, '');
 }
+
+/**
+ * The code without comments, trailing spaces or blank lines: two sketches with the same
+ * fingerprint build the same binary. Renaming the project or wiring an unused part only changes
+ * the header comments, which must not mark a build as outdated.
+ */
+export function codeFingerprint(code: string | null): string | null {
+  if (code === null) return null;
+  let out = '';
+  let i = 0;
+  while (i < code.length) {
+    const c = code[i];
+    if (c === '"' || c === "'") {
+      let j = i + 1;
+      while (j < code.length && code[j] !== c && code[j] !== '\n') j += code[j] === '\\' ? 2 : 1;
+      out += code.slice(i, j + 1);
+      i = j + 1;
+    } else if (c === '/' && code[i + 1] === '/') {
+      while (i < code.length && code[i] !== '\n') i++;
+    } else if (c === '/' && code[i + 1] === '*') {
+      const end = code.indexOf('*/', i + 2);
+      i = end === -1 ? code.length : end + 2;
+    } else {
+      out += c;
+      i++;
+    }
+  }
+  return out
+    .split('\n')
+    .map((l) => l.replace(/\s+$/, ''))
+    .filter((l) => l !== '')
+    .join('\n');
+}

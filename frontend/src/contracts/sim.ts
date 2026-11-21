@@ -239,4 +239,10 @@ export interface CodegenResult {
   /** 1-based line number → Blockly block id. */
   lineMap: Record<number, string>;
   warnings: Array<{ message: string; blockId?: string; part?: Id }>;
+  /**
+   * 1-based lines added automatically in setup() (Serial.begin, pinMode, servo.attach). They
+   * stay in lineMap (click-to-focus, compiler diagnostics) but are not the block's own code:
+   * the editor does not light them up as "running" nor scroll to them.
+   */
+  implicitLines?: number[];
 }

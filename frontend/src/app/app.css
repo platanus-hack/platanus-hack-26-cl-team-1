@@ -7,14 +7,25 @@
 .logo { display: flex; align-items: center; gap: 8px; font-size: 15px; letter-spacing: -0.01em; color: var(--text); white-space: nowrap; }
 .logo b { color: var(--accent); font-weight: 700; }
 .project-name {
-  width: 200px; height: 30px; padding: 0 8px; border-radius: var(--radius-sm); border: 1px solid transparent;
+  flex: 0 1 200px; min-width: 72px; width: 200px; height: 30px; padding: 0 8px; border-radius: var(--radius-sm); border: 1px solid transparent;
   background: transparent; color: var(--text); font: inherit; font-weight: 500; outline: none;
 }
 .project-name:hover { border-color: var(--border); }
 .project-name:focus { border-color: var(--blue); background: var(--bg-sunken); }
 .topbar-group { display: flex; align-items: center; gap: 4px; }
 .topbar-group.right { margin-left: auto; }
-.topbar-center { position: absolute; left: 50%; transform: translateX(-50%); }
+.topbar-center { margin-left: auto; } /* in flow: shares the free space with .right, never overlaps */
+/* Narrow windows: keep every top-bar button on screen. */
+@media (max-width: 1240px) {
+  .logo span { display: none; }
+}
+@media (max-width: 1100px) {
+  /* Ejemplos / Archivo show only their icon (the text stays as the accessible name). */
+  .topbar .menu > .btn { font-size: 0; gap: 0; }
+}
+@media (min-width: 1400px) {
+  .topbar-center { position: absolute; left: 50%; transform: translateX(-50%); margin-left: 0; }
+}
 .divider { width: 1px; height: 22px; background: var(--border); margin: 0 4px; }
 .btn.active-toggle { background: var(--accent-soft); border-color: rgba(61, 220, 151, 0.35); color: var(--accent); }
 

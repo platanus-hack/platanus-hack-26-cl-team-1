@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useProject } from '@/store/project';
 import { useSim } from '@/store/sim';
 import { EditorController } from './editorController';
 import { setFocusHandler, useSoftwareView } from './state';
@@ -13,10 +14,15 @@ export function BlocklyEditor() {
     const host = hostRef.current;
     if (!host) return;
     let controller: EditorController;
+    // Coming back from the Hardware tab: same zoom and place, unless the program changed meanwhile.
+    const saved = useSoftwareView.getState().savedView;
+    const initialView = saved && saved.workspace === useProject.getState().project.program.workspace ? saved : null;
     try {
-      controller = new EditorController(host, {
-        onSelect: (id, ids) => useSoftwareView.getState().setSelection(id, ids),
-      });
+      controller = new EditorController(
+        host,
+        { onSelect: (id, ids) => useSoftwareView.getState().setSelection(id, ids) },
+        { initialView },
+      );
     } catch (e) {
       console.error(e);
       setFailed(e instanceof Error ? e.message : String(e));
@@ -38,6 +44,9 @@ export function BlocklyEditor() {
       ro.disconnect();
       setFocusHandler(null);
       useSoftwareView.getState().setSelection(null, []);
+      controller.flush();
+      const { scale, scrollX, scrollY } = controller.getView();
+      useSoftwareView.setState({ savedView: { scale, scrollX, scrollY, workspace: useProject.getState().project.program.workspace } });
       controller.dispose();
       controllerRef.current = null;
     };
