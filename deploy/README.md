@@ -11,6 +11,9 @@ browser ──https/wss──▶ cloudflared (*.trycloudflare.com) ──▶ dem
 - `deploy/demo_app.py` is `app.main.create_app()` plus the Vite build mounted at `/`. Same origin, so no CORS,
   no `?server=` and no second host.
 - Only the demo server goes through the tunnel. vLLM stays on `127.0.0.1` and has no API key.
+- The link has no login, and every session drives the GPU. `demo_app.py` therefore caps open sessions at
+  `SUP_DEMO_MAX_SESSIONS` (default 4; `deploy/session_cap.py`). A connection takes a slot only once it sends
+  its hello, which must arrive within 10 s. Extra tabs are closed with 1013 and the reason "Demo ocupada…".
 - Webcam access needs HTTPS. The tunnel gives us that.
 
 ## One command
@@ -31,7 +34,8 @@ What `up-demo.sh` does:
 2. Copies the repo's `contracts server tasks deploy training/controller/weights` and `web/dist` to `~/sup/app`.
    It tars git-tracked and untracked-but-not-ignored files (so no `.env`), because the box has no rsync or git.
    `~/sup/app/REVISION` holds the commit.
-3. Installs `cloudflared` if it's missing and runs `uv sync` into `~/sup/venvs/server`.
+3. Installs the pinned, checksummed `cloudflared` if it isn't there yet. Runs `uv sync --no-editable` into
+   `~/sup/venvs/server` while the old server still runs, so a failed install leaves the demo up.
 4. Checks vLLM answers on `:8001`, and fails if it doesn't.
 5. Restarts the server in tmux and waits for `/api/health`.
 6. Reads the tunnel URL and checks `/api/health` and the page through it.
@@ -57,13 +61,16 @@ SUP_PERCEPTION=vlm
 SUP_VLM_BASE_URL=http://127.0.0.1:8001/v1
 SUP_CONTROLLER=rules          # or learned
 SUP_VOICE=browser             # elevenlabs + the two lines below for server TTS
+# SUP_DEMO_MAX_SESSIONS=4     # open /ws/session connections allowed at once
 # ELEVENLABS_API_KEY=…
 # SUP_ELEVENLABS_VOICE_ID=…
 # SUP_TUNNEL_TOKEN=…          # a named Cloudflare tunnel (stable URL) instead of a quick tunnel
 # SUP_TUNNEL_URL=https://…    # its public URL, so up-demo.sh can print and check it
 ```
 
-Edit it on the box, then run `deploy/up-demo.sh` again. To stop the demo:
+Edit it on the box, then run `deploy/up-demo.sh` again. A redeploy takes the page down for a few seconds
+(code swap, `uv sync`, startup), so don't redeploy while a judge is using it. cloudflared is pinned to a
+version and checked against its SHA-256 (`CF_VERSION`/`CF_SHA256` in `up-demo.sh`). To stop the demo:
 `tmux kill-session -t sup-demo-server; tmux kill-session -t sup-demo-tunnel`.
 
 ## Check it from outside
