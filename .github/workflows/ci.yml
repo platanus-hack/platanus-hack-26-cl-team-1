@@ -1,0 +1,55 @@
+name: CI
+
+# Every job is listed in `ci-ok.needs`; `CI OK` is the one check to require on
+# main. Adding a job (web, server, …) only means adding it there. D-006.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  workflow-lint:
+    name: actionlint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: actionlint
+        run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.7 -color
+
+  tooling:
+    name: CI tooling tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Unit tests for scripts/ci
+        run: python3 -I -m unittest discover -s scripts/ci/tests -t . -v
+
+  # The one required check. It never has a job-level condition beyond always(),
+  # because GitHub counts a skipped job as passing.
+  ci-ok:
+    name: CI OK
+    if: always()
+    needs: [workflow-lint, tooling]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Every job succeeded
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          echo "$NEEDS" | jq -c 'map_values(.result)'
+          echo "$NEEDS" | jq -e 'all(.[]; .result == "success")' > /dev/null

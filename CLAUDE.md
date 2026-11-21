@@ -15,20 +15,26 @@ correction. Trained with a simulator and fine-tuned per scenario.
 
 ## Stack and resources
 
-- Stack: to be settled in block 1 (see `agent-kb/decisions.md` §2). Default proposal: web app (Vite + React + TS)
-  and a Python server (FastAPI + `uv`), same as before.
+- Stack per component and repo layout: [docs/STACK.md](docs/STACK.md) (proposal until confirmed).
 - **GPU:** RTX 3090 24 GB at `ssh 172.16.0.204` (no sudo, no Docker GPU runtime: use `uv`). vLLM + training don't fit together.
 - **APIs:** Claude (task/step generation), ElevenLabs (TTS), Runway (video generation). Keys live in
   `.env` files that are gitignored; never commit them, never put them in a service that runs untrusted code.
 
 ## Commands
 
-_None yet: add them here as soon as the skeleton exists._
+```bash
+python3 -I -m unittest discover -s scripts/ci/tests -t .   # CI tooling tests
+```
+
+_Add server/web commands here as soon as the skeleton exists._
 
 ## Rules
 
 1. **PRs go straight to `main`**, small, one topic each. No stacked PRs (they bit us before: see LEGACY).
-   No direct pushes to `main`.
+   No direct pushes to `main`. **A PR merges itself** (squash) once `CI OK` and `Agent reviews OK` are green
+   (two Claude reviewers follow [docs/PR_REVIEW_FOCUS.md](docs/PR_REVIEW_FOCUS.md); D-006, D-007), so open a
+   **draft** while it isn't ready, and make the PR title + body final: they become the commit.
+   Fix every blocking finding or answer it on the PR; only a human adds the `skip-agent-review` label.
 2. **Log the session in `agent-kb/`** before ending (see [agent-kb/README.md](agent-kb/README.md)).
    Check `agent-kb/decisions.md` before proposing anything that sounds like a decision.
 3. **Contracts first.** The action ontology, `task.json` and the M_VL → M_C observation JSON are shared

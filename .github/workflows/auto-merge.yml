@@ -1,0 +1,69 @@
+name: Auto-merge
+
+# Arms GitHub auto-merge (squash) on pull requests to main. The merge still waits
+# for the required checks, `CI OK` and `Agent reviews OK`: that is how the two
+# agent reviewers "approve". Drafts stay unarmed, which is how to hold a PR.
+# Bot and fork PRs merge by hand. Ported from personal-fitness-app; D-007.
+#
+# Safety: if main had no required checks, arming auto-merge on a clean PR would
+# merge it at once. So this only arms a PR that GitHub reports as BLOCKED
+# (required checks pending), and refuses otherwise.
+#
+# `pull_request_target` runs this file from the base branch, so a PR can't edit
+# its own arming. Nothing from the PR is checked out or executed.
+on:
+  pull_request_target:  # zizmor: ignore[dangerous-triggers]
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review, converted_to_draft, edited]
+
+permissions: {}
+
+concurrency:
+  group: auto-merge-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  arm:
+    name: Arm auto-merge
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository
+      && github.event.pull_request.user.type != 'Bot'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Update auto-merge state
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          IS_DRAFT: ${{ github.event.pull_request.draft }}
+        run: |
+          # Disarm first, so that any failure below leaves the PR not armed.
+          is_armed=$(gh pr view "$PR_NUMBER" --json autoMergeRequest --jq '.autoMergeRequest != null')
+          if [ "$is_armed" = "true" ]; then
+            gh pr merge "$PR_NUMBER" --disable-auto
+          fi
+
+          if [ "$IS_DRAFT" = "true" ]; then
+            echo "Draft pull request: not arming auto-merge."
+            exit 0
+          fi
+
+          # GitHub computes the merge state lazily: wait while it is UNKNOWN.
+          state=UNKNOWN
+          for _ in $(seq 1 12); do
+            state=$(gh pr view "$PR_NUMBER" --json mergeStateStatus --jq '.mergeStateStatus')
+            [ "$state" != "UNKNOWN" ] && break
+            sleep 5
+          done
+          if [ "$state" != "BLOCKED" ]; then
+            echo "::warning::Merge state is $state, not BLOCKED: main may have no required checks, so arming could merge without review. Not arming."
+            exit 0
+          fi
+
+          gh pr merge "$PR_NUMBER" --auto --squash --match-head-commit "$HEAD_SHA"

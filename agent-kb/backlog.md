@@ -4,12 +4,14 @@ Owner in brackets once someone takes an item. Blocks refer to the plan in `docs/
 
 ## Now (block 1 · foundations, until ~14:00)
 - [ ] Decide the demo scenario (decisions §2). [team]
-- [ ] Decide repo layout + stack; create the skeleton (web + server) with `make dev` / `make test` and document commands in `CLAUDE.md`. []
+- [ ] Confirm `docs/STACK.md`; create the skeleton (web + server) with `make dev` / `make test` and document commands in `CLAUDE.md`. []
 - [ ] Action ontology v0 (verbs, objects, params) for the demo scenario's domain. []
 - [ ] `task.json` schema + validator; Claude prompt that generates a task from a description; first validated task in `tasks/`. []
 - [ ] Bring the GPU server up again for the new repo (vLLM + Qwen3-VL-8B FP8, tunnel); reuse `deploy/vision/` from `2e9da7c`. []
 - [ ] ElevenLabs: pick a Spanish voice; a streaming TTS call working from the server. []
 - [ ] Close PR #8 (superseded by the pivot) and decide whether to turn off the old Render services. [Alonso]
+- [ ] Add the `ANTHROPIC_API_KEY` (+ `ANTHROPIC_BASE_URL`) repo secret for the agent reviews; a repo admin enables "Allow auto-merge" and protects `main` (PR required, 0 approvals, required checks `CI OK` + `Agent reviews OK`, no force-push). []
+- [ ] Add CI jobs (`server`, `web`, contracts freshness) to `ci-ok.needs` as each folder lands. []
 
 ## Next (block 2 · vertical slice, until ~18:00)
 - [ ] Session WebSocket: browser sends frames (webcam or a sim clip played in the page) + the task; server replies with step / issue / say. Reuse `frontend/src/assembly/*` and `vision/vision/session.py`.
@@ -27,4 +29,5 @@ Owner in brackets once someone takes an item. Blocks refer to the plan in `docs/
 - [ ] Demo rehearsal ×3, backup video, `platanus-hack-project.jsonc`, `project-description.md`, README.
 
 ## Done
+- [x] CI (`CI OK`) and two-agent review (`Agent reviews OK`), auto-merge, review guide, PR template, stack proposal (D-006, D-007).
 - [x] Pivot docs: `docs/VISION.md`, `docs/RESEARCH.md`, `docs/LEGACY.md`, `CLAUDE.md`, agent-kb; old code removed (D-001…D-005).

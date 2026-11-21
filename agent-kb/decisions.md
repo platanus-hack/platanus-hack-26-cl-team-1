@@ -36,12 +36,38 @@ with a pointer to their replacement; nothing is ever deleted from §3.
 - **Decision:** Claude generates and revises task recipes; ElevenLabs does TTS; heavy models (VLM, training) run on the 3090.
 - **Consequences:** see `docs/RESEARCH.md` for models and costs.
 
+### D-006 — CI with one aggregate check, and two agent reviewers on every PR (2026-11-21)
+- **Context:** several people and agents push PRs in parallel overnight; nobody has time to review everything,
+  and the owner wants review automated from the start. personal-fitness-app already runs this setup (its D-011/D-012).
+- **Decision:** `.github/workflows/ci.yml` runs every job and `CI OK` aggregates them (a new job is added to
+  `ci-ok.needs`). `.github/workflows/code-review.yml` runs `claude-haiku-5-5` and `claude-sonnet-5-5`
+  independently on `pull_request_target`, against `docs/PR_REVIEW_FOCUS.md` from the base branch, with read-only
+  tools and structured output that `scripts/ci/format_review.py` validates before posting a `COMMENT` review.
+  A blocking finding fails that reviewer; `Agent reviews OK` aggregates both. Drafts, bots, forks and
+  agent-kb-only PRs are not reviewed. `skip-agent-review` label + re-run is the escape hatch; 8 reviews per
+  reviewer per PR at most. Runs on GitHub-hosted ubuntu runners.
+- **Consequences:** needs the `ANTHROPIC_API_KEY` secret (+ `ANTHROPIC_BASE_URL` for the hackathon proxy) or
+  `CLAUDE_CODE_OAUTH_TOKEN`. The checks are advisory until a repo admin makes `CI OK` and `Agent reviews OK`
+  required on `main`. Auto-merge: D-007.
+
+### D-007 — Agent-approved PRs merge themselves (2026-11-21)
+- **Context:** the owner wants a PR to merge once CI and both agent reviews pass, with no manual step. A real
+  GitHub approval doesn't fit: both agents post as `github-actions[bot]`, where only the latest review counts,
+  and it would mean letting Actions approve PRs. Same reasoning as personal-fitness-app's D-011.
+- **Decision:** the agents approve through the required check `Agent reviews OK`. `.github/workflows/auto-merge.yml`
+  arms squash auto-merge on every same-repo, non-draft, human-authored PR to `main`, and only when GitHub reports
+  the PR as `BLOCKED` (required checks pending), so it can never merge an unprotected PR at once. `main`'s
+  protection: PR required, **0 approvals**, required checks `CI OK` and `Agent reviews OK`, no force-push or deletion.
+- **Consequences:** code reaches `main` with no human reading it; the guide's definition of `blocking` is what holds
+  the merge. Drafts are how to hold a PR. Needs a repo admin to enable "Allow auto-merge" and set the protection
+  (until then the workflow refuses to arm). Merges made with `GITHUB_TOKEN` trigger no `push` run, so CI on `main`
+  only runs on the next PR or by hand (`workflow_dispatch`). Workflow changes take effect only once merged.
+
 ## §2 Open (decide in block 1, see docs/VISION.md)
 
 - **D-?? Demo scenario.** Proposal: a surgery-adjacent task that can be shown live with a webcam (surgical hand
   scrub / WHO hand hygiene, or sterile gloving). Surgery itself can't be demoed live and video generation may block it.
-- **D-?? Repo layout and stack.** Proposal: `web/` (Vite + React + TS), `server/` (FastAPI + uv: tasks,
-  controller, session WebSocket), `gpu/` (vLLM + training scripts), `tasks/` (task library JSON), `sim/`.
+- **D-?? Repo layout and stack.** Proposal in `docs/STACK.md`.
 - **D-?? Task format.** Proposal: `task.json` = steps + objects + action vocabulary subset + automaton
   (states, legal transitions) + mistakes with corrections; validated by a JSON schema plus code checks.
 - **D-?? M_VL.** Proposal: Qwen3-VL-8B FP8 on vLLM (3090) as the main model; a Gemini Flash-class API as labeller/fallback.
