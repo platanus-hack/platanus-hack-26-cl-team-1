@@ -1,5 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { artifactExt, codeLine, formatSeconds, logSummary, usageLevel, usageText } from './format';
+import { artifactExt, codeFingerprint, codeLine, formatSeconds, logSummary, usageLevel, usageText } from './format';
+
+describe('codeFingerprint', () => {
+  it('ignores comments, trailing spaces and blank lines but not code or strings', () => {
+    const a = '// Circuito Vivo — A\nvoid loop() {\n  delay(500);  // espera\n}\n';
+    const b = '// Circuito Vivo — B\n// LED → pin 9\n\nvoid loop() {   \n  delay(500);\n}';
+    expect(codeFingerprint(a)).toBe(codeFingerprint(b));
+    expect(codeFingerprint(a)).not.toBe(codeFingerprint(a.replace('500', '700')));
+    const s = 'Serial.println("http://x // no es comentario");';
+    expect(codeFingerprint(s)).toBe(s);
+    expect(codeFingerprint('char c = \'/\'; /* x */ int y;')).toBe("char c = '/';  int y;");
+    expect(codeFingerprint(null)).toBeNull();
+  });
+});
 
 describe('compile panel formatting', () => {
   it('usage text in Spanish with thousands separators', () => {

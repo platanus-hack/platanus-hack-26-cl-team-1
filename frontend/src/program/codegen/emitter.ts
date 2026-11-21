@@ -11,12 +11,15 @@ export class Emitter {
   readonly comments: Array<string | undefined> = [];
   /** 1-based line → block id. */
   readonly lineMap: Record<number, string> = {};
+  /** 1-based lines generated implicitly (see CodegenResult.implicitLines). */
+  readonly implicitLines = new Set<number>();
   private depth = 0;
 
-  line(text: string, id?: string, comment?: string): void {
+  line(text: string, id?: string, comment?: string, implicit = false): void {
     this.lines.push(text ? '  '.repeat(this.depth) + text : '');
     this.comments.push(text && comment ? comment : undefined);
     if (id) this.lineMap[this.lines.length] = id;
+    if (implicit) this.implicitLines.add(this.lines.length);
   }
 
   /** Blank separator line (never two in a row, never at the start). */
@@ -38,6 +41,7 @@ export class Emitter {
     this.lines.push(...other.lines);
     this.comments.push(...other.comments);
     for (const [ln, id] of Object.entries(other.lineMap)) this.lineMap[Number(ln) + offset] = id;
+    for (const ln of other.implicitLines) this.implicitLines.add(ln + offset);
   }
 
   /** Final text: trailing comments aligned within runs of consecutive commented lines. */

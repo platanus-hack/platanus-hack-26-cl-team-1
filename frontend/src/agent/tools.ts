@@ -30,7 +30,7 @@ import { programContext } from '@/program/context';
 import { runHeadless } from '@/sim/runtime';
 import { getIssues } from '@/store/derived';
 import { createStarterProject } from '@/store/newProject';
-import { getProject, useProject } from '@/store/project';
+import { flushPendingEdits, getProject, useProject } from '@/store/project';
 import { useUI } from '@/store/ui';
 import { getProjectSummary } from './appContext';
 import { describeToolCall as describe, formatDuration, setDescribeProjectSource } from './describe';
@@ -254,6 +254,7 @@ const HANDLERS: { [N in ToolName]: Handler<N> } = {
   },
 
   compile: async (_input, ctx) => {
+    flushPendingEdits(); // a block edit still in the editor's debounce belongs in this build
     const project = getProject();
     if (!projectBoard(project)) return fail('No hay placa en el proyecto: agrega un Arduino Uno o un ESP32-C6 para compilar.');
     ctx.onProgress?.('Enviando el código al compilador…');

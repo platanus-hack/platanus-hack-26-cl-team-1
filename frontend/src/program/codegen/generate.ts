@@ -178,7 +178,7 @@ function emitImplicitSetup(g: GenState, out: Emitter): void {
   }
   if (rows.length === 0) return;
   out.line('// Configuración automática según tu circuito');
-  for (const r of rows) out.line(r.code, r.id, r.comment);
+  for (const r of rows) out.line(r.code, r.id, r.comment, true);
 }
 
 function emitFunction(g: GenState, signature: string, id: string | undefined, body: () => void): Emitter {
@@ -236,5 +236,5 @@ export function generateCode(ir: ProgramIR, ctx: ProgramContext): CodegenResult 
     out.blank();
     out.append(f);
   }
-  return { code: out.toString(), lineMap: out.lineMap, warnings: g.warnings };
+  return { code: out.toString(), lineMap: out.lineMap, warnings: g.warnings, implicitLines: [...out.implicitLines].sort((a, b) => a - b) };
 }

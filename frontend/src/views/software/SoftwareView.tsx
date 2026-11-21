@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ArrowLeft, Cpu } from 'lucide-react';
 import { projectBoard } from '@/catalog';
 import { useProject } from '@/store/project';
@@ -12,6 +12,8 @@ const WIDTH_KEY = 'circuito-vivo:software:code-width';
 const DEFAULT_WIDTH = 440;
 const MIN_WIDTH = 320;
 const MAX_WIDTH = 780;
+/** Room the block editor keeps: toolbox (~132px) + an open flyout (~320px). */
+const EDITOR_MIN = 460;
 
 function readWidth(): number {
   try {
@@ -46,7 +48,22 @@ function NoBoard() {
 /** Software view: Blockly editor (left) + generated C++ and compile panel (right). */
 export function SoftwareView() {
   const hasBoard = useProject((s) => projectBoard(s.project) !== null);
+  /** The width the user chose (persisted). What is shown is capped by the space available. */
   const [width, setWidth] = useState(readWidth);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [rootWidth, setRootWidth] = useState<number | null>(null);
+
+  useLayoutEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    setRootWidth(el.getBoundingClientRect().width);
+    const ro = new ResizeObserver(([entry]) => setRootWidth(entry.contentRect.width));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const maxWidth = rootWidth === null ? MAX_WIDTH : Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, rootWidth - EDITOR_MIN));
+  const shownWidth = Math.min(width, maxWidth);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -62,10 +79,10 @@ export function SoftwareView() {
   const onWidth = useCallback((w: number) => setWidth(w), []);
 
   return (
-    <div className="sw-root">
+    <div className="sw-root" ref={rootRef}>
       <BlocklyEditor />
-      <Splitter width={width} min={MIN_WIDTH} max={MAX_WIDTH} defaultWidth={DEFAULT_WIDTH} onChange={onWidth} />
-      <aside className="sw-side" style={{ width }}>
+      <Splitter width={shownWidth} min={MIN_WIDTH} max={maxWidth} defaultWidth={DEFAULT_WIDTH} onChange={onWidth} />
+      <aside className="sw-side" style={{ width: shownWidth }}>
         {hasBoard ? <CodePanel /> : <NoBoard />}
       </aside>
     </div>

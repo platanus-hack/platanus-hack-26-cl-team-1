@@ -11,7 +11,10 @@ interface Props {
 
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 
-/** Vertical splitter resizing the right column (drag, arrow keys, double-click resets). */
+/**
+ * Vertical splitter resizing the right column (drag, arrow keys, Home = narrowest, End = widest
+ * as for any separator whose value is that column's width, double-click resets). `width` must be the width actually shown, so drags never hit a dead zone.
+ */
 export function Splitter({ width, min, max, defaultWidth, onChange }: Props) {
   const drag = useRef<{ startX: number; startW: number } | null>(null);
 
@@ -59,6 +62,8 @@ export function Splitter({ width, min, max, defaultWidth, onChange }: Props) {
       onKeyDown={(e) => {
         if (e.key === 'ArrowLeft') onChange(clamp(width + 24, min, max));
         else if (e.key === 'ArrowRight') onChange(clamp(width - 24, min, max));
+        else if (e.key === 'Home') onChange(min);
+        else if (e.key === 'End') onChange(max);
         else return;
         e.preventDefault();
       }}

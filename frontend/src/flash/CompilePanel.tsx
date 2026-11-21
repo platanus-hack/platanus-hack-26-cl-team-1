@@ -7,13 +7,13 @@ import clsx from 'clsx';
 import { CircleAlert, CircleCheck, Cpu, Download, Hammer, LoaderCircle, Terminal, Usb, X, Zap } from 'lucide-react';
 import type { BoardProfile, CompileResult } from '@/contracts';
 import { getBoardProfile } from '@/catalog';
-import { useProject } from '@/store/project';
+import { flushPendingEdits, useProject } from '@/store/project';
 import { useUI } from '@/store/ui';
 import { compileSketch } from './compile';
 import { DiagnosticsList, EmptyState, StatusChip, UsageBar, useElapsed } from './CompileParts';
 import { FlashError } from './errors';
 import { downloadArtifactAsync, flashArtifact, webSerialSupported } from './flashing';
-import { artifactExt, formatSeconds, logSummary } from './format';
+import { artifactExt, codeFingerprint, formatSeconds, logSummary } from './format';
 import { projectSketch } from './project';
 import { useCompile, useFlash } from './store';
 import './compile.css';
@@ -47,7 +47,8 @@ export function CompilePanel() {
   const hasCode = 'code' in sketch;
   const elapsed = useElapsed(startedAt, busy);
 
-  const stale = !!result && !busy && (!hasCode || compiledCode !== sketch.code || result.board !== board);
+  // Comment-only changes (project name, the pin list in the header) build the same binary.
+  const stale = !!result && !busy && (!hasCode || codeFingerprint(compiledCode) !== codeFingerprint(sketch.code) || result.board !== board);
   const boardMismatch = !!result && !!board && result.board !== board;
   const resultProfile = safeProfile(result?.board);
   const status: 'idle' | CompileResult['status'] = result ? result.status : 'idle';
@@ -61,13 +62,18 @@ export function CompilePanel() {
   useEffect(() => setDownloadError(null), [result?.jobId]);
 
   const onCompile = async () => {
-    if (!hasCode || busy) return;
+    if (busy) return;
+    // A block edit made a moment ago may still be waiting in the editor's debounce: save it and
+    // compile the program as it is now, not as it was at the last render.
+    flushPendingEdits();
+    const current = projectSketch(useProject.getState().project);
+    if (!('code' in current)) return;
     userCompile?.abort();
     const ctrl = new AbortController();
     userCompile = ctrl;
     setLogOpen(false);
     useFlash.setState({ phase: 'idle', fraction: 0, message: '', error: null, jobId: null });
-    const r = await compileSketch(sketch.board, sketch.code, { signal: ctrl.signal, lineMap: sketch.lineMap });
+    const r = await compileSketch(current.board, current.code, { signal: ctrl.signal, lineMap: current.lineMap });
     if (userCompile === ctrl) userCompile = null;
     // Nothing line-mapped to show: open the raw log so the student sees what happened.
     if (r.status === 'error' && !r.diagnostics.some((d) => d.severity === 'error') && r.log.length > 200) setLogOpen(true);
@@ -97,12 +103,15 @@ export function CompilePanel() {
 
   const goToHardware = () => useUI.getState().showView('hardware');
 
-  const canFlash = !!result && result.status === 'success' && !!result.artifactUrl && serialOk && !isFlashing && !busy && !boardMismatch;
+  // An outdated build (the program or board changed since) must not reach the board.
+  const canFlash = !!result && result.status === 'success' && !!result.artifactUrl && serialOk && !isFlashing && !busy && !boardMismatch && !stale;
   const flashTitle = !serialOk
     ? 'La carga por USB requiere Google Chrome o Microsoft Edge (Web Serial).'
     : boardMismatch
       ? 'Este binario se compiló para otra placa: vuelve a compilar.'
-      : `Conecta tu ${resultProfile?.name ?? 'placa'} por USB y elige su puerto.`;
+      : stale
+        ? 'El programa cambió desde la última compilación: vuelve a compilar antes de cargarlo.'
+        : `Conecta tu ${resultProfile?.name ?? 'placa'} por USB y elige su puerto.`;
 
   return (
     <div className="flash-panel">
@@ -193,7 +202,13 @@ export function CompilePanel() {
               </div>
             )}
             <div className="flash-buttons">
-              <button type="button" className="btn" onClick={onDownload} disabled={!result.artifactUrl}>
+              <button
+                type="button"
+                className="btn"
+                onClick={onDownload}
+                disabled={!result.artifactUrl || stale}
+                title={stale ? 'El programa cambió desde la última compilación: vuelve a compilar.' : undefined}
+              >
                 <Download size={15} /> Descargar {artifactExt(result)}
               </button>
               <span className="flash-btn-wrap" title={flashTitle}>

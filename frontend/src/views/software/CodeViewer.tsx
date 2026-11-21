@@ -11,6 +11,10 @@ interface Props {
   activeLines: ReadonlySet<number>;
   /** Line → block id (clicking a mapped line focuses its block). */
   lineMap: Record<number, string>;
+  /** Auto-added setup lines: highlighted with their block but never the scroll target. */
+  implicitLines?: ReadonlySet<number>;
+  /** The simulation is running: keep the running line in view (unless the user is scrolling). */
+  following?: boolean;
   onLineClick?: (line: number, blockId: string) => void;
   /** Shown in the tab above the code. */
   fileName?: string;
@@ -57,24 +61,53 @@ async function copyText(text: string): Promise<boolean> {
 }
 
 /** Read-only C++ viewer: line numbers, light syntax colouring, block-linked highlights, copy. */
-export function CodeViewer({ code, selectedLines, activeLines, lineMap, onLineClick, fileName = 'sketch.ino' }: Props) {
+/** After the user scrolls the code by hand, stop following the running line for this long. */
+const USER_SCROLL_PAUSE_MS = 4000;
+
+const firstLine = (lines: ReadonlySet<number>, skip?: ReadonlySet<number>): number | null => {
+  let best: number | null = null;
+  for (const n of lines) if (!skip?.has(n) && (best === null || n < best)) best = n;
+  return best;
+};
+
+export function CodeViewer({ code, selectedLines, activeLines, lineMap, implicitLines, following = false, onLineClick, fileName = 'sketch.ino' }: Props) {
   const lines = useMemo(() => tokenizeCpp(code.replace(/\n$/, '')), [code]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState<'ok' | 'fail' | null>(null);
+  const userScrolledAt = useRef(0);
+  const prev = useRef<{ selected: number | null; active: number | null }>({ selected: null, active: null });
 
-  // Bring the first highlighted line into view when the selection changes.
-  const firstSelected = useMemo(() => (selectedLines.size ? Math.min(...selectedLines) : null), [selectedLines]);
-  const firstActive = useMemo(() => (activeLines.size ? Math.min(...activeLines) : null), [activeLines]);
+  // Scroll targets: the block's own code, not the pinMode lines it caused in setup().
+  const firstSelected = useMemo(() => firstLine(selectedLines, implicitLines) ?? firstLine(selectedLines), [selectedLines, implicitLines]);
+  const firstActive = useMemo(() => firstLine(activeLines), [activeLines]);
   useEffect(() => {
-    const target = firstActive ?? firstSelected;
+    const selectedChanged = firstSelected !== prev.current.selected;
+    const activeChanged = firstActive !== prev.current.active;
+    prev.current = { selected: firstSelected, active: firstActive };
+    let target: number | null = null;
+    let smooth = true;
+    if (selectedChanged && firstSelected !== null) {
+      // A block the student picked wins, even while the program runs: following the running
+      // line pauses as if they had scrolled by hand.
+      target = firstSelected;
+      userScrolledAt.current = Date.now();
+    } else if (activeChanged && firstActive !== null && following && Date.now() - userScrolledAt.current > USER_SCROLL_PAUSE_MS) {
+      target = firstActive;
+      smooth = false; // the running line changes often: smooth scrolls would pile up
+    }
     if (target === null) return;
     const box = scrollRef.current;
     const el = box?.querySelector<HTMLElement>(`[data-line="${target}"]`);
     if (!box || !el) return;
     const top = el.offsetTop;
-    const visible = top >= box.scrollTop + 8 && top + el.offsetHeight <= box.scrollTop + box.clientHeight - 48;
-    if (!visible) box.scrollTo({ top: Math.max(0, top - box.clientHeight / 3), behavior: 'smooth' });
-  }, [firstSelected, firstActive]);
+    const margin = Math.min(48, box.clientHeight * 0.15);
+    const visible = top >= box.scrollTop + 8 && top + el.offsetHeight <= box.scrollTop + box.clientHeight - margin;
+    if (!visible) box.scrollTo({ top: Math.max(0, top - box.clientHeight / 3), behavior: smooth ? 'smooth' : 'auto' });
+  }, [firstSelected, firstActive, following]);
+
+  const markUserScroll = () => {
+    userScrolledAt.current = Date.now();
+  };
 
   useEffect(() => {
     if (!copied) return;
@@ -102,7 +135,15 @@ export function CodeViewer({ code, selectedLines, activeLines, lineMap, onLineCl
           <span>{copied === 'ok' ? 'Copiado' : copied === 'fail' ? 'No se pudo copiar' : 'Copiar'}</span>
         </button>
       </div>
-      <div className="sw-code-scroll" ref={scrollRef} role="region" aria-label="Código Arduino generado">
+      <div
+        className="sw-code-scroll"
+        ref={scrollRef}
+        role="region"
+        aria-label="Código Arduino generado"
+        onWheel={markUserScroll}
+        onPointerDown={markUserScroll}
+        onKeyDown={markUserScroll}
+      >
         <pre className="sw-code-pre" style={{ ['--sw-gutter' as string]: gutterWidth }}>
           {lines.map((tokens, i) => {
             const n = i + 1;
