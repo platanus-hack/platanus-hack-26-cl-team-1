@@ -25,7 +25,7 @@ _Status as of 2026-11-21 16:55._
 | **W2** | Symbolic simulator + learned controller + rules-vs-learned eval | Cote | `sim/symbolic/`, `training/controller/`, `server/app/controller/` | **Done** (#18, #23, #25): `training/results/controller.md`, `SUP_CONTROLLER=learned` |
 | **A1** | Robotics ontology, first demo task, Claude task generator | Alonso | `tasks/`, `server/app/library/` | **Done** (#17, #24): `servo_scout_robot`, generator ran live. #19 (duplicate draft) has an Arduino task to port or close |
 | A2 | ElevenLabs `Voice` + anti-spam queue in the session | Alonso | `server/app/voice/`, `server/app/session/` | **Code done** (#22); needs the key + a voice heard end to end |
-| A3 | Deploy: static web + public path to the GPU server, `deploy-url` | Alonso | `deploy/`, `render.yaml` | not started; the 5090 is only reachable by SSH forward today |
+| A3 | Deploy: static web + public path to the GPU server, `deploy-url` | Alonso | `deploy/` | **done** (D-015): `deploy/up-demo.sh` runs the server + web on the 5090 behind a Cloudflare quick tunnel; a stable link needs a named tunnel |
 | N1 | Real web UI (port the old Modo Armado views, clip picker, debug overlay) | Anaís | `web/` | **not started** (critical for the demo); confirm owner |
 | N2 | Clips per (step, correct / mistake) + `ClipRecord` manifest: real recordings first | Anaís | `sim/video/` | not started; needs the kit + camera |
 | E1 | Label clips (Gemini/Claude as teacher); VLM base vs fine-tuned | Cote | `training/vlm/` | after N2's recordings; training on the 5090 |
