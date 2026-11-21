@@ -131,7 +131,38 @@ def parse_qwen_boxes(text: str, w: int, h: int, scale: float = 1000.0) -> list[B
         b = Box(cls, x1 / scale * w, y1 / scale * h, x2 / scale * w, y2 / scale * h).clamped(w, h)
         if b:
             boxes.append(b)
-    return boxes
+    return clean_boxes(boxes, w, h)
+
+
+# Qwen grounding sometimes loops, emitting a grid of near-duplicate boxes until max_tokens.
+MAX_PER_CLASS = {"wire_end": 24, "hand": 4, "arduino_uno": 2}
+MAX_OTHER = 10
+
+
+def _iou(a: Box, b: Box) -> float:
+    ix = max(0.0, min(a.x2, b.x2) - max(a.x1, b.x1))
+    iy = max(0.0, min(a.y2, b.y2) - max(a.y1, b.y1))
+    inter = ix * iy
+    union = (a.x2 - a.x1) * (a.y2 - a.y1) + (b.x2 - b.x1) * (b.y2 - b.y1) - inter
+    return inter / union if union > 0 else 0.0
+
+
+def clean_boxes(boxes: list[Box], w: int, h: int) -> list[Box]:
+    """Drop duplicates (IoU > 0.6, same class), implausibly large boxes and the tail of repetition loops."""
+    out: list[Box] = []
+    count: dict[int, int] = {}
+    for b in boxes:
+        name = CLASSES[b.cls]
+        area = (b.x2 - b.x1) * (b.y2 - b.y1) / (w * h)
+        if area > 0.6 and name != "arduino_uno":
+            continue
+        if any(o.cls == b.cls and _iou(o, b) > 0.6 for o in out):
+            continue
+        if count.get(b.cls, 0) >= MAX_PER_CLASS.get(name, MAX_OTHER):
+            continue
+        count[b.cls] = count.get(b.cls, 0) + 1
+        out.append(b)
+    return out
 
 
 def run_qwen(paths: list[Path], args: argparse.Namespace) -> EngineOut:
@@ -155,7 +186,8 @@ def run_qwen(paths: list[Path], args: argparse.Namespace) -> EngineOut:
                     }
                 ],
                 temperature=0,
-                max_tokens=2048,
+                max_tokens=1200,
+                extra_body={"repetition_penalty": 1.05},  # damp the box-repetition loops
             )
             with Image.open(p) as im:
                 w, h = im.size

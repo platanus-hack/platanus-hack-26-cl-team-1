@@ -294,3 +294,22 @@ def test_build_dataset(tmp_path: Path) -> None:
     assert sum(reviewed_only["images"].values()) == 3
     with pytest.raises(SystemExit):
         make_dataset.build(src, src)
+
+
+def test_clean_boxes_drops_duplicates_giants_and_repetition_tails():
+    from vision.classes import CLASS_ID
+    from vision.tools.autolabel import clean_boxes
+    from vision.yolo_io import Box
+
+    wire, led, uno = CLASS_ID["wire_end"], CLASS_ID["led_red"], CLASS_ID["arduino_uno"]
+    grid = [Box(wire, 10 + 20 * i, 10, 20 + 20 * i, 20) for i in range(40)]  # a looping answer
+    boxes = [
+        Box(led, 100, 100, 120, 130),
+        Box(led, 101, 101, 121, 131),
+        Box(led, 0, 0, 600, 450),
+        Box(uno, 0, 0, 600, 450),
+    ]
+    out = clean_boxes(boxes + grid, 640, 480)
+    assert sum(b.cls == led for b in out) == 1  # duplicate and giant dropped
+    assert sum(b.cls == uno for b in out) == 1  # the board may be big
+    assert sum(b.cls == wire for b in out) == 24

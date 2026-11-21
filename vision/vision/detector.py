@@ -151,12 +151,17 @@ def wire_color(img: np.ndarray, box: tuple[float, float, float, float]) -> str |
 
 
 class Detector:
-    """Ultralytics YOLO (fine-tuned) or YOLO-World (zero-shot fallback before F5)."""
+    """Ultralytics YOLO from CV_YOLO: the fine-tuned weights (or, explicitly, a YOLO-World file)."""
 
     def __init__(self, weights: str | Path | None = None, conf: float = 0.35, imgsz: int = 640) -> None:
         from ultralytics import YOLO, YOLOWorld  # GPU extra
 
-        weights = str(weights or os.environ.get("CV_YOLO", "yolov8s-worldv2.pt"))
+        weights = weights or os.environ.get("CV_YOLO")
+        if not weights:
+            # Zero-shot YOLO-World found nothing on real breadboard photos: without fine-tuned weights
+            # the live session is better off judging part/wire steps with the VLM alone.
+            raise RuntimeError("CV_YOLO no está definido (pesos fine-tuned de YOLO)")
+        weights = str(weights)
         self.conf = conf
         self.imgsz = imgsz
         self.zero_shot = "world" in Path(weights).name
