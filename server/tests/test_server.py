@@ -404,3 +404,10 @@ def test_recording_fails_loudly_until_implemented(first, second, expected_error)
             ws.send_text(second)
             message = ws.receive_json()
     assert message["type"] == "error" and expected_error in message["message"]
+
+
+def test_unknown_scripted_mistake_is_reported():
+    with scripted_client(mistake="touch_faucet_bar").websocket_connect("/ws/session") as ws:
+        ws.send_text(hello())
+        message = ws.receive_json()
+    assert message["type"] == "error" and "touch_faucet_bar" in message["message"]

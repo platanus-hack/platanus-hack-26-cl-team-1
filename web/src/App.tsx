@@ -100,6 +100,10 @@ export function App() {
         setStatus('Elige un video de simulación');
         return;
       }
+      if (!current()) {
+        closeSource(); // a newer start/stop happened while the camera or clip was opening
+        return;
+      }
       const client = new SessionClient(
         { type: 'hello', protocol: 1, task_id: taskId, source, debug: true, record: false },
         {
@@ -120,6 +124,7 @@ export function App() {
     stopRef.current.forEach((f) => f());
     stopRef.current = [];
     speechSynthesis.cancel();
+    setStatus('Detenido');
   }
 
   return (

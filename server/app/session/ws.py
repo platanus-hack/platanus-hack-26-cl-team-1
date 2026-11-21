@@ -197,7 +197,11 @@ async def run_session(
             return
 
         controller = make_controller()
-        session = Session(ws, task, hello, make_perception, controller, voice)
+        try:
+            session = Session(ws, task, hello, make_perception, controller, voice)
+        except ValueError as error:  # misconfigured component (e.g. a bad SUP_ setting): say so
+            await ws.send_text(Error(code="internal", message=str(error)[:500]).model_dump_json())
+            return
         await session.send(Ready(session_id=f"s{next(_session_ids)}", task=task))
         await session.emit(controller.start(task))
 
