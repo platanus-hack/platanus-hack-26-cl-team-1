@@ -9,9 +9,9 @@ h1 { margin: 0; font-size: 20px; }
 .controls label { display: flex; gap: 6px; align-items: center; font-size: 14px; color: #8a93a0; }
 .controls button[aria-pressed='true'] { outline: 2px solid #60a5fa; }
 .note { color: #fbbf24; font-size: 14px; }
-.lost { display: flex; gap: 12px; align-items: center; background: #3b1219; border: 2px solid #f87171; padding: 12px 16px;
+.lost-banner { display: flex; gap: 12px; align-items: center; background: #3b1219; border: 2px solid #f87171; padding: 12px 16px;
   border-radius: 8px; font-size: 20px; font-weight: 600; }
-.lost button { font-size: 18px; padding: 6px 14px; }
+.lost-banner button { font-size: 18px; padding: 6px 14px; }
 .stage { display: grid; grid-template-columns: minmax(0, 3fr) minmax(220px, 1fr); gap: 16px; align-items: start; }
 video { width: 100%; height: auto; background: #000; border-radius: 8px; display: block; }
 .checklist { margin: 0; padding-left: 24px; display: grid; gap: 10px; font-size: 20px; }

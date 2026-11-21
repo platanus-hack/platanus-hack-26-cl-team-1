@@ -39,6 +39,9 @@ export function SupervisorPage() {
   const voiceRef = useRef(new VoicePlayer());
   const chosenCameraRef = useRef<string | null>(null); // picked in this page; wins whenever it's connected
   const serverErrorRef = useRef<string | null>(null); // the server sends `error`, then closes
+  const runningRef = useRef(false);
+  const pendingRefreshRef = useRef(false); // a camera list change arrived during a session
+  const refreshRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     let base = '';
@@ -70,8 +73,17 @@ export function SupervisorPage() {
   }, []);
 
   useEffect(() => {
+    if (!navigator.mediaDevices) {
+      // Browsers only expose cameras on secure origins (https or localhost).
+      setCameraNote('La cámara solo funciona en https o en localhost.');
+      return;
+    }
     let alive = true;
     async function refresh() {
+      if (runningRef.current) {
+        pendingRefreshRef.current = true; // don't change the picker under a live session; redo it on stop
+        return;
+      }
       const list = await listCameras();
       if (!alive) return;
       const choice = cameraToOpen(list, chosenCameraRef.current, loadCameraId());
@@ -94,6 +106,7 @@ export function SupervisorPage() {
       await refresh();
     }
     const onChange = () => void refresh().catch((error: unknown) => setCameraNote(`No pude listar las cámaras: ${String(error)}`));
+    refreshRef.current = onChange;
     void init().catch((error: unknown) => setCameraNote(`No pude listar las cámaras: ${String(error)}`));
     navigator.mediaDevices.addEventListener('devicechange', onChange);
     return () => {
@@ -208,6 +221,14 @@ export function SupervisorPage() {
 
   const running = connection === 'connecting' || connection === 'live';
 
+  useEffect(() => {
+    runningRef.current = running;
+    if (!running && pendingRefreshRef.current) {
+      pendingRefreshRef.current = false;
+      refreshRef.current();
+    }
+  }, [running]);
+
   return (
     <main className="supervisor">
       <header>
@@ -247,7 +268,7 @@ export function SupervisorPage() {
         {cameraNote && <span className="note">{cameraNote}</span>}
       </section>
       {connection === 'lost' && (
-        <div className="lost" role="alert">
+        <div className="lost-banner" role="alert">
           <span>{lostReason}</span>
           <button onClick={() => void start()} disabled={!taskId}>
             Reconectar
