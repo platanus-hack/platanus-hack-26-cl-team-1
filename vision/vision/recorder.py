@@ -3,7 +3,7 @@
 A recording session (hello.record = true, or `set_record`) writes to
 <CV_DATA>/vlm/sessions/<session>/:
     hello.json        the design (rebuilds the expected state and the prompt)
-    frames/<ms>.jpg   one frame per second, as received
+    frames/<ms>.jpg   three frames per second, as received
     timeline.jsonl    {"t", "type": "frame"|"step"|"label", ...}
 
 Labels come from the operator (keys in the overlay): error_inserted(kind) when an error was
@@ -23,7 +23,7 @@ import numpy as np
 
 
 class Recorder:
-    def __init__(self, root: Path, session_id: str, hello: dict[str, Any], every_s: float = 1.0) -> None:
+    def __init__(self, root: Path, session_id: str, hello: dict[str, Any], every_s: float = 1 / 3) -> None:
         self.dir = root / "vlm" / "sessions" / f"{time.strftime('%Y%m%d-%H%M%S')}-{session_id}"
         (self.dir / "frames").mkdir(parents=True, exist_ok=True)
         (self.dir / "hello.json").write_text(json.dumps(hello, ensure_ascii=False))

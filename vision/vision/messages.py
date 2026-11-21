@@ -63,6 +63,11 @@ def component(exp: Expected, step: StepExpect) -> str:
     return "esa pieza"
 
 
+def _g(name: str, masc: str, fem: str) -> str:
+    """Gender agreement from the article: 'la resistencia' → fem, 'el LED' → masc."""
+    return fem if name.startswith("la ") else masc
+
+
 def _cols(n: int) -> str:
     return "una columna" if abs(n) == 1 else f"{abs(n)} columnas"
 
@@ -81,9 +86,11 @@ def issue_line(
     holes = [leg.hole for leg in step.legs]
     where = " y ".join(holes[:2]) if holes else ""
     if kind == "wrong_hole":
-        side = "a la derecha" if shift > 0 else "a la izquierda" if shift < 0 else ""
         extra = f" Va en {where}." if where else ""
-        return f"{r.choice(['Ojo', 'Ojo ahí'])}, {name} quedó corrida {_cols(shift)} {side}.{extra}".replace("  ", " ")
+        if shift == 0:  # direction unknown (dataset labels, VLM-only checks)
+            return f"{r.choice(['Ojo', 'Ojo ahí'])}, {name} quedó en otra columna.{extra}"
+        side = "a la derecha" if shift > 0 else "a la izquierda"
+        return f"{r.choice(['Ojo', 'Ojo ahí'])}, {name} quedó {_g(name, 'corrido', 'corrida')} {_cols(shift)} {side}.{extra}"
     if kind == "led_reversed":
         anode = next((leg.hole for leg in step.legs if leg.pin in ("anode", "plus")), None)
         tail = f" la pata larga va en {anode}." if anode else " dale vuelta."
@@ -102,6 +109,17 @@ def issue_line(
     if kind == "extra_part":
         return f"Sobra una pieza cerca de {where or 'ese paso'}: sácala al tiro."
     return f"Revisa {name}."
+
+
+def ok_line(exp: Expected, step: StepExpect, rng: random.Random | None = None) -> str:
+    name = component(exp, step)
+    return (rng or random).choice(
+        [
+            f"Bien ahí, {name} quedó {_g(name, 'perfecto', 'perfecta')}.",
+            f"Listo, {name} está bien {_g(name, 'puesto', 'puesta')}.",
+            f"Perfecto, {name} quedó donde va.",
+        ]
+    )
 
 
 def fixed_line(rng: random.Random | None = None) -> str:
