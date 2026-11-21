@@ -12,6 +12,34 @@ Delay: median ms from mistake start. A detection counts whatever kind the contro
 under noise the per-kind recall also credits coincidental alarms (rules never flag `repeated` on
 purpose: perception reports an ongoing action twice).
 
+## led_flashlight (v1)
+
+| noise | controller | step acc % | final ok % | mistake P % | R % | F1 % | FA/run | FA/min | delay ms |
+|---|---|---|---|---|---|---|---|---|---|
+| clean | rules | 100.0 | 100.0 | 100.0 | 77.2 | 87.2 | 0.00 | 0.00 | 0 |
+| clean | learned | 98.4 | 99.7 | 98.3 | 90.4 | 94.2 | 0.01 | 0.02 | 0 |
+| low | rules | 87.4 | 88.4 | 46.1 | 72.5 | 56.3 | 0.63 | 0.85 | 0 |
+| low | learned | 88.6 | 97.7 | 71.1 | 73.4 | 72.2 | 0.22 | 0.30 | 0 |
+| medium | rules | 60.2 | 51.3 | 20.1 | 67.5 | 31.0 | 2.02 | 2.69 | 0 |
+| medium | learned | 74.2 | 94.1 | 48.5 | 45.7 | 47.0 | 0.37 | 0.49 | 0 |
+| high | rules | 29.7 | 15.4 | 11.7 | 58.3 | 19.5 | 3.29 | 4.40 | 1386 |
+| high | learned | 56.9 | 83.1 | 31.5 | 21.5 | 25.6 | 0.35 | 0.47 | 1350 |
+
+597 test runs per noise level.
+
+Recall per mistake kind (%):
+
+| noise | controller | out_of_order | wrong_action | incomplete | repeated |
+|---|---|---|---|---|---|
+| clean | rules | 100.0 | 100.0 | 100.0 | 0.0 |
+| clean | learned | 87.4 | 99.0 | 90.6 | 85.3 |
+| low | rules | 96.4 | 95.8 | 81.0 | 12.7 |
+| low | learned | 76.8 | 85.4 | 61.3 | 74.5 |
+| medium | rules | 90.2 | 91.8 | 65.9 | 21.6 |
+| medium | learned | 50.0 | 57.7 | 31.2 | 49.0 |
+| high | rules | 70.3 | 68.8 | 58.8 | 35.0 |
+| high | learned | 19.8 | 30.2 | 14.0 | 25.2 |
+
 ## hand_hygiene_basic (v1)
 
 | noise | controller | step acc % | final ok % | mistake P % | R % | F1 % | FA/run | FA/min | delay ms |
