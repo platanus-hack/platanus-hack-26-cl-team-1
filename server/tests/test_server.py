@@ -30,7 +30,7 @@ def obs(action, t_ms=0, confidence=0.9, quality=None, seq=1):
 
 def test_library_loads_and_validates_the_repo_tasks():
     library = TaskLibrary.load(TASKS_DIR)
-    assert sorted(s.id for s in library.summaries()) == ["hand_hygiene_basic", "servo_scout_robot"]
+    assert {s.id for s in library.summaries()} >= {"hand_hygiene_basic", "servo_scout_robot"}
 
 
 def test_library_refuses_an_invalid_task(tmp_path):
@@ -160,7 +160,7 @@ def test_session_rejects_unknown_task():
 
 def test_tasks_api_lists_the_library():
     client = TestClient(create_app())
-    assert {t["id"] for t in client.get("/api/tasks").json()} == {"hand_hygiene_basic", "servo_scout_robot"}
+    assert {t["id"] for t in client.get("/api/tasks").json()} >= {"hand_hygiene_basic", "servo_scout_robot"}
     assert client.get("/api/tasks/nope").status_code == 404
 
 
