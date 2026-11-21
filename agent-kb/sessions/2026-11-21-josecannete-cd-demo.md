@@ -1,7 +1,7 @@
 # 2026-11-21 — cd-demo
 
 - **Who:** josecannete (+ agent, workspace A3)
-- **Branch / PRs:** `josecannete/cd-demo` → see the PR "ci(deploy): redeploy the demo on every green push to main"
+- **Branch / PRs:** `josecannete/cd-demo` → https://github.com/platanus-hack/platanus-hack-26-cl-team-1/pull/35
 - **Goal:** merged PRs reach the public demo without anyone running `deploy/up-demo.sh` by hand.
 
 ## Done

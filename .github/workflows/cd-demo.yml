@@ -5,8 +5,8 @@ name: CD demo
 # deploy/README.md § Continuous deployment.
 #
 # Safety: `workflow_run` runs this file from main and only for CI runs on pushes to main, so PR code never sees
-# the secrets. It checks out exactly the commit CI tested. Secrets: GPU5090 (user@host), GPU5090_PORT,
-# DEMO_SSH_KEY (a key used only for this, `restrict`ed on the box), DEMO_SSH_KNOWN_HOSTS (the box's host key).
+# the secrets; a manual run is allowed from main only. It checks out exactly the commit CI tested.
+# Secrets: GPU5090 (user@host), GPU5090_PORT, DEMO_SSH_KEY (a key used only for this, `restrict`ed on the box), DEMO_SSH_KNOWN_HOSTS (the box's host key).
 on:
   workflow_run:  # zizmor: ignore[dangerous-triggers]
     workflows: [CI]
@@ -25,11 +25,16 @@ concurrency:
 jobs:
   deploy:
     name: Deploy demo to the 5090
+    # A manual run deploys main only: picking another branch in "Run workflow" would put unreviewed code
+    # live with the deploy key.
     if: >-
-      github.event_name == 'workflow_dispatch'
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
       || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash  # explicit: -eo pipefail, so `up-demo.sh | tee` fails when the deploy does
     env:
       GPU5090: ${{ secrets.GPU5090 }}
       GPU5090_PORT: ${{ secrets.GPU5090_PORT }}
@@ -69,12 +74,15 @@ jobs:
         id: pause
         if: steps.config.outputs.ready == 'true'
         run: |
-          if ssh -p "$GPU5090_PORT" "$GPU5090" 'test -e ~/sup/cd-paused'; then
-            echo "::notice title=Demo deploy paused::~/sup/cd-paused exists on the box; not deploying ${SHA:0:7}."
-            echo "paused=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "paused=false" >> "$GITHUB_OUTPUT"
-          fi
+          # 0 = paused, 1 = not paused, anything else (255: SSH failed) = fail: never deploy on a guess.
+          code=0
+          ssh -p "$GPU5090_PORT" "$GPU5090" 'test -e ~/sup/cd-paused' || code=$?
+          case "$code" in
+            0) echo "::notice title=Demo deploy paused::~/sup/cd-paused exists on the box; not deploying ${SHA:0:7}."
+               echo "paused=true" >> "$GITHUB_OUTPUT" ;;
+            1) echo "paused=false" >> "$GITHUB_OUTPUT" ;;
+            *) echo "::error title=Pause check failed::ssh to the box exited $code"; exit 1 ;;
+          esac
 
       - uses: pnpm/action-setup@v4
         if: steps.config.outputs.ready == 'true' && steps.pause.outputs.paused == 'false'
@@ -91,7 +99,7 @@ jobs:
         if: steps.config.outputs.ready == 'true' && steps.pause.outputs.paused == 'false'
         run: |
           deploy/up-demo.sh | tee deploy.log
-          url=$(grep -o 'https://[^ ]*' deploy.log | tail -1)
+          url=$(sed -n 's/^✔ public demo: //p' deploy.log)
           {
             echo "### Demo deployed: \`${SHA:0:7}\`"
             echo

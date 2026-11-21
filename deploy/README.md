@@ -99,10 +99,11 @@ observations.
 `.github/workflows/cd-demo.yml` runs `deploy/up-demo.sh` on a GitHub runner **every time CI passes on a push to
 `main`**, for exactly the commit CI tested. Deploys queue in order, and the link stays the same because only the
 server restarts. The job summary shows the deployed commit and the link. Actions → *CD demo* → *Run workflow*
-deploys `main` by hand.
+deploys `main` by hand (other branches are refused).
 
 - **Pause it** while judges use the demo: on the box, `touch ~/sup/cd-paused`. Runs then end green with a
-  "paused" notice. `rm ~/sup/cd-paused` resumes. A manual `deploy/up-demo.sh` ignores the switch.
+  "paused" notice. If SSH fails during that check, the run fails rather than deploying.
+  `rm ~/sup/cd-paused` resumes. A manual `deploy/up-demo.sh` ignores the switch.
 - Each deploy takes the page down for a few seconds. A merge during judging is visible, so pause first.
 - If a merge breaks the demo, revert the PR, or redeploy a good commit by hand.
 
