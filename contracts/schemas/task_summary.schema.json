@@ -1,0 +1,43 @@
+{
+  "additionalProperties": false,
+  "description": "What the library lists to the UI.",
+  "properties": {
+    "domain": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "title": "Domain",
+      "type": "string"
+    },
+    "id": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "title": "Id",
+      "type": "string"
+    },
+    "steps": {
+      "minimum": 1,
+      "title": "Steps",
+      "type": "integer"
+    },
+    "title_es": {
+      "minLength": 1,
+      "title": "Title Es",
+      "type": "string"
+    },
+    "version": {
+      "title": "Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "id",
+    "version",
+    "title_es",
+    "domain",
+    "steps"
+  ],
+  "title": "TaskSummary",
+  "type": "object"
+}

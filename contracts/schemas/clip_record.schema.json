@@ -1,0 +1,147 @@
+{
+  "$defs": {
+    "ClipSource": {
+      "enum": [
+        "runway",
+        "wan",
+        "recorded"
+      ],
+      "title": "ClipSource",
+      "type": "string"
+    },
+    "Split": {
+      "description": "Assigned per run / recording session, never per frame or clip of the same run.",
+      "enum": [
+        "train",
+        "val",
+        "test"
+      ],
+      "title": "Split",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "action": {
+      "anyOf": [
+        {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Action"
+    },
+    "duration_s": {
+      "exclusiveMinimum": 0,
+      "title": "Duration S",
+      "type": "number"
+    },
+    "fps": {
+      "exclusiveMinimum": 0,
+      "title": "Fps",
+      "type": "number"
+    },
+    "id": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "title": "Id",
+      "type": "string"
+    },
+    "is_correct": {
+      "title": "Is Correct",
+      "type": "boolean"
+    },
+    "mistake_id": {
+      "anyOf": [
+        {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Mistake Id"
+    },
+    "path": {
+      "minLength": 1,
+      "title": "Path",
+      "type": "string"
+    },
+    "prompt": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Prompt"
+    },
+    "run_id": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "title": "Run Id",
+      "type": "string"
+    },
+    "source": {
+      "$ref": "#/$defs/ClipSource"
+    },
+    "split": {
+      "$ref": "#/$defs/Split"
+    },
+    "step": {
+      "anyOf": [
+        {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Step"
+    },
+    "task_id": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "title": "Task Id",
+      "type": "string"
+    },
+    "task_version": {
+      "title": "Task Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "id",
+    "task_id",
+    "task_version",
+    "run_id",
+    "split",
+    "source",
+    "path",
+    "duration_s",
+    "fps",
+    "action",
+    "step",
+    "is_correct"
+  ],
+  "title": "ClipRecord",
+  "type": "object"
+}

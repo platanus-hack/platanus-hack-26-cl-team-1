@@ -1,0 +1,158 @@
+{
+  "$defs": {
+    "Event": {
+      "enum": [
+        "none",
+        "step_done",
+        "mistake",
+        "mistake_fixed",
+        "reminder",
+        "task_done"
+      ],
+      "title": "Event",
+      "type": "string"
+    },
+    "MistakeKind": {
+      "description": "Closed set of mistake types.\n\n`out_of_order` and `repeated` are detected generically from the step graph; `wrong_action` and\n`incomplete` need a `MistakeDef` in the task to say what they look like and how to correct them.",
+      "enum": [
+        "out_of_order",
+        "wrong_action",
+        "incomplete",
+        "repeated"
+      ],
+      "title": "MistakeKind",
+      "type": "string"
+    },
+    "Priority": {
+      "enum": [
+        "normal",
+        "urgent"
+      ],
+      "title": "Priority",
+      "type": "string"
+    },
+    "SayRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "priority": {
+          "$ref": "#/$defs/Priority",
+          "default": "normal"
+        },
+        "text": {
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "SayRequest",
+      "type": "object"
+    },
+    "StepStatus": {
+      "enum": [
+        "pending",
+        "active",
+        "done",
+        "mistake"
+      ],
+      "title": "StepStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "event": {
+      "$ref": "#/$defs/Event"
+    },
+    "mistake_id": {
+      "anyOf": [
+        {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Mistake Id"
+    },
+    "mistake_kind": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/MistakeKind"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "next_steps": {
+      "items": {
+        "maxLength": 64,
+        "minLength": 1,
+        "pattern": "^[a-z][a-z0-9_]*$",
+        "type": "string"
+      },
+      "title": "Next Steps",
+      "type": "array"
+    },
+    "say": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SayRequest"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "seq": {
+      "minimum": 0,
+      "title": "Seq",
+      "type": "integer"
+    },
+    "statuses": {
+      "patternProperties": {
+        "^[a-z][a-z0-9_]*$": {
+          "$ref": "#/$defs/StepStatus"
+        }
+      },
+      "propertyNames": {
+        "maxLength": 64,
+        "minLength": 1
+      },
+      "title": "Statuses",
+      "type": "object"
+    },
+    "step": {
+      "anyOf": [
+        {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Step"
+    }
+  },
+  "required": [
+    "seq",
+    "event",
+    "statuses",
+    "next_steps"
+  ],
+  "title": "Decision",
+  "type": "object"
+}

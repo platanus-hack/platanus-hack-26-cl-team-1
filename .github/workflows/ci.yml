@@ -38,12 +38,31 @@ jobs:
       - name: Unit tests for scripts/ci
         run: python3 -I -m unittest discover -s scripts/ci/tests -t . -v
 
+  contracts:
+    name: Contracts (ruff, pytest, schemas)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: contracts
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run pytest -q -ra
+      - name: Committed JSON Schemas match the models
+        run: uv run python -m contracts.export --check
+
   # The one required check. It never has a job-level condition beyond always(),
   # because GitHub counts a skipped job as passing.
   ci-ok:
     name: CI OK
     if: always()
-    needs: [workflow-lint, tooling]
+    needs: [workflow-lint, tooling, contracts]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:

@@ -1,0 +1,120 @@
+{
+  "$defs": {
+    "Quality": {
+      "enum": [
+        "ok",
+        "bad",
+        "unknown"
+      ],
+      "title": "Quality",
+      "type": "string"
+    },
+    "Source": {
+      "description": "Where the frames come from. The server treats both the same way.",
+      "enum": [
+        "sim",
+        "webcam"
+      ],
+      "title": "Source",
+      "type": "string"
+    },
+    "VlmOutput": {
+      "additionalProperties": false,
+      "description": "`action` is null when nothing from the task's action set is happening, or the model is unsure.\nA null action must come with quality `unknown`: the supervisor stays silent on it.",
+      "properties": {
+        "action": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z][a-z0-9_]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Action"
+        },
+        "confidence": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        },
+        "objects": {
+          "default": [],
+          "items": {
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "type": "string"
+          },
+          "title": "Objects",
+          "type": "array"
+        },
+        "quality": {
+          "$ref": "#/$defs/Quality"
+        }
+      },
+      "required": [
+        "action",
+        "confidence",
+        "quality"
+      ],
+      "title": "VlmOutput",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "latency_ms": {
+      "minimum": 0,
+      "title": "Latency Ms",
+      "type": "integer"
+    },
+    "model": {
+      "minLength": 1,
+      "title": "Model",
+      "type": "string"
+    },
+    "output": {
+      "$ref": "#/$defs/VlmOutput"
+    },
+    "seq": {
+      "minimum": 0,
+      "title": "Seq",
+      "type": "integer"
+    },
+    "source": {
+      "$ref": "#/$defs/Source"
+    },
+    "t_ms": {
+      "minimum": 0,
+      "title": "T Ms",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "seq",
+    "t_ms",
+    "source",
+    "model",
+    "latency_ms",
+    "output"
+  ],
+  "title": "Observation",
+  "type": "object"
+}

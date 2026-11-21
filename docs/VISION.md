@@ -39,7 +39,7 @@ Transcribed:
 4. **Librería** of tasks, generated with Claude (a "librería cirugía" was the example: surgery).
 5. Real scenario via **webcam** (reading uncertain on the board: "escenario real").
 6. **Fine-tuning**: 1. VT, 2. controller.
-7. "Speech-to-text" on the board; the description says **text-to-speech** (the supervisor talks). Assumed TTS.
+7. "Speech-to-text" on the board means **text-to-speech** (the supervisor talks), confirmed 2026-11-21. No voice input.
 
 Pipeline on the board: `Sim | Webcam → M_VL → M_C → M_TTS`, each a `t → t` stream, with loops back to
 the scene. Second board: the **generator** on the GPU turns simulated videos into text (labels) to
@@ -95,18 +95,36 @@ paso*), then text-to-speech → done. "×40" next to the simulator suggests many
 - **Same input path for sim and webcam.** The server receives frames; it doesn't care whether they come
   from a generated clip played in the browser or from the camera.
 
-## Demo scenario (open: decide first)
+## Demo scenario (direction set, details open)
 
-The task has to be (a) demoable live with a webcam at the pitch, (b) generatable as video without
-content filters blocking it, (c) short (5–10 steps) with obvious, visible mistakes.
+**Direction (2026-11-21 ~12:30): physical assembly in robotics.** A contact who builds robots and
+assembles hardware for a living is interested and will send a short testimonial for the pitch (who they
+are, what they do, how this would help them). They also suggested a framing for the pitch; it changes the
+story, not what we build. The exact task is defined later; until then, build everything task-agnostic.
 
-Surgery itself fails (a) and probably (b). Surgery-adjacent candidates that keep the story:
+The task still has to be (a) demoable live with a webcam at the pitch, (b) generatable as video without
+content filters blocking it, (c) short (5–10 steps) with obvious, visible mistakes. Assembly fits all
+three better than the medical options did.
 
-- **Surgical hand scrub / WHO hand-hygiene steps**: hands only, 6–8 visible steps, classic order mistakes.
-- **Sterile gloving**: short, strict order, contamination mistakes are visible.
-- **Suturing on a practice pad**: impressive, but fine motion is hard for a VLM at 1–6 fps.
+Candidates in that direction (pick one once the contact's input arrives):
 
-Non-medical fallback: assembling a simple object, or a cooking recipe.
+- **A small robot / mechanism assembly**: e.g. mount a servo on a bracket, attach a horn or wheel, wire it
+  to a controller, connect the battery last. Mistakes: wrong order (battery before wiring), wrong part,
+  wrong orientation, missing screw.
+- **Wiring an Arduino circuit on a breadboard**: we already did most of this in Circuito Vivo's Modo Armado
+  (ArUco mat, hole geometry, parts library, VLM prompts; see `docs/LEGACY.md`). Lowest risk, least novel.
+- **A kit with a printed instruction sheet** the contact actually uses, if they can share one.
+
+What this means for the pieces now:
+- **Library (Alonso):** an `assembly` / `robotics` ontology (parts, tools, verbs like `mount`, `screw`,
+  `connect`, `insert`, `orient`); the old `shared/parts/*.json` at `2e9da7c` is a starting list.
+- **Simulator (Anaís):** start-frame photos of the real parts on the table for image-to-video; hands
+  manipulating small parts is the hard case to test early with Runway.
+- **Models (Cote):** fine detail (orientation, which hole, which screw) is where a VLM at 1–6 fps fails;
+  plan crops / a closer camera, and prefer steps whose result is visible in a still frame.
+
+Earlier medical candidates (hand scrub, sterile gloving) stay as fallbacks; the contracts' example
+fixture is hand washing only because it exercises every rule.
 
 ## Plan to tonight (deadline: on `main` by Sun 22-nov 05:30)
 

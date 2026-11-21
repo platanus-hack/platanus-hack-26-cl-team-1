@@ -1,0 +1,20 @@
+{
+  "domain": "hand_hygiene",
+  "version": 1,
+  "objects": [
+    {"id": "faucet", "label_es": "llave", "description": "sink faucet / tap"},
+    {"id": "soap", "label_es": "jabón", "description": "liquid soap dispenser"},
+    {"id": "hands", "label_es": "manos", "description": "both hands of the person"},
+    {"id": "paper_towel", "label_es": "toalla de papel", "description": "disposable paper towel"}
+  ],
+  "actions": [
+    {"id": "wet_hands", "verb": "wet", "object": "hands", "target": "faucet", "label_es": "mojar las manos", "visual_cue": "hands held under running water from the faucet"},
+    {"id": "apply_soap", "verb": "apply", "object": "soap", "target": "hands", "label_es": "aplicar jabón", "visual_cue": "one hand presses the soap dispenser, foam or soap on the palm"},
+    {"id": "rub_palms", "verb": "rub", "object": "hands", "label_es": "frotar las palmas", "visual_cue": "palms pressed together rubbing in circles, away from the water"},
+    {"id": "rub_backs", "verb": "rub", "object": "hands", "label_es": "frotar el dorso", "visual_cue": "one palm rubbing the back of the other hand with fingers interlaced"},
+    {"id": "rinse_hands", "verb": "rinse", "object": "hands", "target": "faucet", "label_es": "enjuagar las manos", "visual_cue": "soapy hands under running water until the foam is gone"},
+    {"id": "dry_hands", "verb": "dry", "object": "hands", "target": "paper_towel", "label_es": "secar las manos", "visual_cue": "hands patted dry with a paper towel"},
+    {"id": "touch_faucet_bare", "verb": "touch", "object": "hands", "target": "faucet", "label_es": "tocar la llave con la mano", "visual_cue": "a clean bare hand turns the faucet off directly"},
+    {"id": "close_faucet_towel", "verb": "close", "object": "faucet", "target": "paper_towel", "label_es": "cerrar la llave con la toalla", "visual_cue": "the faucet is turned off holding a paper towel"}
+  ]
+}
