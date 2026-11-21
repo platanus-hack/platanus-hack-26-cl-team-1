@@ -5,7 +5,7 @@
 - **Goal:** CI and two-agent review from the first commit, plus a stack proposal per component.
 
 ## Done
-- Ported personal-fitness-app's review setup: `code-review.yml` (Haiku + Sonnet, `pull_request_target`, read-only
+- Ported a private repo's review setup: `code-review.yml` (Haiku + Sonnet, `pull_request_target`, read-only
   tools, structured output), `scripts/ci/format_review.py` and `agent_kb_only.py` with their tests, an aggregate
   `Agent reviews OK` check. Adapted to GitHub-hosted ubuntu runners and API-key auth (hackathon proxy supported).
 - `auto-merge.yml`: arms squash auto-merge on non-draft human PRs, only when the PR is `BLOCKED` by required checks.

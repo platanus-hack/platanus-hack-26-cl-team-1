@@ -8,7 +8,7 @@ parallel, so files are split to avoid merge conflicts.
 | --- | --- | --- |
 | [backlog.md](backlog.md) | Pending work: Now / Next / Later / Done, with an owner per item | Edit freely; move finished items to Done with the PR link |
 | [decisions.md](decisions.md) | §1 in force, §2 open, §3 superseded (`D-NNN`) | Never delete from §3; check §1 and §3 before re-deciding anything |
-| [sessions/](sessions/) | One log per working session: `YYYY-MM-DD-<handle>-<slug>.md` | **Append-only.** Never edit someone else's or a past session |
+| [sessions/](sessions/) | One log per working session: `YYYY-MM-DD-<handle>-<slug>.md` | **Append-only.** Never edit someone else's or a past session, except a sensitivity scrub (see Rules) |
 
 ## Session protocol
 
@@ -50,3 +50,5 @@ parallel, so files are split to avoid merge conflicts.
 
 - ISO 8601 dates, times in America/Santiago. Bullets over prose. Link PRs with full URLs.
 - No secrets or tokens. Write about systems and decisions, not about people.
+- **This repo is public.** Don't name or quote private repos or other private sources; say "a private repo".
+  Removing such text from a past session or decision is the one allowed edit to them (a sensitivity scrub).
