@@ -26,11 +26,25 @@ if ! grep -q '^SUP_VLM_API_KEY=' ~/sup/env; then
   echo "SUP_VLM_API_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(24))')" >> ~/sup/env
   ok "new API key in ~/sup/env"
 fi
+set -a; . ~/sup/env; set +a  # the units read it via EnvironmentFile; this script needs SUP_TUNNEL_URL too
 
 cp ~/sup/gpu/systemd/*.service ~/.config/systemd/user/
 systemctl --user daemon-reload
 systemctl --user enable sup-vllm sup-tunnel >/dev/null 2>&1
-if [ "${1:-}" = "--restart" ]; then systemctl --user restart sup-vllm sup-tunnel; else systemctl --user start sup-vllm sup-tunnel; fi
+# Running services keep the config they started with: remember it, and warn when it changed since.
+config_hash=$(cat ~/sup/gpu/vllm.sh ~/sup/gpu/systemd/*.service ~/sup/env | sha256sum | cut -d' ' -f1)
+if [ "${1:-}" = "--restart" ]; then
+  systemctl --user restart sup-vllm sup-tunnel
+  echo "$config_hash" > ~/sup/.started-config
+elif ! systemctl --user is-active --quiet sup-vllm; then
+  systemctl --user start sup-vllm sup-tunnel
+  echo "$config_hash" > ~/sup/.started-config
+else
+  systemctl --user start sup-tunnel
+  if [ "$config_hash" != "$(cat ~/sup/.started-config 2>/dev/null)" ]; then
+    printf '  \033[33m!\033[0m gpu/ or ~/sup/env changed since vLLM started: run with --restart to apply it\n'
+  fi
+fi
 [ "$(loginctl show-user "$USER" -p Linger --value)" = yes ] || loginctl enable-linger || echo "  (no linger: services stop at logout)"
 
 KEY=$(grep '^SUP_VLM_API_KEY=' ~/sup/env | cut -d= -f2-)
@@ -43,7 +57,8 @@ ok "vLLM on 127.0.0.1:8001: $(models http://127.0.0.1:8001 | python3 -c 'import 
 echo "Tunnel"
 url="${SUP_TUNNEL_URL:-}"
 for _ in $(seq 60); do
-  [ -n "${SUP_TUNNEL_URL:-}" ] || url=$(journalctl --user -u sup-tunnel -o cat --since "-30min" 2>/dev/null \
+  [ -n "${SUP_TUNNEL_URL:-}" ] || url=$(journalctl --user -o cat \
+    _SYSTEMD_INVOCATION_ID="$(systemctl --user show -p InvocationID --value sup-tunnel)" 2>/dev/null \
     | grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' | tail -1 || true)
   [ -n "$url" ] && models "$url" >/dev/null 2>&1 && break
   sleep 2

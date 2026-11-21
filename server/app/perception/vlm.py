@@ -1,6 +1,8 @@
 """`VlmPerception`: Qwen3-VL served by vLLM (OpenAI-compatible API) behind the `Perception` interface.
 
 - One call in flight, and at least `min_interval_ms` between calls: anything in between returns `None`.
+  Both hold per instance, i.e. per session: N open sessions can have N calls in flight on the GPU (vLLM
+  batches up to `--max-num-seqs 4`). The demo runs one session.
 - The model sees the newest frame plus one about `span_ms` older (downscaled JPEG), and the task's actions,
   objects, next steps and mistakes. Guided decoding forces the task-narrowed `VlmOutput` schema.
 - A bad answer (invalid JSON, an action outside the task, `null` action with quality `ok`…) becomes an
