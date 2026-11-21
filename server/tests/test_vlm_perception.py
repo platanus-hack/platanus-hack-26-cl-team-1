@@ -15,7 +15,7 @@ from PIL import Image
 
 from app.library.store import TaskLibrary
 from app.main import create_app
-from app.perception import factory
+from app.perception import dataset, factory
 from app.perception.prompt import task_context, task_json_schema
 from app.perception.vlm import VlmPerception, downscale_jpeg, pick_frames
 from app.settings import PerceptionMode, Settings, VoiceMode
@@ -325,3 +325,14 @@ def test_records_frames_and_answers_when_asked(task, ontology, tmp_path):
     assert record["output"]["action"] == "wet_hands"
     assert record["next_steps"] == ["wet"]
     assert [(tmp_path / f).exists() for f in record["frames"]] == [True, True]
+
+
+def test_dataset_labels_pass_the_object_guard():
+    """A fine-tune on `dataset.target` labels must not learn answers the guard rejects."""
+    library = TaskLibrary.load(TASKS_DIR)
+    for summary in library.summaries():
+        task = library.get(summary.id)
+        onto = Ontology.model_validate_json((TASKS_DIR / task.domain / "ontology.json").read_text())
+        for action in task.actions:
+            obs = observe(make(FakeModel(dataset.target(task, onto, action)), onto), task, next_steps=[])
+            assert obs.output.action == action, (task.id, action, obs.output.note)

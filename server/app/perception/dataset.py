@@ -4,7 +4,9 @@ Every example is exactly what production sends (`prompt.build_messages`: the sys
 model saw, the task context with the next steps recorded live), and the target is the JSON answer for the
 label, key order as in `prompt.task_json_schema` (note first):
 
-- an action label → `{"note": <the action's visual cue>, "objects": [], "action": <id>, "quality": "ok", ...}`
+- an action label → `{"note": <the action's visual cue>, "objects": [<object>, <target>], "action": <id>,
+  "quality": "ok", ...}`: the objects always include the action's own object, as `VlmPerception` demands
+  (an answer without it is rejected as uncertain)
 - `none` → `{"note": "None of the task's actions is visible.", ..., "action": null, "quality": "unknown"}`
 - calls before the first label in a session are skipped.
 
@@ -36,9 +38,14 @@ NO_ACTION_NOTE = "None of the task's actions is visible."
 def target(task: Task, ontology: Ontology, label: str) -> str:
     cues = {a.id: a.visual_cue for a in ontology.actions}
     action = None if label == NONE else label
+    seen = (
+        []
+        if action is None
+        else [o for o in (ontology.action(action).object, ontology.action(action).target) if o]
+    )
     answer = {
         "note": f"{cues[label][0].upper()}{cues[label][1:]}." if action else NO_ACTION_NOTE,
-        "objects": [],
+        "objects": seen,
         "action": action,
         "quality": "ok" if action else "unknown",
         "confidence": CONFIDENCE,
