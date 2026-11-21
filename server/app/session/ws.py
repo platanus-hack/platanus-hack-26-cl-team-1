@@ -51,12 +51,15 @@ class Session:
         ws: WebSocket,
         task: Task,
         hello: Hello,
-        perception: Perception,
+        make_perception: Callable[[Task], Perception],
         controller: Controller,
         voice: Voice,
     ) -> None:
         self.ws, self.task, self.hello = ws, task, hello
-        self.perception, self.controller, self.voice = perception, controller, voice
+        self.make_perception = make_perception
+        self.perception = make_perception(task)
+        self.controller, self.voice = controller, voice
+        self.generation = 0  # bumped by reset: results from an older generation are dropped
         self.frames: deque[Frame] = deque(maxlen=FRAME_WINDOW)
         self.send_lock = asyncio.Lock()
         self.perceiving: asyncio.Task | None = None
@@ -106,19 +109,19 @@ class Session:
         self.last_t_ms = t_ms
         await self.send(Debug(seq=seq))
         if self.perceiving is None or self.perceiving.done():
-            self.perceiving = asyncio.create_task(self.perceive(list(self.frames)))
+            self.perceiving = asyncio.create_task(self.perceive(list(self.frames), self.generation))
         if self.last_tick_ms is None or t_ms - self.last_tick_ms >= TICK_EVERY_MS:
             self.last_tick_ms = t_ms
             decision = self.controller.tick(t_ms)
             if decision is not None:
                 await self.emit(decision)
 
-    async def perceive(self, frames: list[Frame]) -> None:
+    async def perceive(self, frames: list[Frame], generation: int) -> None:
         try:
             next_steps = list(self.latest.next_steps) if self.latest else []
             observation = await self.perception.observe(frames, self.task, next_steps)
-            if observation is None:
-                return
+            if observation is None or generation != self.generation:
+                return  # nothing new, or the session was reset while the model was thinking
             if self.hello.debug:
                 await self.send(
                     Debug(
@@ -132,12 +135,28 @@ class Session:
             log.exception("perception failed")
             await self.send(Error(code="internal", message="La percepción falló; revisa el servidor."))
 
+    async def reset(self) -> None:
+        """Start the task over: drop in-flight perception, old frames and the open issue."""
+        self.generation += 1
+        if self.perceiving is not None and not self.perceiving.done():
+            self.perceiving.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self.perceiving
+        self.perceiving = None
+        self.frames.clear()
+        self.perception = self.make_perception(self.task)
+        self.last_tick_ms = None
+        if self.issue_open:
+            self.issue_open = False
+            await self.send(IssueClear(step=None))
+        await self.emit(self.controller.start(self.task))
+
     async def on_text(self, text: str) -> None:
         message = client_message_adapter.validate_json(text)
         if isinstance(message, SkipStep):
             await self.emit(self.controller.skip(self.last_t_ms))
         elif isinstance(message, Reset):
-            await self.emit(self.controller.start(self.task))
+            await self.reset()
         elif isinstance(message, Mute):
             self.muted = message.on
         elif isinstance(message, Label):
@@ -174,7 +193,7 @@ async def run_session(
             return
 
         controller = make_controller()
-        session = Session(ws, task, hello, make_perception(task), controller, voice)
+        session = Session(ws, task, hello, make_perception, controller, voice)
         await session.send(Ready(session_id=f"s{next(_session_ids)}", task=task))
         await session.emit(controller.start(task))
 

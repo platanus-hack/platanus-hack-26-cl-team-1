@@ -232,3 +232,48 @@ def test_session_survives_skip_after_completion():
                 break
     assert not [m for m in messages if m["type"] == "error"]
     assert [m for m in messages if m["type"] == "state"][-1]["next_steps"] == []
+
+
+# ── reset (review finding on PR #14) ─────────────────────────────────────────
+
+
+def run_frames(ws, start_seq, count, step_ms=50, t0=0):
+    messages = []
+    for i in range(count):
+        seq = start_seq + i
+        ws.send_bytes(pack_frame(seq, t0 + i * step_ms, b"\xff\xd8fake"))
+        while True:
+            message = ws.receive_json()
+            messages.append(message)
+            if message["type"] == "debug" and message["seq"] == seq:
+                break
+    return messages
+
+
+def test_reset_clears_the_issue_and_replays_perception():
+    settings = Settings(
+        tasks_dir=TASKS_DIR, perception=PerceptionMode.SCRIPTED, scripted_every_ms=100,
+        voice=VoiceMode.BROWSER, cors_origins=(),
+    )  # fmt: skip
+    client = TestClient(create_app(settings))
+    with client.websocket_connect("/ws/session") as ws:
+        ws.send_text(
+            json.dumps({"type": "hello", "protocol": 1, "task_id": "hand_hygiene_basic", "source": "sim"})
+        )
+        ws.receive_json()  # ready
+        first = run_frames(ws, 0, 12)
+        assert [m for m in first if m["type"] == "state"][-1]["statuses"]["wet"] == "done"
+
+        ws.send_text(json.dumps({"type": "reset"}))
+        after_reset = []
+        while True:
+            message = ws.receive_json()
+            after_reset.append(message)
+            if message["type"] == "say":
+                break
+        state = next(m for m in after_reset if m["type"] == "state")
+        assert set(state["statuses"].values()) == {"active", "pending"}  # nothing done anymore
+
+        # A fresh scripted perception replays from the start on the new frames.
+        replay = run_frames(ws, 100, 12, t0=10_000)
+        assert [m for m in replay if m["type"] == "state"][-1]["statuses"]["wet"] == "done"
