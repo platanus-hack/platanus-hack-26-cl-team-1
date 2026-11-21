@@ -11,3 +11,6 @@ __pycache__
 *.tsbuildinfo
 frontend/.renders
 frontend/.renders-ui
+.venv
+.ruff_cache
+tmp/

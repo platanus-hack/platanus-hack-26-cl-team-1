@@ -8,6 +8,11 @@ Track: 🌐 Simulations
 
 team-1
 
+**Project (in progress):** a supervisor that watches a step-by-step task (simulated video or a real
+webcam), predicts the next correct action from the task's recipe, and speaks the next step or a
+correction. See [docs/VISION.md](docs/VISION.md). Agents start at [CLAUDE.md](CLAUDE.md). The previous
+project (Circuito Vivo) is described in [docs/LEGACY.md](docs/LEGACY.md).
+
 - Alonso Felipe Gac Monárdez ([@alonsogm4](https://github.com/alonsogm4))
 - Anaís Neira Zúñiga ([@chichitaocss](https://github.com/chichitaocss))
 - José Rodolfo Cañete López ([@josecannete](https://github.com/josecannete))
