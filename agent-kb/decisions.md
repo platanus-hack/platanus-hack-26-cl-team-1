@@ -109,6 +109,8 @@ with a pointer to their replacement; nothing is ever deleted from §3.
 - **Consequences:** backward compatible (defaulted); schemas and TS types regenerated. No other consumer yet.
 
 ### D-012 — Perception: Qwen3-VL-8B FP8 on vLLM behind a keyed tunnel (2026-11-21)
+- **Update:** the model and the client stand; where it is served (the 3090 behind a keyed tunnel) is replaced by
+  D-014 (the 5090 over an SSH port-forward). The 3090 setup stays as a fallback.
 - **Context:** the scripted fake must give way to a real video-language model behind `Perception`; the 3090 is
   on a private network and the server may run on a laptop.
 - **Decision:** `SUP_PERCEPTION=vlm` → `VlmPerception` (`server/app/perception/vlm.py`) calls Qwen3-VL-8B-Instruct-FP8

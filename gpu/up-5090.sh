@@ -13,9 +13,15 @@ ALIVE='python3 -c "import urllib.request as u; u.urlopen(\"http://127.0.0.1:8001
 if "${SSH[@]}" "$ALIVE" 2>/dev/null; then
   echo "vLLM already running"
 else
-  # A fresh log, so an old "EngineCore failed" can't abort this start.
-  "${SSH[@]}" 'nohup ~/sup/gpu/vllm-5090.sh > ~/sup/logs/vllm-8b.log 2>&1 < /dev/null & disown'
-  echo "starting vLLM (first start ~2 min; log: ~/sup/logs/vllm-8b.log)…"
+  # "[v]llm" so the pattern can't match the remote shell running this line. A start already loading
+  # the model doesn't answer yet: wait for it rather than launching a second one.
+  if "${SSH[@]}" 'pgrep -f "[v]llm serve .*--port 8001" >/dev/null'; then
+    echo "vLLM is starting already; waiting…"
+  else
+    # A fresh log, so an old "EngineCore failed" can't abort this start.
+    "${SSH[@]}" 'nohup ~/sup/gpu/vllm-5090.sh > ~/sup/logs/vllm-8b.log 2>&1 < /dev/null & disown'
+    echo "starting vLLM (first start ~2 min; log: ~/sup/logs/vllm-8b.log)…"
+  fi
   for i in $(seq 72); do
     "${SSH[@]}" "$ALIVE" 2>/dev/null && break
     if "${SSH[@]}" 'grep -q "EngineCore failed" ~/sup/logs/vllm-8b.log'; then
