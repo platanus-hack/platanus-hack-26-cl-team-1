@@ -13,12 +13,23 @@ import numpy as np
 from . import messages as M
 from .detector import Detector, Placed, place, wire_color
 from .expected import WIRE_COLORS_ES, Expected, StepExpect, build_expected
+from .protocol import ISSUE_KINDS
+from .recorder import Recorder
 from .session import Config, FrameResult, Session
 from .state import Event, FrameVerdict, Tracker
 from .vlm import VlmJudge, VlmResult
 from .vlm_prompt import StepInfo, b64_jpeg, make_crop
 
 log = logging.getLogger(__name__)
+
+LABEL_ES = {
+    "missing": "falta la pieza",
+    "wrong_hole": "hueco corrido",
+    "led_reversed": "polaridad al revés",
+    "wrong_part": "pieza equivocada",
+    "wire_wrong_end": "cable mal puesto",
+    "extra_part": "pieza de más",
+}
 
 
 def step_info(exp: Expected, step: StepExpect, raw: dict[str, Any]) -> StepInfo:
@@ -54,6 +65,7 @@ class AssemblySession(Session):
         self._paused: str | None = None
         self._vlm_ms: float | None = None
         self._issue_key: str | None = None
+        self.recorder: Recorder | None = None
 
     async def run(self) -> None:
         self._worker = asyncio.create_task(self._work())
@@ -63,6 +75,8 @@ class AssemblySession(Session):
             self._worker.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await self._worker
+            if self.recorder:
+                self.recorder.close()
 
     # ------------------------------------------------------------------ hooks
     def on_hello_extra(self) -> None:
@@ -91,6 +105,11 @@ class AssemblySession(Session):
             res.latency_ms["vlm"] = round(self._vlm_ms)
         if self.book is None or self.tracker is None:
             return
+        if self.record:  # dataset session: the operator drives steps and labels, no auto events
+            rec = self._recorder()
+            rec.frame(jpeg, self.book.current, self.reg.H, res.calib_ok, res.detections)
+            res.paused = f"Grabando dataset · {rec.frames} frames · {rec.labels} etiquetas"
+            return
         for ev in self.tracker.update(self.book.current, self._placed, res.calib_ok):
             if ev.kind == "paused":
                 self._paused = ev.verdict.detail if ev.verdict else "Pausa"
@@ -103,6 +122,36 @@ class AssemblySession(Session):
     async def advance(self, manual: bool = False) -> None:
         await self._clear_issue(say_fixed=False)
         await super().advance(manual)
+        if self.record and self.book:
+            self._recorder().step(self.book.current, self.book.status, "manual" if manual else "auto")
+
+    # ------------------------------------------------------------------ recording (F7)
+    def _recorder(self) -> Recorder:
+        if self.recorder is None:
+            assert self.hello is not None
+            self.recorder = Recorder(self.cfg.data_dir, self.id, self.hello)
+            if self.book:
+                self.recorder.step(self.book.current, self.book.status, "start")
+            log.info("grabando dataset en %s", self.recorder.dir)
+        return self.recorder
+
+    async def on_message(self, m: dict) -> None:
+        await super().on_message(m)
+        if m.get("type") == "back_step" and self.record and self.book:
+            self._recorder().step(self.book.current, self.book.status, "back")
+
+    async def on_label(self, m: dict) -> None:
+        if not self.record or self.book is None:
+            return
+        rec = self._recorder()
+        if m.get("kind") == "error_inserted" and m.get("error") in ISSUE_KINDS:
+            step = self.exp.step(self.book.current) if self.exp else None
+            target = m.get("target") or (step.part or step.wire if step else None)
+            rec.label("error_inserted", self.book.current, m["error"], target)
+            self.speaker.say(f"Marcado: {LABEL_ES[m['error']]}.", "error")
+        elif m.get("kind") == "error_fixed":
+            rec.label("error_fixed", self.book.current)
+            self.speaker.say("Marcado: corregido.")
 
     # ------------------------------------------------------------------ events
     async def _work(self) -> None:

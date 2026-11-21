@@ -9,7 +9,7 @@ import { getNetlist } from '@/store/derived';
 import { useProject } from '@/store/project';
 import { AudioQueue, BrowserClipPlayer } from './audioQueue';
 import { AssemblyClient } from './client';
-import { type ClientMsg, type HelloMsg, PROTOCOL, type ServerMsg } from './protocol';
+import { type ClientMsg, type HelloMsg, type IssueKind, PROTOCOL, type ServerMsg } from './protocol';
 import { useAssembly } from './store';
 import { FRAME_H, FRAME_W } from './useCamera';
 
@@ -191,6 +191,31 @@ export function setMuted(muted: boolean): void {
 export function setDebug(debug: boolean): void {
   useAssembly.getState().patch({ debug });
   send({ type: 'set_debug', debug });
+}
+
+/** Dataset recording (F7): keys 1–6 = error inserted (this order), 0 = fixed, N = step done. */
+export const LABEL_KEYS: Array<{ key: string; kind: IssueKind; label: string }> = [
+  { key: '1', kind: 'missing', label: 'falta' },
+  { key: '2', kind: 'wrong_hole', label: 'hueco corrido' },
+  { key: '3', kind: 'led_reversed', label: 'polaridad' },
+  { key: '4', kind: 'wrong_part', label: 'pieza equivocada' },
+  { key: '5', kind: 'wire_wrong_end', label: 'cable mal' },
+  { key: '6', kind: 'extra_part', label: 'pieza de más' },
+];
+
+export function setRecord(record: boolean): void {
+  useAssembly.getState().patch({ record });
+  send({ type: 'set_record', record });
+}
+
+/** Returns true when the key was a recording shortcut. */
+export function recordKey(key: string): boolean {
+  if (!useAssembly.getState().record) return false;
+  const l = LABEL_KEYS.find((x) => x.key === key);
+  if (l) return send({ type: 'label', kind: 'error_inserted', error: l.kind });
+  if (key === '0') return send({ type: 'label', kind: 'error_fixed' });
+  if (key === 'n' || key === 'N') return send({ type: 'skip_step' });
+  return false;
 }
 
 export function setCapture(on: boolean): void {

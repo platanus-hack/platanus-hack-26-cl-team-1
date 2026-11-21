@@ -9,7 +9,9 @@ import {
 } from 'lucide-react';
 import type { GuideStep } from '@/contracts';
 import { CALIB_HOLES, useAssembly } from '@/assembly/store';
-import { send, setCapture, setDebug, setMuted, startSession, stopSession } from '@/assembly/session';
+import {
+  LABEL_KEYS, recordKey, send, setCapture, setDebug, setMuted, setRecord, startSession, stopSession,
+} from '@/assembly/session';
 import { useCamera } from '@/assembly/useCamera';
 import type { StepStatus } from '@/assembly/protocol';
 import { buildWiringGuide } from '@/guide';
@@ -126,6 +128,7 @@ function Stage({ cam }: { cam: ReturnType<typeof useCamera> }) {
   const paused = useAssembly((s) => s.paused);
   const calibClick = useAssembly((s) => s.calibClick);
   const capture = useAssembly((s) => s.capture);
+  const record = useAssembly((s) => s.record);
   const visionUrl = useAssembly((s) => s.visionUrl);
   const setVisionUrl = useAssembly((s) => s.setVisionUrl);
   const steps = useProject((s) => s.project.parts.length);
@@ -209,7 +212,25 @@ function Stage({ cam }: { cam: ReturnType<typeof useCamera> }) {
           <button className={`btn sm ${capture.on ? 'danger' : ''}`} onClick={() => setCapture(!capture.on)}>
             <Camera size={14} /> {capture.on ? `Detener fotos (${capture.saved})` : 'Grabar fotos'}
           </button>
+          <button className={`btn sm ${record ? 'danger' : ''}`} onClick={() => setRecord(!record)} title="Sesión de dataset para el VLM">
+            <CircleDot size={14} /> {record ? 'Detener sesión de dataset' : 'Grabar sesión (dataset)'}
+          </button>
           <span className="asm-debug-note">Tecla D: ocultar el modo debug</span>
+        </div>
+      )}
+      {debug && running && record && (
+        <div className="asm-debugbar asm-keys mono">
+          {LABEL_KEYS.map((l) => (
+            <span key={l.key}>
+              <kbd>{l.key}</kbd> {l.label}
+            </span>
+          ))}
+          <span>
+            <kbd>0</kbd> corregido
+          </span>
+          <span>
+            <kbd>N</kbd> paso hecho
+          </span>
         </div>
       )}
     </section>
@@ -227,6 +248,10 @@ export function AssemblyView() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (isTypingTarget(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (recordKey(e.key)) {
+        e.preventDefault();
+        return;
+      }
       if (e.key === 'd' || e.key === 'D') setDebug(!useAssembly.getState().debug);
       if (e.key === 'Escape') useAssembly.getState().patch({ calibClick: null });
     };
