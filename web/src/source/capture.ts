@@ -21,8 +21,13 @@ export async function openClip(video: HTMLVideoElement, file: File): Promise<() 
   };
 }
 
-/** Grab JPEG frames from `video` at `fps`; returns a stop function. Skips a tick while one is encoding. */
-export function startCapture(video: HTMLVideoElement, fps: number, onJpeg: (jpeg: ArrayBuffer) => void): () => void {
+/** Grab 640×480 JPEG frames from `source` at `fps`; returns a stop function. Skips a tick while one is
+encoding. `source` is a <video> (webcam, clip) or a canvas (an in-page simulator): same path either way. */
+export function startCapture(
+  source: HTMLVideoElement | HTMLCanvasElement,
+  fps: number,
+  onJpeg: (jpeg: ArrayBuffer) => void,
+): () => void {
   const canvas = document.createElement('canvas');
   canvas.width = 640;
   canvas.height = 480;
@@ -30,9 +35,9 @@ export function startCapture(video: HTMLVideoElement, fps: number, onJpeg: (jpeg
   if (!ctx) throw new Error('canvas 2d context unavailable');
   let encoding = false;
   const timer = window.setInterval(() => {
-    if (encoding || video.readyState < 2) return;
+    if (encoding || (source instanceof HTMLVideoElement && source.readyState < 2)) return;
     encoding = true;
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
     canvas.toBlob(
       (blob) => {
         encoding = false;
