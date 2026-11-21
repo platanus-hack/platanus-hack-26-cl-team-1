@@ -170,7 +170,8 @@ with a pointer to their replacement; nothing is ever deleted from §3.
 - **Decision:** `.github/workflows/cd-demo.yml` runs `deploy/up-demo.sh` on a runner after CI passes on a push to
   `main` (`workflow_run`, from main only, for the tested commit), queued, never cancelled halfway. It logs in
   with a key used only by CD, `restrict`ed on the box, and checks the pinned host key. Secrets: `GPU5090`,
-  `GPU5090_PORT`, `DEMO_SSH_KEY`, `DEMO_SSH_KNOWN_HOSTS`. A file on the box (`~/sup/cd-paused`) pauses it
+  `GPU5090_PORT`, `DEMO_SSH_KEY`, `DEMO_SSH_KNOWN_HOSTS`, stored in the `demo` environment, restricted to `main`.
+  A file on the box (`~/sup/cd-paused`) pauses it
   without needing repo admin.
 - **Consequences:** GitHub holds a key that can run commands as root on the GPU box. Every merge restarts the
   demo server for a few seconds, so pause CD during judging. A broken merge reaches the demo once CI passes;

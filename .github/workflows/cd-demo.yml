@@ -33,6 +33,9 @@ jobs:
       || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # The secrets live in this environment, restricted to `main` in the repo settings. That is the real guard:
+    # the `if` above is read from whichever branch is run, so a branch could drop it; the environment can't be.
+    environment: demo
     defaults:
       run:
         shell: bash  # explicit: -eo pipefail, so `up-demo.sh | tee` fails when the deploy does

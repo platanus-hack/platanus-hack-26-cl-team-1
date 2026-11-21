@@ -108,8 +108,12 @@ deploys `main` by hand (other branches are refused).
 - Each deploy takes the page down for a few seconds. A merge during judging is visible, so pause first.
 - If a merge breaks the demo, revert the PR, or redeploy a good commit by hand.
 
-**One-time setup.** It needs repo secrets, which only a repo admin can add. Until then the job ends green with a
-"Demo deploy skipped" warning.
+**One-time setup** (only a repo admin can do it). Until then the job ends green with a "Demo deploy skipped"
+warning.
+1. *Settings → Environments → `demo`* (the first run creates it): under *Deployment branches and tags*, choose
+   **Selected branches** and add **`main` only**. This is what keeps the key away from other branches: anyone
+   with write access can run a workflow file from their own branch, and repo-level secrets would reach it.
+2. Add these as **environment secrets of `demo`**, not repository secrets:
 
 | Secret | Value |
 |---|---|
