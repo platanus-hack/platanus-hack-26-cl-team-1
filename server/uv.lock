@@ -686,6 +686,7 @@ dependencies = [
     { name = "anthropic" },
     { name = "contracts" },
     { name = "fastapi" },
+    { name = "httpx" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -701,6 +702,7 @@ requires-dist = [
     { name = "anthropic", specifier = ">=0.70" },
     { name = "contracts", editable = "../contracts" },
     { name = "fastapi", specifier = ">=0.115" },
+    { name = "httpx", specifier = ">=0.27" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },
 ]
 

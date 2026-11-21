@@ -7,6 +7,7 @@ dependencies = [
     "anthropic>=0.70",
     "contracts",
     "fastapi>=0.115",
+    "httpx>=0.27",
     "uvicorn[standard]>=0.32",
 ]
 

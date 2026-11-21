@@ -15,6 +15,7 @@ from .perception.factory import make_perception
 from .session.ws import run_session
 from .settings import Settings
 from .voice.factory import make_voice
+from .voice.queue import VoiceQueue
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -42,7 +43,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.websocket("/ws/session")
     async def session(ws: WebSocket) -> None:
-        await run_session(ws, library, lambda t: make_perception(settings, t), RulesController, voice)
+        await run_session(
+            ws,
+            library,
+            lambda t: make_perception(settings, t),
+            RulesController,
+            voice,
+            lambda: VoiceQueue(min_gap_ms=settings.voice_min_gap_ms),
+        )
 
     return app
 
