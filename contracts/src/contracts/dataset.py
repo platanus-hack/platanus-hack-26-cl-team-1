@@ -23,6 +23,7 @@ from .common import (
     Strict,
     TaskId,
 )
+from .perception import Quality
 
 
 class Split(enum.StrEnum):
@@ -38,6 +39,7 @@ class TrajectoryEvent(Strict):
     true_action: ActionId | None  # what really happened (null = idle / nothing relevant)
     observed_action: ActionId | None  # what simulated perception reported (noise applied)
     observed_confidence: Confidence
+    observed_quality: Quality = Quality.UNKNOWN  # simulated perception's quality judgement (`incomplete`)
     step: StepId | None  # the step the true action belongs to
     mistake_kind: MistakeKind | None = None  # ground truth
     mistake_id: MistakeId | None = None

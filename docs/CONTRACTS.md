@@ -116,7 +116,8 @@ Helpers: `pack_frame/unpack_frame`, `pack_audio/unpack_audio`, `client_message_a
 
 - `Trajectory`: a symbolic run over a task (`seed`, `split`, `noise` parameters, `completed`), with events
   carrying ground truth (`true_action`, `step`, `mistake_kind`, `mistake_id`) and what simulated
-  perception reported (`observed_action`, `observed_confidence`). Trains and tests the controller.
+  perception reported (`observed_action`, `observed_confidence`, `observed_quality`: the `Quality` a
+  `VlmOutput` would carry, so `incomplete` is observable; default `unknown`). Trains and tests the controller.
 - `ClipRecord`: one clip (`runway | wan | recorded`) with its label (`action`, `step`, `is_correct`,
   `mistake_id`), `run_id`, `split`, `path` relative to the data root on the GPU server, and the generation
   `prompt`. Manifests are JSONL in git; the clips are not.

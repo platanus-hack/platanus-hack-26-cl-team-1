@@ -99,6 +99,13 @@ with a pointer to their replacement; nothing is ever deleted from §3.
   and no API keys; each owner replaces a fake behind its interface. Message and output schemas are exported in
   serialization mode so TypeScript sees `type` as required.
 
+### D-011 — `TrajectoryEvent.observed_quality` (2026-11-21)
+- **Context:** `incomplete` (right action, done badly) reaches the controller only through `VlmOutput.quality`;
+  trajectories had no way to carry it, so neither controller could be trained or tested on it.
+- **Decision:** `TrajectoryEvent` gets `observed_quality: Quality = "unknown"`, the quality simulated perception
+  reports alongside `observed_action`/`observed_confidence`.
+- **Consequences:** backward compatible (defaulted); schemas and TS types regenerated. No other consumer yet.
+
 ## §2 Open (decide in block 1, see docs/VISION.md)
 
 - **D-?? Demo scenario.** Direction: physical assembly in robotics (a contact who assembles robots will give a

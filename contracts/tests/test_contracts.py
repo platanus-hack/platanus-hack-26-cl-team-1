@@ -305,3 +305,21 @@ def test_scripted_perception_replays_on_the_client_clock(task):
     assert [at(0, 5000), at(1, 5500), at(2, 6000), at(3, 6100), at(4, 7000)] == [
         None, None, "wet_hands", None, "touch_faucet_bare",
     ]  # fmt: skip
+
+
+def test_trajectory_event_observed_quality_defaults_to_unknown():
+    from contracts import Quality, TrajectoryEvent
+
+    event = TrajectoryEvent(
+        t_ms=0, true_action=None, observed_action=None, observed_confidence=0.0, step=None
+    )
+    assert event.observed_quality is Quality.UNKNOWN
+    bad = TrajectoryEvent(
+        t_ms=1,
+        true_action="a",
+        observed_action="a",
+        observed_confidence=0.9,
+        step="s",
+        observed_quality="bad",
+    )
+    assert bad.observed_quality is Quality.BAD
