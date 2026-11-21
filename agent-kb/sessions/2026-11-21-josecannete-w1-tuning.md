@@ -1,7 +1,7 @@
 # 2026-11-21 — w1-tuning
 
 - **Who:** josecannete (+ agent, workspace W1)
-- **Branch / PRs:** https://github.com/platanus-hack/platanus-hack-26-cl-team-1/pull/34 (tools), `josecannete/perception-fixes` (fixes)
+- **Branch / PRs:** https://github.com/platanus-hack/platanus-hack-26-cl-team-1/pull/34 (tools), https://github.com/platanus-hack/platanus-hack-26-cl-team-1/pull/37 (fixes)
 - **Goal:** see why the first live webcam run (hand washing, iPhone) went badly, and fix it.
 
 ## Done
