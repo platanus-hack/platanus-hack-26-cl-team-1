@@ -19,8 +19,12 @@ def _ontology(path: Path) -> Ontology:
 
 
 @cache
-def _completer(base_url: str, model: str, api_key: str | None, timeout_s: float) -> OpenAICompleter:
-    return OpenAICompleter(base_url, model, api_key, timeout_s)  # one HTTP connection pool for all sessions
+def _completer(
+    base_url: str, model: str, api_key: str | None, timeout_s: float, max_tokens: int
+) -> OpenAICompleter:
+    return OpenAICompleter(
+        base_url, model, api_key, timeout_s, max_tokens
+    )  # one HTTP connection pool for all sessions
 
 
 def make_perception(settings: Settings, task: Task) -> Perception:
@@ -35,7 +39,11 @@ def make_perception(settings: Settings, task: Task) -> Perception:
     if settings.perception is PerceptionMode.VLM:
         assert settings.vlm_base_url  # checked by Settings
         completer = _completer(
-            settings.vlm_base_url, settings.vlm_model, settings.vlm_api_key, settings.vlm_timeout_s
+            settings.vlm_base_url,
+            settings.vlm_model,
+            settings.vlm_api_key,
+            settings.vlm_timeout_s,
+            settings.vlm_max_tokens,
         )
         return VlmPerception(
             completer,
@@ -44,6 +52,7 @@ def make_perception(settings: Settings, task: Task) -> Perception:
             min_interval_ms=settings.vlm_min_interval_ms,
             max_side_px=settings.vlm_max_side_px,
             span_ms=settings.vlm_span_ms,
+            frames_per_call=settings.vlm_frames,
             record_dir=settings.vlm_record_dir,
         )
     raise ValueError(f"unsupported perception mode {settings.perception!r}")

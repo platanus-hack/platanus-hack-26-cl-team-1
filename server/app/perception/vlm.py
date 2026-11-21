@@ -3,8 +3,8 @@
 - One call in flight, and at least `min_interval_ms` between calls: anything in between returns `None`.
   Both hold per instance, i.e. per session: N open sessions can have N calls in flight on the GPU (vLLM
   batches up to `--max-num-seqs 4`). The demo runs one session.
-- The model sees the newest frame plus one about `span_ms` older (downscaled JPEG), and the task's actions,
-  objects, next steps and mistakes. Guided decoding forces the task-narrowed `VlmOutput` schema.
+- The model sees `frames_per_call` frames spread over the last `span_ms` (downscaled JPEG), the task's
+  actions, objects, next steps and mistakes. Guided decoding forces the task-narrowed `VlmOutput` schema.
 - A bad answer (invalid JSON, an action outside the task, `null` action with quality `ok`…) becomes an
   uncertain observation (`action=None`, `quality=unknown`) so the supervisor stays silent. Real failures
   (server down, timeout, HTTP error, an undecodable frame) raise, and the session reports them.
@@ -38,7 +38,7 @@ from .prompt import NOTE_MAX_CHARS, build_messages, task_json_schema
 
 log = logging.getLogger(__name__)
 
-MAX_TOKENS = 200
+MAX_TOKENS = 256  # enough for the JSON answer; a thinking model needs more (SUP_VLM_MAX_TOKENS)
 JPEG_QUALITY = 85
 
 
@@ -51,7 +51,9 @@ class ChatCompleter(Protocol):
 class OpenAICompleter:
     """`ChatCompleter` over an OpenAI-compatible server (vLLM)."""
 
-    def __init__(self, base_url: str, model: str, api_key: str | None, timeout_s: float) -> None:
+    def __init__(
+        self, base_url: str, model: str, api_key: str | None, timeout_s: float, max_tokens: int = MAX_TOKENS
+    ) -> None:
         from openai import AsyncOpenAI
 
         # vLLM without --api-key accepts any key; the SDK insists on one.
@@ -59,13 +61,14 @@ class OpenAICompleter:
             base_url=base_url, api_key=api_key or "none", timeout=timeout_s, max_retries=0
         )
         self._model = model
+        self._max_tokens = max_tokens
 
     async def __call__(self, messages: list[dict], json_schema: dict) -> str:
         response = await self._client.chat.completions.create(
             model=self._model,
             messages=messages,  # type: ignore[arg-type]
             temperature=0,
-            max_tokens=MAX_TOKENS,
+            max_tokens=self._max_tokens,
             response_format={
                 "type": "json_schema",
                 "json_schema": {"name": "vlm_output", "schema": json_schema, "strict": True},
@@ -74,11 +77,19 @@ class OpenAICompleter:
         return response.choices[0].message.content or ""
 
 
-def pick_frames(frames: Sequence[Frame], span_ms: int) -> list[Frame]:
-    """The newest frame plus the oldest one at most `span_ms` before it (if it's a different frame)."""
+def pick_frames(frames: Sequence[Frame], span_ms: int, count: int = 2) -> list[Frame]:
+    """`count` frames spread over the last `span_ms`, oldest first, newest last. Each pick is the earliest
+    frame at or after its target time, so a short window or a slow camera gives fewer, distinct frames."""
     newest = frames[-1]
-    older = next(f for f in frames if newest.t_ms - f.t_ms <= span_ms)
-    return [newest] if older is newest else [older, newest]
+    if count <= 1:
+        return [newest]
+    picked: list[Frame] = []
+    for k in range(count - 1, 0, -1):
+        target = newest.t_ms - span_ms * k / (count - 1)
+        frame = next(f for f in frames if f.t_ms >= target)
+        if frame is not newest and (not picked or frame is not picked[-1]):
+            picked.append(frame)
+    return [*picked, newest]
 
 
 def downscale_jpeg(jpeg: bytes, max_side_px: int) -> bytes:
@@ -107,8 +118,10 @@ class VlmPerception:
         min_interval_ms: int = 1500,
         max_side_px: int = 640,
         span_ms: int = 1000,
+        frames_per_call: int = 2,
         clock: Callable[[], float] = time.monotonic,
         record_dir: Path | None = None,
+        session: str | None = None,
     ) -> None:
         self._completer = completer
         self._ontology = ontology
@@ -116,13 +129,15 @@ class VlmPerception:
         self._min_interval_s = min_interval_ms / 1000
         self._max_side_px = max_side_px
         self._span_ms = span_ms
+        self._count = frames_per_call
         self._clock = clock
         self._lock = asyncio.Lock()
         self._last_call_at: float | None = None
         self._schemas: dict[str, dict] = {}
         self._record_dir = record_dir
         self._calls = 0
-        self._session = uuid.uuid4().hex[:8]  # one VlmPerception per session: groups recorded calls
+        # One VlmPerception per session: the id groups recorded calls (re-judging keeps the original id).
+        self._session = session or uuid.uuid4().hex[:8]
 
     def _encode(self, frames: Sequence[Frame]) -> list[bytes]:
         return [downscale_jpeg(f.jpeg, self._max_side_px) for f in frames]
@@ -151,7 +166,7 @@ class VlmPerception:
             return None
         async with self._lock:
             self._last_call_at = now
-            picked = pick_frames(frames, self._span_ms)
+            picked = pick_frames(frames, self._span_ms, self._count)
             jpegs = await asyncio.to_thread(self._encode, picked)
             messages = build_messages(task, self._ontology, next_steps, jpegs)
             if task.id not in self._schemas:

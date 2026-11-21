@@ -41,11 +41,13 @@ class Settings:
     vlm_base_url: str | None = None  # OpenAI-compatible base URL, e.g. https://<tunnel>/v1
     vlm_model: str = "qwen3-vl-8b-fp8"  # served model name in vLLM; also recorded in every Observation
     vlm_api_key: str | None = None  # vLLM --api-key; never commit it (gpu/README.md)
-    vlm_min_interval_ms: int = 1500  # minimum time between two VLM calls, so we don't hammer the GPU
+    vlm_min_interval_ms: int = 750  # minimum time between two VLM calls, so we don't hammer the GPU
     vlm_timeout_s: float = 10.0  # a slower answer is a real failure (raises)
     vlm_max_side_px: int = 640  # frames are downscaled so their longest side is at most this
     vlm_record_dir: Path | None = None  # if set, every VLM call's frames + answer are saved here
-    vlm_span_ms: int = 1000  # the prompt shows the newest frame plus one about this much older
+    vlm_span_ms: int = 1100  # the frames shown to the model cover about this much time
+    vlm_max_tokens: int = 256  # answer budget; a thinking model needs ~2000
+    vlm_frames: int = 3  # frames per call, spread over vlm_span_ms (vLLM's --limit-mm-per-prompt caps it)
 
     def __post_init__(self) -> None:
         if self.perception is PerceptionMode.VLM and not self.vlm_base_url:
@@ -66,6 +68,8 @@ class Settings:
             vlm_max_side_px=int(os.environ.get("SUP_VLM_MAX_SIDE_PX", cls.vlm_max_side_px)),
             vlm_record_dir=Path(d) if (d := os.environ.get("SUP_VLM_RECORD_DIR")) else None,
             vlm_span_ms=int(os.environ.get("SUP_VLM_SPAN_MS", cls.vlm_span_ms)),
+            vlm_max_tokens=int(os.environ.get("SUP_VLM_MAX_TOKENS", cls.vlm_max_tokens)),
+            vlm_frames=int(os.environ.get("SUP_VLM_FRAMES", cls.vlm_frames)),
             voice=VoiceMode(os.environ.get("SUP_VOICE", "browser")),
             elevenlabs_api_key=os.environ.get("ELEVENLABS_API_KEY", ""),
             elevenlabs_voice_id=os.environ.get("SUP_ELEVENLABS_VOICE_ID", ""),
