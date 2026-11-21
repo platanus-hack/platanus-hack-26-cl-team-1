@@ -113,7 +113,7 @@ def test_schema_is_narrowed_to_the_task(task):
 
 def test_schema_decodes_what_it_sees_before_the_action(task):
     schema = task_json_schema(task)
-    assert list(schema["properties"]) == ["objects", "note", "action", "quality", "confidence"]
+    assert list(schema["properties"]) == ["note", "objects", "action", "quality", "confidence"]
     assert set(schema["properties"]) == set(VlmOutput.model_fields)  # reordering drops no field
     assert schema["required"] == list(schema["properties"])
 
@@ -258,6 +258,13 @@ def test_pick_frames_newest_plus_one_about_span_older():
     assert [f.t_ms for f in pick_frames(fs, span_ms=1000)] == [600, 1500]
     assert [f.t_ms for f in pick_frames(fs[-1:], span_ms=1000)] == [1500]
     assert [f.t_ms for f in pick_frames(fs, span_ms=0)] == [1500]
+
+
+def test_pick_frames_spreads_more_frames_over_the_span():
+    fs = frames(n=8, step_ms=170)  # ~6 fps: t = 0, 170, …, 1190 (the session's 8-frame window)
+    assert [f.t_ms for f in pick_frames(fs, span_ms=1100, count=3)] == [170, 680, 1190]
+    assert [f.t_ms for f in pick_frames(fs[-2:], span_ms=1100, count=3)] == [1020, 1190]  # fewer frames
+    assert [f.t_ms for f in pick_frames(fs, span_ms=1100, count=1)] == [1190]
 
 
 def test_downscale_keeps_small_frames_and_shrinks_big_ones():

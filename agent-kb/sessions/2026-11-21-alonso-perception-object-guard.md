@@ -7,7 +7,7 @@
 ## Done
 - Diagnosis workflow (4 lenses, a design pass, skeptics on each change). There are no observation logs, so the
   chain is reasoned from the code: the "Expected next … should be doing" prompt line, `action` decoded before
-  `objects`, no check of the action against what was seen, and one observation completes a step (D-017).
+  `objects`, no check of the action against what was seen, and one observation completes a step (D-018).
 - `prompt.py`: objects/note decoded first; SYSTEM rules say an action needs the object it acts on visible;
   each action line shows `[acts on: <object>]`; softer "Expected next". A derived "Base objects" line was tried
   and dropped: in aviation it listed the ignition key, which `start_engine` turns.
@@ -20,12 +20,12 @@
   no yoke, so the guard would have rejected every rotation. `start_engine` acts on `ignition_key` (target `engine`):
   the key turns before the propeller spins (from the PR #39 Haiku review).
 - Rebased on main after #34 (run recording): its VLM log line now also carries next steps, quality and objects,
-  and `deploy/demo_app.py` configures logging so it reaches the box log. The decision is D-017 (D-016 was taken twice on main).
+  and `deploy/demo_app.py` configures logging so it reaches the box log. The decision is D-018 (D-016 and D-017 were already taken on main).
 - Tests: guard (hand hygiene, the breadboard case, robot motor wiring, cockpit rotate and establish_climb),
   schema order with no field dropped, "acts on" in the prompt.
 
 ## Decisions
-- D-017.
+- D-018.
 
 ## Open / blocked
 - Not measured on the real model: run `app.perception.bench --task led_flashlight` on an empty-breadboard
@@ -37,3 +37,6 @@
 
 ## Next
 - Learned-controller gate PR (Cote's area).
+
+- Merged main after #37 (Cote's describe-then-decide prompt, measured): kept its SYSTEM, note-first order and v2
+  cockpit cues; added the object rule, `[acts on: …]`, no-drop schema ordering and the three object swaps on top.

@@ -131,11 +131,12 @@ function Project({ taskId, onBack }: { taskId: string; onBack: () => void }) {
 
   useEffect(() => simulator?.setMuted(muted), [simulator, muted]);
 
-  function runSim(sim: Simulator) {
+  /** Start the simulator. `clock` re-stamps its events (recording: the video's clock, not sim time). */
+  function runSim(sim: Simulator, clock?: () => number) {
     eventsRef.current = [];
     setEvents([]);
     sim.start((event) => {
-      eventsRef.current = [...eventsRef.current, event];
+      eventsRef.current = [...eventsRef.current, clock ? { ...event, t: clock() } : event];
       setEvents(eventsRef.current);
     });
     setRunning(true);
@@ -166,8 +167,9 @@ function Project({ taskId, onBack }: { taskId: string; onBack: () => void }) {
     if (!simulator) return;
     try {
       const recorder = new CanvasRecorder(simulator.canvas);
-      runSim(simulator);
       recorder.start();
+      // Labels must line up with the video: sim time stops when the tab is hidden, the video doesn't.
+      runSim(simulator, () => recorder.elapsedS());
       setRecording({ phase: 'recording', runId: newRunId(), recorder });
     } catch (e) {
       setError(String(e));
@@ -179,7 +181,8 @@ function Project({ taskId, onBack }: { taskId: string; onBack: () => void }) {
     const { video, durationS } = await recording.recorder.stop();
     simulator?.stop();
     setRunning(false);
-    const labeled = labelRun(task, recording.runId, eventsRef.current, durationS);
+    // Expert runs are fine-tuning data, so the whole run is `train`; eval runs come from elsewhere.
+    const labeled = labelRun(task, recording.runId, eventsRef.current, durationS, 'train');
     setRecording({ phase: 'review', runId: recording.runId, video, durationS, labeled });
   }
 
