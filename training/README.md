@@ -5,8 +5,11 @@ Sincroniza el código desde el PC antes de cada fase:
 
 ```bash
 rsync -az --exclude .venv --exclude out vision/ 172.16.0.204:cv/app/vision/
-rsync -az training/ 172.16.0.204:cv/app/training/
+rsync -az --exclude results training/ 172.16.0.204:cv/app/training/
 ```
+
+⚠️ Los resultados se escriben en el servidor en `~/cv/app/training/results/`: tráelos al repo con
+`scp '172.16.0.204:cv/app/training/results/*' training/results/` **antes** de cualquier `rsync --delete` de `training/`.
 
 ## F4 — Fotos para YOLO (necesita el kit, cámara fija, tapete pegado)
 
@@ -26,6 +29,9 @@ cd ~/cv/app/vision
 ✅ `data.yaml` en `~/cv/data/yolo/v1` y ≥ 80 instancias por clase (el script avisa cuáles faltan).
 
 ## F5 — YOLO11s
+
+Todo en un comando (split → entrenamiento → evaluación → activa el detector): `ssh 172.16.0.204 'bash ~/cv/app/training/run_f5.sh v1'`.
+Paso a paso:
 
 ```bash
 cd ~/cv/app/vision
@@ -60,6 +66,10 @@ cd ~/cv/app/vision
 
 ## F8 — QLoRA de Qwen3-VL-8B
 
+Todo en un comando (dataset → eval base → QLoRA → sirve la LoRA → eval LoRA → SUMMARY.md → producción usa el que gane):
+`ssh 172.16.0.204 'bash ~/cv/app/training/run_f8.sh v1'` · plan B de tiempo: `EPOCHS=1 R=8 LIMIT=600 bash ~/cv/app/training/run_f8.sh v1`.
+Paso a paso:
+
 ```bash
 cd ~/cv/app/vision
 .venv/bin/python ../training/vlm/eval.py --data ~/cv/data/vlm/v1/test.jsonl --model qwen3vl --name base     # ANTES
@@ -73,3 +83,10 @@ echo "VLM_LORA=$HOME/cv/runs/vlm/v1/adapter" >> ~/cv/env && systemctl --user sta
 
 Para que producción use la LoRA: `echo "VLM_SERVED=armado" >> ~/cv/env && systemctl --user restart cv-vision`.
 Si la LoRA no mejora, se dice tal cual en el pitch y se sirve el modelo que gane.
+
+Publicar en Hugging Face (🧑 decide si es público; inicia sesión con su propio token: `~/cv/venvs/train/bin/hf auth login`):
+
+```bash
+~/cv/venvs/train/bin/python ~/cv/app/training/vlm/publish.py --adapter ~/cv/runs/vlm/v1/adapter \
+    --repo <usuario>/circuito-vivo-armado-qwen3vl-lora            # privado; agrega --public si así se decide
+```

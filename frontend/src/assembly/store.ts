@@ -21,6 +21,19 @@ export function normalizeVisionUrl(raw: string): string {
   }
 }
 
+/** wss://host/ws/session → https://host/health (same server, plain HTTP check). */
+export function healthUrl(wsUrl: string): string {
+  try {
+    const u = new URL(wsUrl);
+    u.protocol = u.protocol === 'ws:' ? 'http:' : 'https:';
+    u.pathname = '/health';
+    u.search = '';
+    return u.toString();
+  } catch {
+    return '';
+  }
+}
+
 function readStoredUrl(): string {
   try {
     const q = new URLSearchParams(window.location.search).get('vision');

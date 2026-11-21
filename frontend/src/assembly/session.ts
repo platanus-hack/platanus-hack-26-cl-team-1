@@ -10,7 +10,7 @@ import { useProject } from '@/store/project';
 import { AudioQueue, BrowserClipPlayer } from './audioQueue';
 import { AssemblyClient } from './client';
 import { type ClientMsg, type HelloMsg, type IssueKind, PROTOCOL, type ServerMsg } from './protocol';
-import { useAssembly } from './store';
+import { healthUrl, useAssembly } from './store';
 import { FRAME_H, FRAME_W } from './useCamera';
 
 const FPS = 6;
@@ -131,11 +131,63 @@ async function grabFrame(): Promise<void> {
   }
 }
 
+/** Call synchronously inside the click handler (autoplay policies), before any await. */
+export function unlockAudio(): void {
+  player.unlock();
+}
+
+export interface VisionHealth {
+  ok: boolean;
+  message: string;
+  vllm?: boolean;
+  voice?: string | null;
+  detector?: string | null;
+}
+
+/** Quick /health check of the vision server, so a stale tunnel URL fails loudly instead of reconnecting forever. */
+export async function checkVision(wsUrl: string, timeoutMs = 6000): Promise<VisionHealth> {
+  const url = healthUrl(wsUrl);
+  if (!url) return { ok: false, message: 'La URL del servidor de visión no es válida.' };
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const r = await fetch(url, { signal: ctrl.signal, cache: 'no-store' });
+    if (!r.ok) return { ok: false, message: `El servidor de visión respondió ${r.status}.` };
+    const h = (await r.json()) as { ok?: boolean; vllm?: boolean; voice?: string | null; detector?: string | null };
+    return { ok: !!h.ok, message: h.vllm ? 'Servidor de visión listo.' : 'Servidor listo, pero el VLM no responde.', ...h };
+  } catch {
+    return {
+      ok: false,
+      message:
+        'No pude conectar con el servidor de visión. Si se reinició, la URL del túnel cambió: copia la nueva que imprime up.sh.',
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+let wakeLock: { release: () => Promise<void> } | null = null;
+
+async function keepScreenOn(on: boolean): Promise<void> {
+  try {
+    if (on) {
+      const wl = (navigator as unknown as { wakeLock?: { request: (t: 'screen') => Promise<{ release: () => Promise<void> }> } }).wakeLock;
+      wakeLock = (await wl?.request('screen')) ?? null;
+    } else {
+      await wakeLock?.release();
+      wakeLock = null;
+    }
+  } catch {
+    /* not supported / denied: the demo just relies on the OS settings */
+  }
+}
+
 /** Must be called from a user gesture (audio unlock). */
 export function startSession(videoEl: HTMLVideoElement): void {
   stopSession();
   hadReady = false;
   player.unlock();
+  void keepScreenOn(true);
   const st = useAssembly.getState();
   const project = useProject.getState().project;
   const steps = buildWiringGuide(project, getNetlist(project));
@@ -168,6 +220,7 @@ export function startSession(videoEl: HTMLVideoElement): void {
 }
 
 export function stopSession(): void {
+  void keepScreenOn(false);
   if (frameTimer) clearInterval(frameTimer);
   frameTimer = null;
   client?.close();

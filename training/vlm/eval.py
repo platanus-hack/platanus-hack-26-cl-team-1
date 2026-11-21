@@ -52,6 +52,8 @@ def f1(tp: int, fp: int, fn: int) -> float:
 
 async def run(data: Path, model: str, url: str, limit: int | None) -> dict:
     recs = [json.loads(x) for x in data.read_text().splitlines() if x.strip()][:limit]
+    if not recs:
+        raise SystemExit(f"{data} no tiene ejemplos (¿hay al menos 3 sesiones con errores para separar test?)")
     rows = []
     async with httpx.AsyncClient(timeout=30) as c:
         for i, rec in enumerate(recs):
