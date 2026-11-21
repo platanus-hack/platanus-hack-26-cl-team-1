@@ -256,7 +256,7 @@ Recortar en este orden:
 
 ## 10. Definición de "terminado"
 
-- [ ] El Modo Armado funciona desde la URL de Render apuntando al túnel de la 3090.
+- [x] El Modo Armado funciona desde la URL de Render apuntando al túnel de la 3090 (sáb 07:58, con cámara simulada; falta con webcam real).
 - [ ] La checklist avanza sola al completar cada paso del circuito demo.
 - [ ] El agente detecta y dice en voz alta al menos 2 tipos de error.
 - [ ] `training/results/SUMMARY.md` tiene las tablas de base vs. fine-tuned para YOLO y para el VLM.
@@ -291,4 +291,6 @@ _(El ejecutor anota aquí cada decisión que se aparte del plan, con su hora y s
 | sáb 07:41 | Auto-etiquetado con Qwen: el modelo a veces entra en un bucle de cajas repetidas hasta `max_tokens`; se limpian duplicados (IoU > 0,6), cajas gigantes y colas por clase, más una penalización de repetición. En 8 fotos reales: de 261 a 72 cajas, conservando las piezas reales. | Visto en una hoja de contactos con fotos libres de Wikimedia. |
 | sáb 07:43 | Prueba de punta a punta solo con VLM por el túnel, con el `hello` real del ejemplo "Parpadeo": saludo a 1 s, pasos 1 y 2 completos solos con su frase, y el paso 3 revisado por el VLM cada 6 s (~0,45 s por juicio, "incierto" sobre el tapete vacío → silencio). | — |
 | sáb 07:43 | 🧑 El kit todavía no llega. Se sigue con lo que no lo necesita; se pregunta de nuevo a las 12:00, como dice §8. | — |
+| sáb 07:47 | PRs encadenados (#2 → #3 → #4 → #5): como #2 entró a `main` primero, #3–#5 quedaron mergeados en ramas intermedias y no en `main`. Se corrigió con #6 (`feat/assembly-f6` → `main`). Desde ahí, todo PR va directo a `main`. | Riesgo del encadenamiento de PRs; nada se perdió. |
+| sáb 07:58 | ✅ "El Modo Armado funciona desde la URL de Render apuntando al túnel de la 3090" (commit `f6dc199`): conecta, calibra, saludo con Kokoro, pasos 1–2 automáticos con voz, RTT 94 ms, VLM ~0,5 s. Sin CSP ni Permissions-Policy en el nginx de producción que bloqueen la cámara o el WSS. | Probado con una cámara simulada (el tapete impreso) en Chrome. |
 
