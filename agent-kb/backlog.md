@@ -3,15 +3,17 @@
 Owner in brackets once someone takes an item. Blocks refer to the plan in `docs/VISION.md`.
 
 ## Now (status 2026-11-21 16:55; critical path to the 18:00 webcam loop)
-- [ ] **Confirm the demo task.** Default: `tasks/robot_assembly/servo_scout_robot.json` (the only robot task). Optional second candidate: port the Arduino task from draft PR #19 onto the merged ontology. [team]
+- [ ] **Confirm the demo task.** Default: `tasks/robot_assembly/servo_scout_robot.json`. New candidate with a much cheaper kit: `tasks/circuit_assembly/led_flashlight.json` (LED, 220 Ω resistor, push button, AA battery pack and jumper wires on a breadboard; weights trained). Optional: port the Arduino task from draft PR #19. [team]
 - [ ] **Kit + fixed camera on a table**, matching the demo task's parts. Nothing recorded yet. [team]
 - [x] Perception on the RTX 5090 over an SSH forward (`gpu/up-5090.sh`, PR #27; D-014): 8B FP8 at p50 ≈ 0.4 s per frame, end to end through `/ws/session`. The 3090 refuses SSH (port 22), so it's parked as a fallback. [Cote]
+- [x] Public demo link (A3, D-015): `deploy/up-demo.sh` runs the server + web app on the 5090 next to vLLM behind a Cloudflare quick tunnel; `--url` prints the current link. Measured from Santiago: ack RTT p50 ≈ 90 ms, frame → VLM observation p50 ≈ 0.5 s. [Cote's agent, handed off from Alonso]
+- [ ] **Stable demo link:** create a named Cloudflare tunnel (needs an account + domain) and put `SUP_TUNNEL_TOKEN` + `SUP_TUNNEL_URL` in `~/sup/demo.env` on the box; otherwise re-check the quick-tunnel link (`deploy/up-demo.sh --url`) before judging. [Alonso?]
 - [ ] **First real webcam run** of `servo_scout_robot`: `SUP_PERCEPTION=vlm` (5090), `SUP_CONTROLLER=rules|learned`, ElevenLabs voice. Tune the single-frame "runs ahead of the steps" false `out_of_order` seen in #27's test. [Cote + whoever has the kit]
 - [ ] ElevenLabs: key in the server's env, pick a Spanish voice (`SUP_ELEVENLABS_VOICE_ID`), hear it end to end. Code is in (`app/voice/elevenlabs.py`). [Alonso]
 - [ ] **Web demo screen** (N1): the UI is still the minimal skeleton plus the voice player; nobody has started the real screen (checklist, mistake banner, subtitles, debug overlay; port `frontend/src/assembly/*` at `2e9da7c`). [Anaís? confirm owner]
 - [ ] Get the contact's testimonial (text, name, role, photo) with explicit consent to publish it; keep it out of the repo until then. [Anaís]
 - [ ] Repo admin: enable "Allow auto-merge" and protect `main` (PR required, 0 approvals, required checks `CI OK` + `Agent reviews OK`, no force-push). Until then green PRs are merged by hand. [Alonso]
-- [ ] Close PR #8 (superseded by the pivot); decide on #19 (port its Arduino task + task-list tests, or close); turn off the old Render services. [Alonso]
+- [ ] Close PR #8 (superseded by the pivot); decide on #19 (port its Arduino task + task-list tests, or close); turn off the old Render services (D-015: this project doesn't use Render). [Alonso]
 
 ## Next (tonight)
 - [ ] Real recordings of the demo task on the fixed camera: correct runs + each mistake, labeled as `ClipRecord`, split per run. These replace generated video while there's no Runway key. [Anaís]

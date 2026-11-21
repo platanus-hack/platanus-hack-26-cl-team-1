@@ -31,7 +31,7 @@ scripts/ci/     CI tooling (review formatter, scope check) + its tests
 | **Web** | **Vite + React 19 + TypeScript**, Zustand, **pnpm**, **vitest**; camera + WS client + audio queue ported from `frontend/src/assembly/` | Sim clips play in a `<video>` and are captured through the same canvas path as the webcam |
 | **VLM fine-tuning** | **Unsloth + TRL** QLoRA on Qwen3-VL-8B, adapter served by vLLM (`--enable-lora`); ported from `training/vlm/` | vLLM must be stopped while training (24 GB) |
 | **GPU ops** | `uv` envs, `systemd --user`, **cloudflared** quick tunnel, `up.sh` health check; ported from `deploy/vision/` | No sudo, no Docker GPU runtime on the box |
-| **Deploy** | Server + vLLM on the 3090 behind one tunnel; web as a static build on Render (public `deploy-url` for the hackathon) pointing at the tunnel via `?server=wss://…` | Same pattern as before; browser talks to the 3090 directly |
+| **Deploy** | Server + web build + vLLM on the 5090; the server serves the web app (`deploy/demo_app.py`) behind one Cloudflare tunnel; `deploy/up-demo.sh` (D-015, `deploy/README.md`) | One origin, no CORS, no Render; browser talks to the GPU box directly |
 | **CI** | GitHub Actions (ubuntu): `actionlint`, tooling tests, then `server` (ruff + pytest), `web` (tsc + vitest + build), contracts freshness; `CI OK` aggregates | Jobs are added to `ci-ok.needs` as each folder appears |
 | **Agentic review** | `anthropics/claude-code-action`, Haiku + Sonnet in parallel, read-only tools, structured output validated by `scripts/ci/format_review.py`, guided by `docs/PR_REVIEW_FOCUS.md` | Ported from a private repo (D-006) |
 
