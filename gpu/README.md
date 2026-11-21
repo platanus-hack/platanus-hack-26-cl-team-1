@@ -1,4 +1,7 @@
-# GPU box: vLLM + tunnel for perception
+# GPU boxes: vLLM for perception
+
+**Now:** use the RTX 5090 box (§ RTX 5090 box). Its one command is `gpu/up-5090.sh`. The 3090 setup below
+stays for when that box is reachable over SSH again.
 
 The supervisor's perception (`SUP_PERCEPTION=vlm`, `server/app/perception/vlm.py`) calls
 **Qwen3-VL-8B-Instruct-FP8** served by **vLLM** on the team's RTX 3090, through a **Cloudflare tunnel**. The
@@ -8,7 +11,7 @@ session server can run anywhere (a laptop at `make dev`); only the model runs on
 browser ──ws──▶ server (laptop, SUP_PERCEPTION=vlm) ──https + API key──▶ cloudflared ──▶ vLLM 127.0.0.1:8001 (3090)
 ```
 
-## One command
+## One command (3090)
 
 From the repo root on your laptop (needs `ssh 172.16.0.204` to work):
 
@@ -59,6 +62,43 @@ holds `SUP_VLM_API_KEY` and optionally `VLM_MODEL`, `VLM_SERVED`, `VLM_GPU_UTIL`
 | `SUP_VLM_TIMEOUT_S` | `10` | slower = failure (raises; the session reports an `error`) |
 | `SUP_VLM_MAX_SIDE_PX` | `640` | frames are downscaled to this longest side |
 | `SUP_VLM_SPAN_MS` | `1000` | the model sees the newest frame + one about this much older |
+
+## RTX 5090 box (current GPU)
+
+A second box with an **RTX 5090 (32 GB)**: a container where we're root, with no systemd and no rsync, and
+`nvcc` 12.9. Its address is in the team chat; keep it out of git (the repo is public and the login is root).
+vLLM listens on `127.0.0.1` only, and we reach it with an **SSH port-forward**, so it needs no public tunnel
+and no API key.
+
+```bash
+GPU5090=root@<host> GPU5090_PORT=<ssh port> gpu/up-5090.sh   # setup if needed, start vLLM, forward :8001
+cd server && SUP_PERCEPTION=vlm SUP_VLM_BASE_URL=http://localhost:8001/v1 uv run uvicorn app.main:app --port 8000
+```
+
+- `setup-5090.sh` (run once, by `up-5090.sh`): installs uv, then a vLLM venv on **uv's managed Python**.
+  The system Python has no `Python.h`, and Triton needs it, or the engine fails at startup. It also downloads
+  the 8B FP8 and 2B weights.
+- `vllm-5090.sh`: sets `VLLM_USE_DEEP_GEMM=0`. Otherwise the FP8 path JIT-compiles DeepGEMM SM120 kernels,
+  which need CUDA ≥ 13, and the box's `nvcc` 12.9 fails. Logs: `~/sup/logs/vllm-8b.log`. To stop it:
+  `pkill -f "vllm serve"`.
+- 8B FP8 at `VLM_GPU_UTIL=0.6`: 10 GB of weights, KV cache of 46,592 tokens, 17.7 GB in use.
+- A second model on another port, e.g. the 2B for comparison:
+  `VLM_MODEL=Qwen/Qwen3-VL-2B-Instruct VLM_SERVED=qwen3-vl-2b VLM_PORT=8002 VLM_GPU_UTIL=0.3 ~/sup/gpu/vllm-5090.sh`
+
+Measured 2026-11-21 with `app.perception.bench` (4 public photos × 3, through the SSH forward from Santiago):
+
+| Model (vLLM, 5090) | `hand_hygiene_basic` p50 / p95 | `servo_scout_robot` p50 / p95 |
+|---|---|---|
+| Qwen3-VL-8B-Instruct-FP8 | 437 / 512 ms | 395 / 932 ms |
+| Qwen3-VL-2B-Instruct (BF16) | 266 / 319 ms | 491 / 559 ms |
+
+- **8B:** it labels the soap photos `wet_hands`. It answers `null` (uncertain) for the towel dispenser and the
+  robot hand in the hand-washing task, and for every non-robot photo in the robot task.
+- **2B on vLLM:** it gets the same actions here. Unlike the 4-bit Ollama build it made no false
+  `mount_dc_motor`, but its `objects` still repeat the prompt's list.
+- **End to end:** real JPEGs over `/ws/session` → server → 8B → rules controller. The run gave an
+  observation every ~1.5 s (the rate limit) at about 480 ms each, advanced `wet`, and said the next step.
+  It also flagged a lathered-hands frame (`rub_palms`) as `out_of_order` before `soap`.
 
 ## Local on a Mac (prototype, no GPU box)
 
