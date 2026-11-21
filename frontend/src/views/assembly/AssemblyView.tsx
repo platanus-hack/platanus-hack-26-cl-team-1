@@ -8,9 +8,9 @@ import {
   TriangleAlert, Video, Volume2, VolumeX, Wifi, WifiOff, X,
 } from 'lucide-react';
 import type { GuideStep } from '@/contracts';
-import { CALIB_HOLES, useAssembly } from '@/assembly/store';
+import { CALIB_HOLES, normalizeVisionUrl, useAssembly } from '@/assembly/store';
 import {
-  LABEL_KEYS, recordKey, send, setCapture, setDebug, setMuted, setRecord, startSession, stopSession,
+  LABEL_KEYS, checkVision, recordKey, send, setCapture, setDebug, setMuted, setRecord, startSession, stopSession, unlockAudio,
 } from '@/assembly/session';
 import { useCamera } from '@/assembly/useCamera';
 import type { StepStatus } from '@/assembly/protocol';
@@ -133,6 +133,8 @@ function Stage({ cam }: { cam: ReturnType<typeof useCamera> }) {
   const setVisionUrl = useAssembly((s) => s.setVisionUrl);
   const steps = useProject((s) => s.project.parts.length);
   const [urlDraft, setUrlDraft] = useState(visionUrl);
+  const [checking, setChecking] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
 
   useEffect(() => {
     if (videoRef.current && cam.stream && videoRef.current.srcObject !== cam.stream) {
@@ -142,8 +144,19 @@ function Stage({ cam }: { cam: ReturnType<typeof useCamera> }) {
   }, [cam.stream]);
 
   const begin = async () => {
+    unlockAudio(); // synchronously, while the click still counts as a user gesture
     if (urlDraft !== visionUrl) setVisionUrl(urlDraft);
-    const stream = cam.stream ?? (await cam.start());
+    setStartError(null);
+    setChecking(true);
+    const [health, stream] = await Promise.all([
+      checkVision(normalizeVisionUrl(urlDraft)),
+      cam.stream ? Promise.resolve(cam.stream) : cam.start(),
+    ]);
+    setChecking(false);
+    if (!health.ok) {
+      setStartError(health.message);
+      return;
+    }
     if (!stream || !videoRef.current) return;
     videoRef.current.srcObject = stream;
     await videoRef.current.play().catch(() => {});
@@ -198,8 +211,9 @@ function Stage({ cam }: { cam: ReturnType<typeof useCamera> }) {
               />
             </label>
             {cam.error && <p className="asm-warn">{cam.error}</p>}
-            <button className="btn primary" disabled={!urlDraft.trim()} onClick={() => void begin()}>
-              <Video size={16} /> Empezar
+            {startError && <p className="asm-warn">{startError}</p>}
+            <button className="btn primary" disabled={!urlDraft.trim() || checking} onClick={() => void begin()}>
+              {checking ? <LoaderCircle size={16} className="spin" /> : <Video size={16} />} {checking ? 'Conectando…' : 'Empezar'}
             </button>
           </div>
         )}
