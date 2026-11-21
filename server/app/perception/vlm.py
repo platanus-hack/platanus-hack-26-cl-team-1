@@ -6,7 +6,9 @@
 - The model sees the newest frame plus one about `span_ms` older (downscaled JPEG), and the task's actions,
   objects, next steps and mistakes. Guided decoding forces the task-narrowed `VlmOutput` schema.
 - An action whose own object (ontology `object`) is not among the answer's `objects` is rejected the same
-  way: the model must see the part it claims is being handled (an empty breadboard is not `place_button`).
+  way: the model must report seeing the part it claims is being handled (an empty breadboard is not
+  `place_button`). It checks the answer's consistency, not the frames: a model that also invents the part
+  passes. Decoding `objects` before `action` (prompt.py) is what makes that less likely.
 - Every observation is logged at INFO on this logger (task, next steps, answer), rejections at WARNING.
 - A bad answer (invalid JSON, an action outside the task, `null` action with quality `ok`…) becomes an
   uncertain observation (`action=None`, `quality=unknown`) so the supervisor stays silent. Real failures

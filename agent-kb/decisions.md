@@ -201,7 +201,8 @@ with a pointer to their replacement; nothing is ever deleted from §3.
 - **Decision:** the guided-decoding schema emits `objects`, `note`, then `action`, `quality`, `confidence` (the
   `VlmOutput` contract is unchanged: same fields, validated by name). The prompt shows what each action acts on
   (ontology `object`) and presents the next steps as context only. `VlmPerception` turns into `uncertain` (logged at WARNING) any action
-  whose ontology `object` is not among the answer's `objects`. Every VLM answer and controller decision is logged
+  whose ontology `object` is not among the answer's `objects`. The guard checks the answer's consistency, not
+  the frames: a model that lists an object it can't see still passes it. Every VLM answer and controller decision is logged
   at INFO on the demo box.
 - **Consequences:** an action's ontology `object` must be what the camera sees being handled.
   `robot_assembly`'s `connect_motor_wires` now acts on `dc_motor` (its cue shows the motor's own leads), not on
