@@ -12,7 +12,7 @@ Delay: median ms from mistake start. A detection counts whatever kind the contro
 under noise the per-kind recall also credits coincidental alarms (rules never flag `repeated` on
 purpose: perception reports an ongoing action twice).
 
-## c172_takeoff (v1)
+## c172_takeoff (v2)
 
 | noise | controller | step acc % | final ok % | mistake P % | R % | F1 % | FA/run | FA/min | delay ms |
 |---|---|---|---|---|---|---|---|---|---|

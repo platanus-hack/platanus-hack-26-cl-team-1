@@ -210,32 +210,66 @@ function arc(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, a0:
   ctx.stroke();
 }
 
+// Legibility rules (PR #36's VLM run: qwen3-vl-8b read only big, high-contrast changes at 640×480):
+// every control the recipe uses changes *on the control itself*, large and in color (a lit ON pill, a
+// lit state placard, a color-coded readout), and the cues in tasks/aviation/ name those exact things.
+
+const GREEN = '#22c55e';
+const RED = '#ef4444';
+const AMBER = '#f59e0b';
+
+/** A lit state pill (like a backlit legend): colored and glowing when `color` is set, dark otherwise. */
+function pill(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  text: string,
+  color: string | null,
+  fontSize = Math.round(h * 0.62),
+) {
+  ctx.fillStyle = color ?? '#17181a';
+  ctx.strokeStyle = '#4b4f55';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(x - w / 2, y - h / 2, w, h, 4);
+  if (color) {
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 16;
+  }
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.stroke();
+  label(ctx, text, x, y + 1, fontSize, color ? '#0b0b0b' : '#6b6f75');
+}
+
 function tachometer(ctx: CanvasRenderingContext2D, sim: Sim) {
   const x = 850;
-  const y = 600;
-  const r = 70;
+  const y = 612;
+  const r = 82;
   bezel(ctx, x, y, r);
   const angle = (rpm: number) => -135 + (Math.min(3500, rpm) / 3500) * 270;
-  arc(ctx, x, y, r - 9, angle(2100), angle(2700), '#2fb34a', 8);
-  arc(ctx, x, y, r - 9, angle(2700), angle(2730), '#e0362c', 8);
+  arc(ctx, x, y, r - 10, angle(2100), angle(2700), '#2fb34a', 10);
+  arc(ctx, x, y, r - 10, angle(2700), angle(2740), '#e0362c', 10);
   for (let v = 0; v <= 35; v++) {
     const a = deg(angle(v * 100) - 90);
     const major = v % 5 === 0;
     ctx.strokeStyle = '#f4f2ea';
-    ctx.lineWidth = major ? 3 : 1.5;
+    ctx.lineWidth = major ? 3.5 : 1.5;
     ctx.beginPath();
     ctx.moveTo(x + Math.cos(a) * (r - 4), y + Math.sin(a) * (r - 4));
-    ctx.lineTo(x + Math.cos(a) * (r - (major ? 16 : 10)), y + Math.sin(a) * (r - (major ? 16 : 10)));
+    ctx.lineTo(x + Math.cos(a) * (r - (major ? 18 : 11)), y + Math.sin(a) * (r - (major ? 18 : 11)));
     ctx.stroke();
-    if (major) label(ctx, String(v), x + Math.cos(a) * (r - 28), y + Math.sin(a) * (r - 28), 15);
+    if (major) label(ctx, String(v), x + Math.cos(a) * (r - 32), y + Math.sin(a) * (r - 32), 17);
   }
-  label(ctx, 'RPM', x, y + 26, 12);
-  label(ctx, 'x100', x, y + 40, 10, '#b9b6ac');
-  needle(ctx, x, y, r - 12, angle(sim.flight.rpm), 5);
+  label(ctx, 'RPM', x, y + 30, 13);
+  label(ctx, 'x100', x, y + 46, 11, '#b9b6ac');
+  needle(ctx, x, y, r - 12, angle(sim.flight.rpm), 8);
 }
 
 function engineCluster(ctx: CanvasRenderingContext2D, sim: Sim) {
-  const x = 950;
+  const x = 958;
   const y = 520;
   const w = 220;
   const h = 170;
@@ -266,62 +300,48 @@ function engineCluster(ctx: CanvasRenderingContext2D, sim: Sim) {
 }
 
 function annunciators(ctx: CanvasRenderingContext2D, sim: Sim) {
+  const m = sim.controls.master;
   const lights: [string, boolean, string][] = [
-    ['LOW VOLTS', sim.controls.master && sim.flight.engine !== 'running', '#ffb020'],
-    ['OIL PRESS', sim.controls.master && sim.flight.engine !== 'running', '#ff3b30'],
-    ['STALL', sim.controls.master && sim.flight.stall, '#ff3b30'],
+    ['LOW VOLTS', m && sim.flight.engine !== 'running', AMBER],
+    ['OIL PRESS', m && sim.flight.engine !== 'running', RED],
+    ['STARTER', m && sim.controls.magnetos === 'start', AMBER],
+    ['PARK BRAKE', m && sim.controls.parkingBrake, RED],
+    ['STALL', m && sim.flight.stall, RED],
   ];
-  lights.forEach(([name, on, color], i) => {
-    const x = 950 + i * 76;
-    const y = 470;
-    ctx.fillStyle = on ? color : '#1a1b1d';
-    ctx.strokeStyle = '#55595e';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.roundRect(x, y, 68, 30, 4);
-    ctx.fill();
-    ctx.stroke();
-    if (on) {
-      ctx.shadowColor = color;
-      ctx.shadowBlur = 18;
-      ctx.fill();
-      ctx.shadowBlur = 0;
-    }
-    label(ctx, name, x + 34, y + 15, 11, on ? '#1a0d00' : '#5b5e62');
-  });
+  lights.forEach(([name, on, color], i) => pill(ctx, 815 + i * 94, 472, 88, 30, name, on ? color : null, 13));
 }
 
 // ── switches, key, knobs, levers ───────────────────────────────────────────
 
-function rocker(ctx: CanvasRenderingContext2D, x: number, y: number, on: boolean, color: string, name: string, w = 30, h = 54) {
+/** A rocker switch with a lit ON/OFF pill above it. */
+function rocker(ctx: CanvasRenderingContext2D, x: number, y: number, on: boolean, color: string, name: string, w = 40, h = 64) {
   ctx.fillStyle = '#111214';
   ctx.beginPath();
-  ctx.roundRect(x - w / 2 - 4, y - h / 2 - 4, w + 8, h + 8, 5);
+  ctx.roundRect(x - w / 2 - 5, y - h / 2 - 5, w + 10, h + 10, 6);
   ctx.fill();
-  // The pressed half sits low (dark); the raised half catches the light.
   const g = ctx.createLinearGradient(0, y - h / 2, 0, y + h / 2);
   if (on) {
     g.addColorStop(0, color);
     g.addColorStop(0.5, color);
-    g.addColorStop(1, '#00000088');
+    g.addColorStop(1, '#000000aa');
   } else {
-    g.addColorStop(0, '#00000088');
+    g.addColorStop(0, '#000000aa');
     g.addColorStop(0.5, color);
     g.addColorStop(1, color);
   }
   ctx.fillStyle = g;
   ctx.beginPath();
-  ctx.roundRect(x - w / 2, y - h / 2, w, h, 4);
+  ctx.roundRect(x - w / 2, y - h / 2, w, h, 5);
   ctx.fill();
   ctx.fillStyle = '#ffffff';
-  ctx.fillRect(x - 6, on ? y - h / 2 + 6 : y + h / 2 - 10, 12, 4);
-  label(ctx, name, x, y + h / 2 + 16, 12);
-  label(ctx, on ? 'ON' : 'OFF', x, y - h / 2 - 14, 10, on ? '#ffffff' : '#7d8086');
+  ctx.fillRect(x - 9, on ? y - h / 2 + 7 : y + h / 2 - 12, 18, 5);
+  pill(ctx, x, y - h / 2 - 20, w + 6, 20, on ? 'ON' : 'OFF', on ? GREEN : null);
+  label(ctx, name, x, y + h / 2 + 18, 14);
 }
 
 function ignitionKey(ctx: CanvasRenderingContext2D, sim: Sim) {
-  const x = 120;
-  const y = 560;
+  const x = 115;
+  const y = 572;
   const positions: [string, number][] = [
     ['OFF', -75],
     ['R', -40],
@@ -329,62 +349,85 @@ function ignitionKey(ctx: CanvasRenderingContext2D, sim: Sim) {
     ['BOTH', 25],
     ['START', 65],
   ];
-  label(ctx, 'MAGNETOS', x, y - 74, 12);
+  const current = sim.controls.magnetos === 'start' ? 'START' : sim.controls.magnetos === 'both' ? 'BOTH' : 'OFF';
   for (const [name, a] of positions) {
-    const r = 58;
-    label(ctx, name, x + Math.sin(deg(a)) * r, y - Math.cos(deg(a)) * r, name === 'START' ? 13 : 12, name === 'START' ? '#ff6b5b' : '#e9e6dc');
+    const lx = x + Math.sin(deg(a)) * 66;
+    const ly = y - Math.cos(deg(a)) * 66;
+    if (name === current) {
+      pill(ctx, lx, ly, name.length * 11 + 12, 22, name, name === 'START' ? AMBER : name === 'BOTH' ? GREEN : '#9ca3af');
+    } else {
+      label(ctx, name, lx, ly, 14, name === 'START' ? '#ff8a7a' : '#e9e6dc');
+    }
   }
-  bezel(ctx, x, y, 34);
-  const current = sim.controls.magnetos === 'start' ? 65 : sim.controls.magnetos === 'both' ? 25 : -75;
+  bezel(ctx, x, y, 38);
+  const a = positions.find(([n]) => n === current)?.[1] ?? -75;
   ctx.save();
   ctx.translate(x, y);
-  ctx.rotate(deg(current));
-  const g = ctx.createLinearGradient(-8, 0, 8, 0);
+  ctx.rotate(deg(a));
+  const g = ctx.createLinearGradient(-11, 0, 11, 0);
   g.addColorStop(0, '#8d9196');
-  g.addColorStop(0.5, '#e3e6ea');
+  g.addColorStop(0.5, '#f1f3f5');
   g.addColorStop(1, '#7a7e83');
   ctx.fillStyle = g;
   ctx.beginPath();
-  ctx.roundRect(-9, -30, 18, 60, 6);
+  ctx.roundRect(-12, -40, 24, 80, 8);
   ctx.fill();
   ctx.fillStyle = '#2a2c2f';
   ctx.beginPath();
-  ctx.arc(0, -20, 4, 0, Math.PI * 2);
+  ctx.arc(0, -27, 5, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
+  label(ctx, 'MAGNETOS', x, y - 94, 13);
 }
 
-/** A push-pull plunger (throttle, mixture, carb heat): `out` 0 = pushed in … 1 = pulled out. */
-function plunger(ctx: CanvasRenderingContext2D, x: number, y: number, out: number, kind: 'throttle' | 'mixture' | 'carb', name: string) {
-  label(ctx, name, x, y - 52, 12);
-  ctx.fillStyle = '#121315';
+/**
+ * A push-pull plunger: `out` 0 = pushed in … 1 = pulled out. Pulled out it sits lower and bigger with a
+ * long chrome shaft; a lit placard above it names the state (`state`).
+ */
+function plunger(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  out: number,
+  kind: 'throttle' | 'mixture' | 'carb',
+  name: string,
+  state: [string, string | null] | null,
+) {
+  label(ctx, name, x, y - 72, 13);
+  if (state) pill(ctx, x, y - 50, 84, 22, state[0], state[1]);
+  ctx.fillStyle = '#0d0e10';
   ctx.beginPath();
-  ctx.arc(x, y, 20, 0, Math.PI * 2);
+  ctx.arc(x, y, 22, 0, Math.PI * 2);
   ctx.fill();
-  // Pulled out = closer to the eye: the knob sits lower and bigger, with the chrome shaft showing.
-  const dy = out * 56;
-  const scale = 1 + out * 0.3;
+  const travel = kind === 'carb' ? 50 : 104;
+  const dy = out * travel;
+  const scale = 1 + out * 0.35;
   if (out > 0.02) {
-    const shaft = ctx.createLinearGradient(x - 6, 0, x + 6, 0);
-    shaft.addColorStop(0, '#6f7378');
-    shaft.addColorStop(0.5, '#eef0f2');
-    shaft.addColorStop(1, '#6f7378');
+    const shaft = ctx.createLinearGradient(x - 8, 0, x + 8, 0);
+    shaft.addColorStop(0, '#80858a');
+    shaft.addColorStop(0.5, '#ffffff');
+    shaft.addColorStop(1, '#80858a');
     ctx.fillStyle = shaft;
-    ctx.fillRect(x - 6, y, 12, dy);
+    ctx.fillRect(x - 8, y, 16, dy);
   }
-  const r = 26 * scale;
+  const r = (kind === 'carb' ? 22 : 31) * scale;
   const ky = y + dy;
   const base = kind === 'throttle' ? '#1b1c1e' : kind === 'mixture' ? '#c8261e' : '#ece9e0';
   const g = ctx.createRadialGradient(x - r * 0.3, ky - r * 0.35, r * 0.1, x, ky, r);
-  g.addColorStop(0, kind === 'carb' ? '#ffffff' : kind === 'mixture' ? '#ff6a5c' : '#5a5d61');
+  g.addColorStop(0, kind === 'carb' ? '#ffffff' : kind === 'mixture' ? '#ff6a5c' : '#62666b');
   g.addColorStop(1, base);
   ctx.fillStyle = g;
   ctx.beginPath();
   ctx.arc(x, ky, r, 0, Math.PI * 2);
   ctx.fill();
+  if (kind === 'throttle') {
+    ctx.strokeStyle = '#e5e7eb'; // a light rim so the black knob reads on the dark panel
+    ctx.lineWidth = 3;
+    ctx.stroke();
+  }
   if (kind === 'mixture') {
     ctx.strokeStyle = '#7d120d';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 2.5;
     for (let i = 0; i < 12; i++) {
       const a = (i / 12) * Math.PI * 2;
       ctx.beginPath();
@@ -393,105 +436,125 @@ function plunger(ctx: CanvasRenderingContext2D, x: number, y: number, out: numbe
       ctx.stroke();
     }
   }
-  // No words on the knobs: a state word ("RICH") on a pulled-out knob would mislead the VLM.
 }
 
 function parkingBrake(ctx: CanvasRenderingContext2D, sim: Sim) {
-  const x = 120;
-  const y = 860;
+  const x = 115;
+  const y = 842;
   const set = sim.controls.parkingBrake;
-  label(ctx, 'PARK BRAKE', x, y - 50, 12);
-  ctx.fillStyle = '#121315';
+  label(ctx, 'PARK BRAKE', x, y - 28, 13);
+  ctx.fillStyle = '#0d0e10';
   ctx.beginPath();
-  ctx.arc(x, y - 20, 12, 0, Math.PI * 2);
+  ctx.arc(x, y, 14, 0, Math.PI * 2);
   ctx.fill();
-  const dy = set ? 50 : 0;
+  const dy = set ? 46 : 0;
   if (set) {
-    ctx.fillStyle = '#c9ccd0';
-    ctx.fillRect(x - 5, y - 20, 10, dy);
+    ctx.fillStyle = '#d4d7db';
+    ctx.fillRect(x - 6, y, 12, dy);
   }
-  const hy = y - 20 + dy;
-  ctx.fillStyle = '#d7d4ca';
+  const hy = y + dy;
+  ctx.fillStyle = '#e4e1d6';
   ctx.beginPath();
-  ctx.roundRect(x - 40, hy - 10, 80, 20, 8);
+  ctx.roundRect(x - 56, hy - 13, 112, 26, 10);
   ctx.fill();
-  if (set) {
-    ctx.fillStyle = '#e0362c';
-    ctx.beginPath();
-    ctx.roundRect(x - 26, hy + 14, 52, 22, 4);
-    ctx.fill();
-    label(ctx, 'SET', x, hy + 25, 14, '#ffffff');
-  }
+  if (set) pill(ctx, x, hy + 36, 92, 30, 'SET', RED);
 }
 
+const FLAP_COLORS: Record<number, string> = { 0: '#e5e7eb', 10: GREEN, 20: AMBER, 30: RED };
+
 function flaps(ctx: CanvasRenderingContext2D, sim: Sim) {
-  const x = 1060;
-  const top = 750;
-  const step = 52;
-  label(ctx, 'FLAPS', x, top - 30, 13);
+  const x = 1012;
+  const top = 780;
+  const step = 48;
+  // A big readout of the lever position, colored per detent (30° is red: never for takeoff).
+  label(ctx, 'FLAPS', x + 18, top - 64, 13);
+  ctx.fillStyle = '#060707';
+  ctx.strokeStyle = '#4b4f55';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(x - 30, top - 52, 96, 36, 5);
+  ctx.fill();
+  ctx.stroke();
+  label(ctx, `${sim.controls.flaps}°`, x + 18, top - 33, 28, FLAP_COLORS[sim.controls.flaps]);
   ctx.fillStyle = '#0c0d0e';
   ctx.beginPath();
-  ctx.roundRect(x - 9, top - 8, 18, step * 3 + 16, 8);
+  ctx.roundRect(x - 10, top - 10, 20, step * 3 + 20, 8);
   ctx.fill();
   [0, 10, 20, 30].forEach((d, i) => {
-    label(ctx, `${d}°`, x - 44, top + i * step, 15);
+    label(ctx, `${d}°`, x - 44, top + i * step, 17, FLAP_COLORS[d]);
     ctx.strokeStyle = '#e9e6dc';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(x - 26, top + i * step);
-    ctx.lineTo(x - 14, top + i * step);
+    ctx.moveTo(x - 28, top + i * step);
+    ctx.lineTo(x - 15, top + i * step);
     ctx.stroke();
   });
   const ly = top + (sim.controls.flaps / 10) * step;
-  const g = ctx.createLinearGradient(0, ly - 14, 0, ly + 14);
+  const g = ctx.createLinearGradient(0, ly - 16, 0, ly + 16);
   g.addColorStop(0, '#ffffff');
   g.addColorStop(1, '#b8b5ab');
   ctx.fillStyle = g;
   ctx.beginPath();
-  ctx.roundRect(x - 30, ly - 13, 60, 26, 6);
+  ctx.roundRect(x - 36, ly - 15, 72, 30, 7);
   ctx.fill();
   ctx.fillStyle = '#5b5e62';
-  ctx.fillRect(x - 22, ly - 2, 44, 4);
+  ctx.fillRect(x - 26, ly - 2, 52, 4);
   // Flap position indicator (actual flaps, which lag the lever).
-  const ix = x + 62;
+  const ix = x + 60;
   ctx.fillStyle = '#0c0d0e';
-  ctx.fillRect(ix - 10, top - 8, 20, step * 3 + 16);
+  ctx.fillRect(ix - 10, top - 10, 20, step * 3 + 20);
   const iy = top + (sim.flight.flapsDeg / 10) * step;
-  ctx.fillStyle = '#ffb020';
+  ctx.fillStyle = AMBER;
   ctx.beginPath();
   ctx.moveTo(ix - 8, iy);
-  ctx.lineTo(ix + 8, iy - 7);
-  ctx.lineTo(ix + 8, iy + 7);
+  ctx.lineTo(ix + 8, iy - 8);
+  ctx.lineTo(ix + 8, iy + 8);
   ctx.fill();
 }
 
 function fuelSelector(ctx: CanvasRenderingContext2D, sim: Sim) {
-  const x = 1218;
-  const y = 860;
-  const r = 44;
-  label(ctx, 'FUEL', x, y - r - 26, 13);
+  const x = 1192;
+  const y = 852;
+  const r = 62;
+  const both = sim.controls.fuelBoth;
+  label(ctx, 'FUEL SELECTOR', x, y - r - 30, 13);
+  // Two halves: BOTH (top) lights green when selected, OFF (bottom) lights red.
   ctx.fillStyle = '#d9d5c8';
   ctx.beginPath();
   ctx.arc(x, y, r + 12, 0, Math.PI * 2);
   ctx.fill();
-  label(ctx, 'BOTH', x, y - r + 2, 12, '#1a1b1d');
-  label(ctx, 'OFF', x, y + r - 4, 12, '#c8261e');
+  for (const [isTop, active, color] of [
+    [true, both, GREEN],
+    [false, !both, RED],
+  ] as const) {
+    ctx.fillStyle = active ? color : '#bdb8aa';
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.arc(x, y, r + 8, isTop ? Math.PI : 0, isTop ? 2 * Math.PI : Math.PI);
+    ctx.closePath();
+    ctx.fill();
+  }
+  label(ctx, 'BOTH', x, y - r + 16, 17, both ? '#052e12' : '#55524a');
+  label(ctx, 'OFF', x, y + r - 14, 17, both ? '#55524a' : '#ffffff');
   ctx.fillStyle = '#25272a';
   ctx.beginPath();
-  ctx.arc(x, y, r - 18, 0, Math.PI * 2);
+  ctx.arc(x, y, r - 26, 0, Math.PI * 2);
   ctx.fill();
   ctx.save();
   ctx.translate(x, y);
-  ctx.rotate(sim.controls.fuelBoth ? 0 : Math.PI);
+  ctx.rotate(both ? 0 : Math.PI);
   ctx.fillStyle = '#ffffff';
+  ctx.strokeStyle = '#111';
+  ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(0, -r + 10);
-  ctx.lineTo(9, -6);
-  ctx.lineTo(5, 20);
-  ctx.lineTo(-5, 20);
-  ctx.lineTo(-9, -6);
+  ctx.moveTo(0, -r + 4);
+  ctx.lineTo(13, -10);
+  ctx.lineTo(7, 30);
+  ctx.lineTo(-7, 30);
+  ctx.lineTo(-13, -10);
   ctx.closePath();
   ctx.fill();
+  ctx.stroke();
   ctx.restore();
 }
 
@@ -526,15 +589,15 @@ function windshieldFrame(ctx: CanvasRenderingContext2D, sim: Sim, w: number) {
       ctx.restore();
     } else {
       const g = ctx.createRadialGradient(cx, hubY, 10, cx, hubY, 300);
-      g.addColorStop(0, 'rgba(20,20,20,0.10)');
-      g.addColorStop(0.9, 'rgba(20,20,20,0.16)');
+      g.addColorStop(0, 'rgba(20,20,20,0.30)');
+      g.addColorStop(0.9, 'rgba(20,20,20,0.38)');
       g.addColorStop(1, 'rgba(20,20,20,0)');
       ctx.fillStyle = g;
       ctx.beginPath();
       ctx.arc(cx, hubY, 300, 0, Math.PI * 2);
       ctx.fill();
-      ctx.strokeStyle = 'rgba(255,255,255,0.12)';
-      ctx.lineWidth = 3;
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+      ctx.lineWidth = 4;
       ctx.beginPath();
       ctx.arc(cx, hubY, 296, 0, Math.PI * 2);
       ctx.stroke();
@@ -616,9 +679,9 @@ export function drawPanel(ctx: CanvasRenderingContext2D, im: PanelImages, sim: S
   engineCluster(ctx, sim);
   annunciators(ctx, sim);
   ignitionKey(ctx, sim);
-  rocker(ctx, 92, 720, sim.controls.master, '#c8261e', 'BAT');
-  rocker(ctx, 140, 720, sim.controls.master, '#c8261e', 'ALT');
-  label(ctx, 'MASTER', 116, 670, 12);
+  label(ctx, 'MASTER', 115, 646, 13);
+  rocker(ctx, 88, 726, sim.controls.master, '#c8261e', 'BAT');
+  rocker(ctx, 142, 726, sim.controls.master, '#c8261e', 'ALT');
   const lightRow: [string, boolean][] = [
     ['BCN', false],
     ['LAND', sim.controls.landingLight],
@@ -626,10 +689,11 @@ export function drawPanel(ctx: CanvasRenderingContext2D, im: PanelImages, sim: S
     ['NAV', false],
     ['STROBE', false],
   ];
-  lightRow.forEach(([name, on], i) => rocker(ctx, 260 + i * 62, 860, on, '#26282b', name, 28, 46));
-  plunger(ctx, 640, 860, 0, 'carb', 'CARB HEAT');
-  plunger(ctx, 770, 860, 1 - sim.controls.throttle, 'throttle', 'THROTTLE');
-  plunger(ctx, 900, 860, sim.controls.mixtureRich ? 0 : 1, 'mixture', 'MIXTURE');
+  lightRow.forEach(([name, on], i) => rocker(ctx, 262 + i * 66, 872, on, '#2a2c30', name, 38, 58));
+  plunger(ctx, 640, 890, 0, 'carb', 'CARB HEAT', null);
+  const t = sim.controls.throttle;
+  plunger(ctx, 790, 796, 1 - t, 'throttle', 'THROTTLE', t >= 0.95 ? ['FULL', GREEN] : t <= 0.02 ? ['IDLE', null] : [`${Math.round(t * 100)}%`, AMBER]);
+  plunger(ctx, 900, 796, sim.controls.mixtureRich ? 0 : 1, 'mixture', 'MIXTURE', sim.controls.mixtureRich ? ['RICH', GREEN] : ['CUTOFF', RED]);
   parkingBrake(ctx, sim);
   flaps(ctx, sim);
   fuelSelector(ctx, sim);

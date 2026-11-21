@@ -8,6 +8,9 @@ const RUNWAY_LENGTH = 3200; // m
 const RUNWAY_WIDTH = 45;
 const START_Z = -40; // the plane starts just past the threshold, nose to -z
 const EYE_HEIGHT = 1.6;
+// The windshield shows pitch 1.6× (instruments stay true): at 640×480 a real 7° rotation barely moves the
+// horizon, and the VLM must see the nose come up.
+const VIEW_PITCH_GAIN = 1.6;
 
 function canvasTexture(w: number, h: number, draw: (ctx: CanvasRenderingContext2D) => void): THREE.CanvasTexture {
   const c = document.createElement('canvas');
@@ -204,7 +207,7 @@ export class OutsideView {
     // A little vibration with the engine running, more on the ground roll.
     const shake = f.engine === 'running' ? (f.onGround ? 0.004 + f.airspeedKt * 0.0002 : 0.0015) : 0;
     this.camera.position.set(Math.sin(f.t * 47) * shake * 2, EYE_HEIGHT + agl, z);
-    this.camera.rotation.set(((f.pitchDeg + Math.sin(f.t * 61) * shake * 40) * Math.PI) / 180, 0, 0);
+    this.camera.rotation.set(((f.pitchDeg * VIEW_PITCH_GAIN + Math.sin(f.t * 61) * shake * 40) * Math.PI) / 180, 0, 0);
 
     const lit = sim.controls.landingLight && sim.controls.master;
     this.landingLight.intensity = lit ? 900 : 0;
