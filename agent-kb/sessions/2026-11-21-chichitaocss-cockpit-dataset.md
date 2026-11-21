@@ -14,6 +14,11 @@
   `server/tests/test_simruns.py`.
 - C172 cockpit keeps a dev-only event log (`window.__c172.eventLog`).
 
+- Haiku's blocking finding on #44: run ids depended on the position in a `flyC172` batch, not the seed, so the
+  documented `--test-sessions` didn't match one-batch runs and `dataset.py` silently trained on them. Now the
+  scenario follows the seed (`SCENARIOS[(N - 1) % 6]`) and `dataset.py` refuses unknown `--test-sessions`.
+  The first local batch (two batches, old rule) keeps its self-describing ids.
+
 ## Decisions
 - None (label policy is a tool default: hold 2.5 s after an action, else `none`; Jose can change it).
 

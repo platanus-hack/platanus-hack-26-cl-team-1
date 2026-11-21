@@ -9,7 +9,9 @@ each call would have sent + `labels.json` (one label per call, so nothing is lef
 
     cd server && uv run python -m app.perception.simruns ../.context/sim-raw --out ../.context/sim-runs/v1
     cd server && uv run python -m app.perception.dataset ../.context/sim-runs/v1 \\
-        --out ../.context/vlm-data/sim-v1 --test-sessions sim005_flaps_full sim006_power_with_brake
+        --out ../.context/vlm-data/sim-v1 \\
+        --test-sessions sim007_correct sim009_start_not_ready sim010_flaps_full \\
+        sim011_power_with_brake sim012_rotate_early
 
 Labels: a call is labelled with the latest ground-truth action if the newest frame it sends is at most
 `--hold-ms` after it (the change and the state right after it are on screen), otherwise `none`. "Expected

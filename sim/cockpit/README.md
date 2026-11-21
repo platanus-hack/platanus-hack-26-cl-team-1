@@ -61,8 +61,10 @@ The simulator knows exactly which action happened and when, so its runs need no 
 4. Build the fine-tuning dataset with the usual tool, holding out whole runs:
    ```bash
    cd server && uv run python -m app.perception.dataset ../.context/sim-runs/v1 --out ../.context/vlm-data/sim-v1 \
-     --test-sessions <run ids>
+     --test-sessions sim007_correct sim009_start_not_ready sim010_flaps_full sim011_power_with_brake sim012_rotate_early
    ```
+   Run ids follow the seed (`sim<N>_<scenario>`, see `fly_c172.js`), so with seeds 1–12 that holds out the
+   second cycle's correct run and one of each mistake. An id that isn't in the runs is an error.
 
 Label policy (`--hold-ms`, default 2500): a call is labelled with the latest ground-truth action while its
 newest frame is within 2.5 s of it, else `none`; "expected next" counts only the actions before the call's

@@ -5,10 +5,12 @@ import itertools
 import json
 from pathlib import Path
 
+import pytest
 from contracts import TaskAutomaton
 from PIL import Image
 
 from app.library.store import TaskLibrary
+from app.perception.dataset import check_test_sessions
 from app.perception.review import effective_labels, load_sessions
 from app.perception.simruns import convert_run, done_at, label_at
 from app.settings import Settings
@@ -72,3 +74,11 @@ def test_a_run_becomes_live_shaped_calls_with_every_call_labelled(tmp_path):
     [session] = load_sessions(out, LIBRARY)
     assert session.id == "sim001_test" and len(session.calls) == len(calls)
     assert None not in effective_labels(session, labels)
+
+
+def test_a_held_out_session_that_does_not_exist_is_an_error():
+    """A typo in --test-sessions must not silently train on the test run."""
+    found = {"sim007_correct", "sim010_flaps_full"}
+    check_test_sessions(["sim010_flaps_full"], found)
+    with pytest.raises(ValueError, match="sim005_flaps_full"):
+        check_test_sessions(["sim005_flaps_full"], found)

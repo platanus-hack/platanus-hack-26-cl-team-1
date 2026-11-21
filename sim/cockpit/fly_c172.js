@@ -6,7 +6,9 @@
 //   await flyC172({ runs: 12, seed: 1 })
 // Each run streams 640×480 JPEGs at ~6 fps (the page's capture rate) and ends with `<run>/run.json`: the
 // frames and the simulator's ground-truth events, both on simulator time. `app.perception.simruns` turns
-// the raw runs into recorded VLM calls + labels. Runs are seeded: the same seed flies the same plan.
+// the raw runs into recorded VLM calls + labels. Runs are seeded: seed N always flies the same run with the
+// same id, `sim<N>_<scenario>`, scenario = SCENARIOS[(N - 1) % 6] (seeds 1–6: correct, correct,
+// start_not_ready, flaps_full, power_with_brake, rotate_early; 7–12 repeat the cycle).
 (() => {
   const RECEIVER = 'http://localhost:8765/';
   const FPS = 6;
@@ -154,7 +156,8 @@
     const done = [];
     for (let i = 0; i < runs; i++) {
       const runSeed = seed + i;
-      const scenario = SCENARIOS[i % SCENARIOS.length];
+      // From the seed, not the position in this batch: seed N is always the same run, however it's batched.
+      const scenario = SCENARIOS[(runSeed - 1) % SCENARIOS.length];
       const runId = `${prefix}${String(runSeed).padStart(3, '0')}_${scenario}`;
       (button('Reiniciar') ?? button('Empezar práctica')).click();
       await sleep(800);
