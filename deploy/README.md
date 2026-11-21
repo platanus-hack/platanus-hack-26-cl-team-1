@@ -97,7 +97,8 @@ observations.
 ## Continuous deployment (D-016)
 
 `.github/workflows/cd-demo.yml` runs `deploy/up-demo.sh` on a GitHub runner **every time CI passes on a push to
-`main`**, for exactly the commit CI tested. Deploys queue in order, and the link stays the same because only the
+`main`**, for exactly the commit CI tested, as long as it's still the tip of `main` (CI runs can finish out of
+order). Deploys queue in order, and the link stays the same because only the
 server restarts. The job summary shows the deployed commit and the link. Actions → *CD demo* → *Run workflow*
 deploys `main` by hand (other branches are refused).
 
