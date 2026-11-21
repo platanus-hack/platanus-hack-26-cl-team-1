@@ -219,6 +219,22 @@ with a pointer to their replacement; nothing is ever deleted from §3.
   author declared doing it early a real mistake (power with the parking brake set, key to START with fuel off, a
   battery connected early, soap before wetting), so it keeps warning instead of saying "doy por hecho". Before
   this, the C172 demo's two deliberate order mistakes were accepted ~3 s after the warning.
+### D-018 — Pipelined VLM calls: 3 in flight per session (2026-11-21)
+- **Context:** a call takes ~0.8 s and is dominated by writing the answer (~90 tokens); prompt size barely
+  matters. With one call in flight the GPU idles, and a 1–2 s action (taking soap) is seen by 1–2 calls at most.
+- **Decision:** `VlmPerception` pipelines calls inside the `Perception` interface, so the session and the
+  contract don't change (the session still has one `observe` at a time):
+  - up to `SUP_VLM_MAX_IN_FLIGHT=3` calls at once, starting at least `SUP_VLM_MIN_INTERVAL_MS=250` apart;
+  - answers are delivered in launch order;
+  - `observe` waits for the oldest call only until the next call is due.
+  - The rules controller's inference also needs its sightings to span ≥ 2 s (`INFER_MIN_MS`), so faster
+    perception doesn't infer sooner.
+  - Measured with `app.perception.bench --stream 45` on the 5090 (6 fps camera, 3 frames per call):
+    1.11 → 2.84 observations/s, latency p50 777 → 843 ms.
+- **Consequences:** about 3× the load on vLLM per session (`--max-num-seqs 4`, so a second open session queues).
+  Overlapping windows mean each brief action is seen by several calls. Accuracy per call is unchanged (same
+  prompt); whether it catches more of the real actions needs a labelled live run.
+
 ## §2 Open (decide in block 1, see docs/VISION.md)
 
 - **D-?? Demo scenario.** Direction: physical assembly in robotics (a contact who assembles robots will give a

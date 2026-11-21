@@ -33,6 +33,7 @@ Owner in brackets once someone takes an item. Blocks refer to the plan in `docs/
 - [ ] Demo rehearsal ×3, backup video, `platanus-hack-project.jsonc`, `project-description.md`, README.
 
 ## Done
+- [x] Pipelined VLM calls (D-018): 2.84 vs 1.11 observations/s at about the same latency, `app.perception.bench --stream`. [Cote]
 - [x] Session WebSocket server per `contracts.protocol` (skeleton, D-010) with the voice queue (#22).
 - [x] Symbolic simulator `sim/symbolic` (D-011 `observed_quality`), learned controller + eval + `SUP_CONTROLLER` (D-013). [Cote]
 - [x] Robot assembly ontology v0, first task `servo_scout_robot`, Claude task generator (https://github.com/platanus-hack/platanus-hack-26-cl-team-1/pull/17).
