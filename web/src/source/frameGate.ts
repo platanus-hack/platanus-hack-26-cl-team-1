@@ -20,6 +20,11 @@ export class FrameGate {
     this.lastFrameAt = now;
   }
 
+  /** The page is hidden, so the browser reports no frames: don't count that time toward a stall. */
+  hold(now: number): void {
+    this.lastFrameAt = now;
+  }
+
   take(now: number): GateResult {
     if (this.fresh) {
       this.fresh = false;

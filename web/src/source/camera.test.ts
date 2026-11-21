@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cameraToOpen, loadCameraId, pickCamera } from './camera';
+import { cameraForReconnect, cameraToOpen, loadCameraId, pickCamera } from './camera';
 
 const devs = [
   { deviceId: 'a', label: 'FaceTime' },
@@ -48,5 +48,21 @@ describe('cameraToOpen', () => {
 
   it('ignores empty ids (devices listed before camera permission)', () => {
     expect(cameraToOpen(withoutPhone, '', '')).toEqual({ deviceId: 'facetime', missing: false });
+  });
+});
+
+describe('cameraForReconnect', () => {
+  const withPhone = [
+    { deviceId: 'facetime', label: 'FaceTime' },
+    { deviceId: 'iphone', label: 'Cámara del iPhone' },
+  ];
+  const withoutPhone = [{ deviceId: 'facetime', label: 'FaceTime' }];
+
+  it('reconnects to the camera the session was using', () => {
+    expect(cameraForReconnect(withPhone, 'iphone')).toBe('iphone');
+  });
+
+  it('refuses to fall back when that camera is not connected', () => {
+    expect(cameraForReconnect(withoutPhone, 'iphone')).toBeNull();
   });
 });

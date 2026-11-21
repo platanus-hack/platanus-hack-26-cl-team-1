@@ -25,3 +25,14 @@ describe('FrameGate', () => {
     expect(gate.take(4000)).toBe('stalled');
   });
 });
+
+describe('FrameGate.hold', () => {
+  it('does not count time while the page is hidden as a stall', () => {
+    const gate = new FrameGate(3000, 0);
+    gate.markFrame(100);
+    expect(gate.take(150)).toBe('capture');
+    gate.hold(5000); // hidden tab: the browser stops reporting frames
+    expect(gate.take(5100)).toBe('skip');
+    expect(gate.take(8000)).toBe('stalled');
+  });
+});

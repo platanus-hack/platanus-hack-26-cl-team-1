@@ -9,7 +9,7 @@ import { SessionClient } from '../session/client';
 import { describeLoss, type Loss } from '../session/loss';
 import { apiUrl, serverUrls } from '../session/server';
 import { VoicePlayer } from '../session/voice';
-import { cameraToOpen, loadCameraId, saveCameraId } from '../source/camera';
+import { cameraForReconnect, cameraToOpen, loadCameraId, saveCameraId } from '../source/camera';
 import { listCameras, openWebcam, startCapture, type Camera } from '../source/capture';
 
 const FPS = 6;
@@ -39,6 +39,7 @@ export function SupervisorPage() {
   const voiceRef = useRef(new VoicePlayer());
   const chosenCameraRef = useRef<string | null>(null); // picked in this page; wins whenever it's connected
   const serverErrorRef = useRef<string | null>(null); // the server sends `error`, then closes
+  const sessionCameraRef = useRef<string | null>(null); // the camera "Reconectar" goes back to
   const runningRef = useRef(false);
   const pendingRefreshRef = useRef(false); // a camera list change arrived during a session
   const refreshRef = useRef<() => void>(() => {});
@@ -117,6 +118,7 @@ export function SupervisorPage() {
 
   function chooseCamera(id: string) {
     chosenCameraRef.current = id;
+    sessionCameraRef.current = id; // an explicit pick is also what "Reconectar" should use
     setCameraId(id);
     setCameraNote('');
     saveCameraId(id);
@@ -164,7 +166,26 @@ export function SupervisorPage() {
     setStatus(text);
   }
 
-  async function start() {
+  async function reconnect() {
+    const last = sessionCameraRef.current;
+    if (!last) return start(cameraId);
+    let deviceId: string | null = null;
+    try {
+      deviceId = cameraForReconnect(await listCameras(), last);
+    } catch (error) {
+      setLostReason(`No pude listar las cámaras: ${String(error)}`);
+      return;
+    }
+    if (!deviceId) {
+      const text = 'La cámara de la sesión no está conectada: conéctala de nuevo o elige otra cámara.';
+      setLostReason(text);
+      setStatus(text);
+      return;
+    }
+    return start(deviceId);
+  }
+
+  async function start(deviceId: string | null) {
     const video = videoRef.current;
     if (!video || !taskId) return;
     stop();
@@ -181,11 +202,12 @@ export function SupervisorPage() {
     setConnection('connecting');
     setStatus('Conectando…');
     try {
-      const closeCamera = await openWebcam(video, cameraId, () => current() && lose({ kind: 'camera' }));
+      const closeCamera = await openWebcam(video, deviceId, () => current() && lose({ kind: 'camera' }));
       if (!current()) {
         closeCamera(); // a newer start/stop happened while the camera was opening
         return;
       }
+      sessionCameraRef.current = deviceId;
       // Each cleanup is registered as soon as its resource exists, so a throw below still releases it.
       stopRef.current = [closeCamera];
       if (video.videoWidth && video.videoHeight) setAspect(video.videoWidth / video.videoHeight);
@@ -256,7 +278,7 @@ export function SupervisorPage() {
             ))}
           </select>
         </label>
-        <button onClick={() => void start()} disabled={!taskId || running}>
+        <button onClick={() => void start(cameraId)} disabled={!taskId || running}>
           Empezar
         </button>
         <button onClick={stop} disabled={!running}>
@@ -270,7 +292,7 @@ export function SupervisorPage() {
       {connection === 'lost' && (
         <div className="lost-banner" role="alert">
           <span>{lostReason}</span>
-          <button onClick={() => void start()} disabled={!taskId}>
+          <button onClick={() => void reconnect()} disabled={!taskId}>
             Reconectar
           </button>
         </div>

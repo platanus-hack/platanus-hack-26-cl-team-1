@@ -37,3 +37,8 @@ export function cameraToOpen(
 ): { deviceId: string | null; missing: boolean } {
   return pickCamera(devices, chosen || saved || null);
 }
+
+/** "Reconectar" uses the camera the session was streaming from, or none: never a silent fallback. */
+export function cameraForReconnect(devices: Camera[], lastLive: string): string | null {
+  return devices.some((d) => d.deviceId === lastLive) ? lastLive : null;
+}

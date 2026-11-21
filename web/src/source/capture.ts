@@ -44,11 +44,17 @@ export async function openWebcam(
   };
   stream.getVideoTracks().forEach((t) => t.addEventListener('ended', onTrackEnded));
   video.srcObject = stream;
-  await video.play();
+  try {
+    await video.play();
+  } catch (error) {
+    stream.getTracks().forEach((t) => t.stop()); // don't leave the camera on when playback fails
+    if (video.srcObject === stream) video.srcObject = null;
+    throw error;
+  }
   return () => {
     closed = true;
     stream.getTracks().forEach((t) => t.stop());
-    video.srcObject = null;
+    if (video.srcObject === stream) video.srcObject = null; // a newer session may own the video now
   };
 }
 
@@ -87,6 +93,10 @@ export function startCapture(
   };
   const timer = window.setInterval(() => {
     if (encoding) return;
+    if (document.visibilityState === 'hidden') {
+      gate.hold(performance.now()); // Chrome pauses frame callbacks in a hidden tab; not a frozen camera
+      return;
+    }
     const verdict = gate.take(performance.now());
     if (verdict === 'stalled') {
       stop();
