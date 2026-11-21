@@ -1,0 +1,14 @@
+[Unit]
+Description=Circuito Vivo — Cloudflare quick tunnel → 127.0.0.1:8100
+After=network-online.target cv-vision.service
+
+[Service]
+Type=simple
+EnvironmentFile=-%h/cv/env
+# CV_TUNNEL_TOKEN set in ~/cv/env → named tunnel (stable URL); otherwise a quick tunnel (*.trycloudflare.com).
+ExecStart=/bin/sh -c 'if [ -n "$CV_TUNNEL_TOKEN" ]; then exec %h/.local/bin/cloudflared tunnel --no-autoupdate run --token "$CV_TUNNEL_TOKEN"; else exec %h/.local/bin/cloudflared tunnel --no-autoupdate --url http://127.0.0.1:8100; fi'
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

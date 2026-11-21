@@ -1,0 +1,16 @@
+[Unit]
+Description=Circuito Vivo — servidor de visión (FastAPI) en 127.0.0.1:8100
+After=network-online.target cv-vllm.service
+
+[Service]
+Type=simple
+EnvironmentFile=-%h/cv/env
+Environment=CV_DATA=%h/cv/data
+Environment=CV_MODELS=%h/cv/models
+WorkingDirectory=%h/cv/app/vision
+ExecStart=%h/cv/app/vision/.venv/bin/uvicorn vision.app:app --host 127.0.0.1 --port 8100 --ws-max-size 4194304 --log-level info
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=default.target
