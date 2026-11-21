@@ -20,6 +20,9 @@ from vision import mat
 
 DPI = 300
 PAGE_W_MM, PAGE_H_MM = 297.0, 210.0
+# Mat frame (mm) → page (mm): centre the mat's bounding box, a bit higher to leave room for the notes.
+OFF_X = (PAGE_W_MM - (mat.MAT_MAX_X - mat.MAT_MIN_X)) / 2 - mat.MAT_MIN_X
+OFF_Y = (PAGE_H_MM - 30 - (mat.MAT_MAX_Y - mat.MAT_MIN_Y)) / 2 - mat.MAT_MIN_Y
 
 
 def mm2px(v: float) -> int:
@@ -39,12 +42,9 @@ def _font(size_mm: float) -> ImageFont.ImageFont:
 def render_mat() -> Image.Image:
     page = Image.new("L", (mm2px(PAGE_W_MM), mm2px(PAGE_H_MM)), 255)
     d = ImageDraw.Draw(page)
-    # Centre the mat's bounding box on the page (a bit higher to leave room for the notes).
-    off_x = (PAGE_W_MM - (mat.MAT_MAX_X - mat.MAT_MIN_X)) / 2 - mat.MAT_MIN_X
-    off_y = (PAGE_H_MM - 30 - (mat.MAT_MAX_Y - mat.MAT_MIN_Y)) / 2 - mat.MAT_MIN_Y
 
     def P(x: float, y: float) -> tuple[int, int]:
-        return mm2px(x + off_x), mm2px(y + off_y)
+        return mm2px(x + OFF_X), mm2px(y + OFF_Y)
 
     aruco = cv2.aruco.getPredefinedDictionary(getattr(cv2.aruco, mat.ARUCO_DICT))
     side = mm2px(mat.MARKER_MM)

@@ -277,4 +277,8 @@ _(El ejecutor anota aquí cada decisión que se aparte del plan, con su hora y s
 | sáb 07:05 | Servicios como `systemd --user` (con `loginctl enable-linger`, que funcionó sin sudo) en vez de unidades de sistema. Unidades en `deploy/vision/systemd/`. | Sin sudo. Mismo efecto: `Restart=always` y arranque al reiniciar. |
 | sáb 07:05 | Túnel: quick tunnel de Cloudflare (`*.trycloudflare.com`). Si alguien pone `CV_TUNNEL_TOKEN` en `~/cv/env`, la unidad usa el túnel con nombre. | 🧑 HUMANO no definió dominio todavía; el quick tunnel funciona con `?vision=`. |
 | sáb 07:05 | Voz por defecto `ef_dora` hasta que 🧑 HUMANO elija (muestras enviadas: `ef_dora`, `em_alex`, `em_santa`). | Kokoro solo trae esas 3 voces en español. |
+| sáb 07:35 | Protocolo: el ack de cada frame es el mensaje `debug` (siempre se envía; las detecciones solo si el cliente pidió debug). Se agregan `issue_clear`, `cancel_say`, `capture`, `calib_points`, `set_capture`, `mute`. El audio binario lleva `uint8 len + id + WAV`. Contrato en `frontend/src/assembly/protocol.ts` ↔ `vision/vision/protocol.py`. | Faltaban mensajes para cancelar voz, limpiar errores y la calibración por clics. |
+| sáb 07:35 | Si el servidor no tiene TTS, `say` llega con `audio:false` y el navegador lo lee con `speechSynthesis` (es-CL). | Permite desarrollar sin GPU. |
+| sáb 07:35 | `registration.py` (F3.1) se adelantó y quedó en F2, con tests sintéticos del tapete en 3 perspectivas: los 400 huecos salen exactos. | Lo necesitaba el overlay de F2. |
+| sáb 07:35 | F4: con "Grabar fotos" activo, el navegador manda JPEG q92 y el servidor guarda esos bytes tal cual (sin recomprimir), en vez de frames sin comprimir. | El servidor solo recibe JPEG; q92 basta para YOLO. |
 
