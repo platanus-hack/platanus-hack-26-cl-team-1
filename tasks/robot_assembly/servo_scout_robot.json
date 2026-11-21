@@ -1,0 +1,28 @@
+{
+  "id": "servo_scout_robot",
+  "version": 1,
+  "title_es": "Robot explorador con servo",
+  "description": "Assemble a small two-wheel scout robot: DC motors with wheels, a servo that turns an ultrasonic sensor, the controller board and its wiring; the battery is connected last, then the robot is switched on.",
+  "domain": "robot_assembly",
+  "ontology_version": 1,
+  "objects": ["chassis", "dc_motor", "motor_bracket", "wheel", "servo_motor", "servo_bracket", "servo_horn", "ultrasonic_sensor", "sensor_mount", "controller_board", "servo_cable", "jumper_wire", "battery_pack", "power_switch"],
+  "actions": ["mount_dc_motor", "attach_wheel", "insert_servo_bracket", "attach_servo_horn", "mount_sensor", "mount_controller", "connect_servo_cable", "connect_sensor_wires", "connect_battery", "switch_power_on", "insert_servo_upside_down", "connect_servo_reversed"],
+  "steps": [
+    {"id": "motors", "title_es": "Montar los motores", "instruction_es": "Monta los dos motores en sus soportes, con el eje hacia afuera.", "action": "mount_dc_motor", "completion_cue": "both yellow gear motors held in their brackets on the chassis, shafts pointing outward"},
+    {"id": "wheels", "title_es": "Poner las ruedas", "instruction_es": "Ahora encaja una rueda en el eje de cada motor.", "action": "attach_wheel", "requires": ["motors"], "completion_cue": "a wheel sits flush on each motor shaft"},
+    {"id": "servo", "title_es": "Montar el servo", "instruction_es": "Inserta el servo en su soporte, con el eje hacia arriba.", "action": "insert_servo_bracket", "completion_cue": "the blue servo is in its bracket at the front, shaft pointing up"},
+    {"id": "horn", "title_es": "Poner el brazo del servo", "instruction_es": "Pon el brazo blanco en el eje del servo.", "action": "attach_servo_horn", "requires": ["servo"], "completion_cue": "a white plastic arm is fixed on the servo shaft"},
+    {"id": "sensor", "title_es": "Montar el sensor", "instruction_es": "Monta el sensor ultrasónico sobre el brazo del servo, con los ojos hacia adelante.", "action": "mount_sensor", "requires": ["horn"], "completion_cue": "the ultrasonic sensor sits on the servo arm, its two round eyes facing forward"},
+    {"id": "controller", "title_es": "Montar la placa", "instruction_es": "Atornilla la placa controladora sobre el chasis.", "action": "mount_controller", "completion_cue": "the controller board is fixed on top of the chassis"},
+    {"id": "servo_cable", "title_es": "Conectar el servo", "instruction_es": "Conecta el cable del servo a la placa, con el cable café en GND.", "action": "connect_servo_cable", "requires": ["servo", "controller"], "completion_cue": "the servo's 3-pin connector is on the board's pins, brown wire on GND"},
+    {"id": "sensor_wires", "title_es": "Conectar el sensor", "instruction_es": "Conecta los cuatro cables del sensor a la placa.", "action": "connect_sensor_wires", "requires": ["sensor", "controller"], "completion_cue": "four jumper wires run from the sensor's pins to the board"},
+    {"id": "battery", "title_es": "Conectar la batería", "instruction_es": "Ya está todo cableado: conecta el portapilas.", "action": "connect_battery", "requires": ["wheels", "servo_cable", "sensor_wires"], "completion_cue": "the battery holder's red and black leads are connected"},
+    {"id": "power", "title_es": "Encender el robot", "instruction_es": "Enciende el robot con el interruptor.", "action": "switch_power_on", "requires": ["battery"], "completion_cue": "the switch is on and an LED on the board is lit"}
+  ],
+  "mistakes": [
+    {"id": "battery_before_wiring", "kind": "out_of_order", "step": "battery", "description": "Connects the battery before all the wiring is finished.", "visual_cue": "battery leads connected while sensor or servo wires are still loose", "correction_es": "Ojo, desconecta la batería: se conecta solo al final, cuando todo el cableado esté listo."},
+    {"id": "servo_upside_down", "kind": "wrong_action", "step": "servo", "action": "insert_servo_upside_down", "description": "Mounts the servo with its shaft pointing down.", "visual_cue": "the servo sits in its bracket with the output shaft pointing down or into the chassis", "correction_es": "Ojo, el servo quedó al revés: sácalo y ponlo con el eje hacia arriba."},
+    {"id": "servo_cable_reversed", "kind": "wrong_action", "step": "servo_cable", "action": "connect_servo_reversed", "description": "Plugs the servo connector in reversed.", "visual_cue": "the servo connector is plugged in with the orange wire on the GND side", "correction_es": "Ojo, el cable del servo está invertido: dalo vuelta para que el café quede en GND."},
+    {"id": "loose_wheel", "kind": "incomplete", "step": "wheels", "description": "A wheel is only partly pushed onto the shaft.", "visual_cue": "a wheel wobbles or leaves a visible gap to the motor", "correction_es": "Ojo, la rueda quedó suelta: empújala hasta que toque el motor."}
+  ]
+}

@@ -7,6 +7,7 @@ correction. Trained with a simulator and fine-tuned per scenario.
 - **Read first:** [docs/VISION.md](docs/VISION.md) (idea, architecture, plan), then
   [agent-kb/README.md](agent-kb/README.md) (session protocol), `agent-kb/backlog.md` (Now), and the newest file in `agent-kb/sessions/`.
 - **Options and costs per component:** [docs/RESEARCH.md](docs/RESEARCH.md).
+- **Work plan, work items, checkpoints:** [docs/PLAN.md](docs/PLAN.md).
 - **Contracts between the pieces:** [docs/CONTRACTS.md](docs/CONTRACTS.md) (code in `contracts/`). **Owners:** `docs/STACK.md` § Ownership.
 - **Previous project (Circuito Vivo):** removed from the tree, last commit `2e9da7c`. Before writing
   camera streaming, a WebSocket session, a VLM call, a TTS queue, a QLoRA pipeline or GPU-server ops, read
