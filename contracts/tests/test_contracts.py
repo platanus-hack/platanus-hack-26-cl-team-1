@@ -323,3 +323,12 @@ def test_trajectory_event_observed_quality_defaults_to_unknown():
         observed_quality="bad",
     )
     assert bad.observed_quality is Quality.BAD
+    with pytest.raises(ValueError):
+        TrajectoryEvent(
+            t_ms=2,
+            true_action=None,
+            observed_action=None,
+            observed_confidence=0.1,
+            step=None,
+            observed_quality="bad",
+        )

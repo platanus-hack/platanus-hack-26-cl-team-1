@@ -44,6 +44,12 @@ class TrajectoryEvent(Strict):
     mistake_kind: MistakeKind | None = None  # ground truth
     mistake_id: MistakeId | None = None
 
+    @model_validator(mode="after")
+    def _check(self) -> TrajectoryEvent:
+        if self.observed_action is None and self.observed_quality is not Quality.UNKNOWN:
+            raise ValueError("a null observed_action must have quality 'unknown' (as in VlmOutput)")
+        return self
+
 
 class Trajectory(Strict):
     id: Id
