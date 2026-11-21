@@ -122,3 +122,33 @@ export function startCapture(
   }, 1000 / fps);
   return stop;
 }
+
+/**
+ * Grab JPEG frames from an in-page simulator's canvas at `fps` (long side at most 640 px, like the camera);
+ * returns a stop function. A canvas has no "new frame" signal, so every tick is sent: the simulator
+ * redraws continuously while it runs. Skips a tick while one is encoding, and while the tab is hidden
+ * (the simulator's render loop pauses there too).
+ */
+export function startCanvasCapture(source: HTMLCanvasElement, fps: number, onJpeg: (jpeg: ArrayBuffer) => void): () => void {
+  const canvas = document.createElement('canvas');
+  const { width, height } = frameSize(source.width, source.height);
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('canvas 2d context unavailable');
+  let encoding = false;
+  const timer = window.setInterval(() => {
+    if (encoding || document.visibilityState === 'hidden') return;
+    encoding = true;
+    ctx.drawImage(source, 0, 0, width, height);
+    canvas.toBlob(
+      (blob) => {
+        encoding = false;
+        if (blob) void blob.arrayBuffer().then(onJpeg);
+      },
+      'image/jpeg',
+      0.7,
+    );
+  }, 1000 / fps);
+  return () => window.clearInterval(timer);
+}

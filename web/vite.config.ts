@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react';
 
 // Page paths of the client router (src/router.ts). The demo server serves real files only (D-015,
 // deploy/demo_app.py), so the build writes each page's index.html where a reload will look for it.
-const PAGES = ['supervisor'];
+const PAGES = ['supervisor', 'simulador'];
 
 function pageCopies(): Plugin {
   return {

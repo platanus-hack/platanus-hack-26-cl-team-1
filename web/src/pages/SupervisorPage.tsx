@@ -5,6 +5,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { TaskSummary } from '../contracts/task_summary';
 import type { Debug, Issue, Task, WsServerMessage } from '../contracts/ws_server_message';
+import { Nav } from '../Nav';
+import { cameraTasks } from '../simulator/simOnly';
 import { SessionClient } from '../session/client';
 import { closingServerError, describeLoss, type Loss } from '../session/loss';
 import { apiUrl, serverUrls } from '../session/server';
@@ -58,7 +60,8 @@ export function SupervisorPage() {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json() as Promise<TaskSummary[]>;
       })
-      .then((list) => {
+      .then((all) => {
+        const list = cameraTasks(all); // the simulator page has the rest
         setTasks(list);
         if (list[0]) setTaskId(list[0].id);
         else setStatus('El servidor no tiene tareas.');
@@ -260,6 +263,7 @@ export function SupervisorPage() {
     <main className="supervisor">
       <header>
         <h1>Supervisor</h1>
+        <Nav current="supervisor" />
         <span className={`status ${statusError ? 'lost' : connection}`}>{status}</span>
       </header>
       <section className="controls">

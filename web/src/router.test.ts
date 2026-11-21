@@ -11,7 +11,12 @@ describe('route', () => {
     expect(route('/')).toBe('root');
   });
 
+  it('opens the simulator page with or without a trailing slash', () => {
+    expect(route('/simulador')).toBe('simulator');
+    expect(route('/simulador/')).toBe('simulator');
+  });
+
   it('reports unknown pages', () => {
-    expect(route('/simulador')).toBe('not_found');
+    expect(route('/simulator')).toBe('not_found');
   });
 });

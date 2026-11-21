@@ -12,7 +12,7 @@ from app.main import create_app
 from app.settings import PerceptionMode, Settings, VoiceMode
 
 TASKS_DIR = Path(__file__).resolve().parents[2] / "tasks"
-REPO_TASK_IDS = {"hand_hygiene_basic", "led_flashlight", "servo_scout_robot"}
+REPO_TASK_IDS = {"c172_takeoff", "hand_hygiene_basic", "led_flashlight", "servo_scout_robot"}
 
 
 @pytest.fixture(scope="module")

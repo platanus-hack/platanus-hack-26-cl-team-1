@@ -165,6 +165,22 @@ with a pointer to their replacement; nothing is ever deleted from §3.
   with a Cloudflare account. If the box goes down, so does the demo (fallback: `make dev` on a laptop +
   `gpu/up-5090.sh`).
 
+### D-016 — Simulator page: an in-browser C172 cockpit as a second, practice-mode demo (2026-11-21)
+- **Context:** besides the physical kit (webcam), Anaís wants a demo that needs no hardware: a simulated task
+  the presenter does live, making mistakes on purpose so the supervisor corrects them. It sits next to the
+  robot/circuit task; it doesn't replace it.
+- **Decision:** a `Simulador` page (`/simulador/`, `web/src/simulator/`): pick a library task that has a
+  simulator, then **Práctica** (live: the simulator's canvas is the frame source, `hello.source = sim`,
+  `hello.task_id` = the project, so perception and the controller use its recipe) or **Grabación (experto)**
+  (offline: the canvas is recorded to `.webm` and labeled from the simulator's ground truth as `ClipRecord`s;
+  **mocked**: downloaded, no upload endpoint yet). First simulator: a Cessna 172 cockpit (2D panel with the
+  MIT `flight-indicators-js` gauges + a three.js windshield), keyboard-driven, for the new
+  `tasks/aviation/c172_takeoff.json` (cold-and-dark start → takeoff → climb; 4 task mistakes). Only video goes
+  to the server in practice: the simulator's ground truth stays in the page (debug overlay, labels).
+- **Consequences:** no contract change (`source: sim` already covers it; `ClipRecord` has no start/end, so the
+  mock puts the segment in the path as a media fragment). The demo deploy (D-015) serves the page because
+  `simulador` is a page of the web router (`web/src/router.ts`, copied to `simulador/index.html` at build). `c172_takeoff` has learned-controller weights.
+  Design: `docs/superpowers/specs/2026-11-21-simulator-page-design.md`.
 ### D-016 — Continuous deployment of the demo from GitHub Actions over SSH (2026-11-21)
 - **Context:** D-002 removed the old CI/CD, and D-015's deploy was manual, so merged PRs (e.g. #31's new task) didn't reach the public link until
   someone remembered to run `deploy/up-demo.sh`.

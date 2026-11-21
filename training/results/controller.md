@@ -12,6 +12,34 @@ Delay: median ms from mistake start. A detection counts whatever kind the contro
 under noise the per-kind recall also credits coincidental alarms (rules never flag `repeated` on
 purpose: perception reports an ongoing action twice).
 
+## c172_takeoff (v1)
+
+| noise | controller | step acc % | final ok % | mistake P % | R % | F1 % | FA/run | FA/min | delay ms |
+|---|---|---|---|---|---|---|---|---|---|
+| clean | rules | 100.0 | 100.0 | 100.0 | 76.1 | 86.4 | 0.00 | 0.00 | 0 |
+| clean | learned | 97.1 | 99.8 | 97.9 | 81.1 | 88.7 | 0.01 | 0.01 | 0 |
+| low | rules | 84.4 | 82.4 | 32.7 | 70.8 | 44.7 | 1.12 | 1.07 | 0 |
+| low | learned | 85.8 | 98.0 | 64.8 | 64.9 | 64.9 | 0.27 | 0.26 | 0 |
+| medium | rules | 50.1 | 36.9 | 11.3 | 63.1 | 19.2 | 3.76 | 3.59 | 1027 |
+| medium | learned | 69.4 | 93.8 | 41.4 | 38.7 | 40.0 | 0.42 | 0.40 | 1134 |
+| high | rules | 23.3 | 8.7 | 8.0 | 59.9 | 14.1 | 5.31 | 5.08 | 1464 |
+| high | learned | 53.7 | 90.8 | 28.4 | 18.5 | 22.4 | 0.36 | 0.34 | 1574 |
+
+597 test runs per noise level.
+
+Recall per mistake kind (%):
+
+| noise | controller | out_of_order | wrong_action | incomplete | repeated |
+|---|---|---|---|---|---|
+| clean | rules | 100.0 | 100.0 | 100.0 | 0.0 |
+| clean | learned | 80.7 | 98.1 | 71.7 | 76.4 |
+| low | rules | 95.8 | 96.2 | 79.5 | 9.2 |
+| low | learned | 66.4 | 90.4 | 44.1 | 63.3 |
+| medium | rules | 86.4 | 83.3 | 63.2 | 19.1 |
+| medium | learned | 39.8 | 59.8 | 18.4 | 40.9 |
+| high | rules | 72.0 | 74.0 | 61.7 | 31.2 |
+| high | learned | 17.8 | 35.6 | 4.7 | 19.3 |
+
 ## led_flashlight (v1)
 
 | noise | controller | step acc % | final ok % | mistake P % | R % | F1 % | FA/run | FA/min | delay ms |
