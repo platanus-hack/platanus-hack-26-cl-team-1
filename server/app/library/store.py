@@ -2,6 +2,9 @@
 
 Layout: tasks/<domain>/ontology.json plus one JSON file per task. An invalid file stops the server:
 a broken task must never reach a session.
+
+Tasks are listed sorted by task id, never by folder: the web app opens on the first one, so adding a
+domain must not change that default.
 """
 
 from __future__ import annotations
@@ -42,7 +45,7 @@ class TaskLibrary:
                 tasks[task.id] = task
         if not tasks:
             raise ValueError(f"no tasks found under {root}")
-        return cls(tasks)
+        return cls(dict(sorted(tasks.items())))
 
     def get(self, task_id: str) -> Task | None:
         return self._tasks.get(task_id)
