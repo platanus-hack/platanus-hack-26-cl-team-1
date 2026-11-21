@@ -62,7 +62,7 @@ The plane task lives next to the robot task; it doesn't replace it.
 ## Deploy note
 
 Asked for Render, but D-015 (merged while this was built) dropped Render: the 5090 box serves the web build
-and the session server on one origin behind a Cloudflare tunnel. The build has a second HTML entry
-(`web/simulador/index.html`) so the box's static mount serves `/simulador/`. If a separate static host comes
+and the session server on one origin behind a Cloudflare tunnel. `simulador` is a page of the web router
+(`web/src/router.ts`); the build copies `index.html` to `simulador/index.html`, so the box serves it. If a separate static host comes
 back, `?server=wss://<host>` (or `VITE_SUP_SERVER`) points both the WebSocket and the API at the server, which
 then needs that origin in `SUP_CORS_ORIGINS`. Learned-controller weights for `c172_takeoff` are committed.

@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { TaskSummary } from '../contracts/task_summary';
 import type { Task } from '../contracts/ws_server_message';
 import { Nav } from '../Nav';
-import { apiUrl } from '../session/client';
+import { apiUrl } from '../session/server';
 import { useSession } from '../session/useSession';
 import { CanvasRecorder, doneSteps, type Labeled, labelRun, newRunId, sendRecordingMock } from './recording';
 import { SIMULATORS } from './registry';

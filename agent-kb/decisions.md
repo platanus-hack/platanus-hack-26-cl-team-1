@@ -177,8 +177,8 @@ with a pointer to their replacement; nothing is ever deleted from §3.
   `tasks/aviation/c172_takeoff.json` (cold-and-dark start → takeoff → climb; 4 task mistakes). Only video goes
   to the server in practice: the simulator's ground truth stays in the page (debug overlay, labels).
 - **Consequences:** no contract change (`source: sim` already covers it; `ClipRecord` has no start/end, so the
-  mock puts the segment in the path as a media fragment). The demo deploy (D-015) serves the page because the
-  build has a second HTML entry (`web/simulador/index.html`). `c172_takeoff` has learned-controller weights.
+  mock puts the segment in the path as a media fragment). The demo deploy (D-015) serves the page because
+  `simulador` is a page of the web router (`web/src/router.ts`, copied to `simulador/index.html` at build). `c172_takeoff` has learned-controller weights.
   Design: `docs/superpowers/specs/2026-11-21-simulator-page-design.md`.
 
 ## §2 Open (decide in block 1, see docs/VISION.md)

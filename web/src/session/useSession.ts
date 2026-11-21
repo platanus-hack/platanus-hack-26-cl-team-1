@@ -1,9 +1,10 @@
 // One live supervisor session (owner: Anaís): WebSocket client, frame capture, voice, and the state the
-// UI draws (checklist statuses, subtitle, open issue, debug). Shared by the main page and the simulator.
+// UI draws (checklist statuses, subtitle, open issue, debug). Used by the simulator page; the supervisor
+// page keeps its own camera-specific session (reconnect, camera loss).
 import { useEffect, useRef, useState } from 'react';
 import type { Hello, WsClientMessage } from '../contracts/ws_client_message';
 import type { Debug, Issue, Task, WsServerMessage } from '../contracts/ws_server_message';
-import { startCapture } from '../source/capture';
+import { startCanvasCapture } from '../source/capture';
 import { SessionClient } from './client';
 import { VoicePlayer } from './voice';
 
@@ -76,14 +77,14 @@ export function useSession() {
   }
 
   /** Open the session and stream `source`. `extra` cleanups run on stop (close the camera, the clip…). */
-  function connect(current: () => boolean, hello: Hello, source: HTMLVideoElement | HTMLCanvasElement, extra: (() => void)[] = []) {
+  function connect(current: () => boolean, hello: Hello, source: HTMLCanvasElement, extra: (() => void)[] = []) {
     const c = new SessionClient(hello, {
       onMessage: (message) => current() && onMessage(message),
       onAudio: (id, audio) => current() && voice.current.play(id, audio),
       onClose: (reason) => current() && patch({ status: `Desconectado: ${reason}` }),
     });
     client.current = c;
-    const stopCapture = startCapture(source, FPS, (jpeg) => c.sendFrame(jpeg));
+    const stopCapture = startCanvasCapture(source, FPS, (jpeg) => c.sendFrame(jpeg));
     cleanups.current = [stopCapture, () => c.close(), ...extra];
   }
 

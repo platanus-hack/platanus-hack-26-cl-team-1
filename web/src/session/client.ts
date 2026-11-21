@@ -2,6 +2,7 @@
 import type { Hello, WsClientMessage } from '../contracts/ws_client_message';
 import type { WsServerMessage } from '../contracts/ws_server_message';
 import { packFrame, unpackAudio } from './frames';
+import { sessionWsUrl } from './server';
 
 export type SessionHandlers = {
   onMessage: (message: WsServerMessage) => void;
@@ -9,30 +10,12 @@ export type SessionHandlers = {
   onClose: (reason: string) => void;
 };
 
-/** The session server's WebSocket origin: `?server=wss://host` (e.g. a tunnel to the laptop next to the
-GPU box), else the build's `VITE_SUP_SERVER`, else same origin (dev proxy). */
-function serverWsBase(): string {
-  const override = new URLSearchParams(location.search).get('server') ?? import.meta.env.VITE_SUP_SERVER;
-  const base = override || `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}`;
-  return base.replace(/\/$/, '');
-}
-
-export function sessionUrl(): string {
-  return `${serverWsBase()}/ws/session`;
-}
-
-/** HTTP URL on the same server as the session (`wss://h` → `https://h`), so a static build on Render can
-reach the API through the same tunnel. */
-export function apiUrl(path: string): string {
-  return serverWsBase().replace(/^ws(s?):/, 'http$1:') + path;
-}
-
 export class SessionClient {
   private ws: WebSocket;
   private seq = 0;
   private readonly t0 = performance.now();
 
-  constructor(hello: Hello, handlers: SessionHandlers, url = sessionUrl()) {
+  constructor(hello: Hello, handlers: SessionHandlers, url = sessionWsUrl()) {
     this.ws = new WebSocket(url);
     this.ws.binaryType = 'arraybuffer';
     this.ws.onopen = () => this.send(hello);

@@ -17,6 +17,11 @@
   state via a dev-only `window.__c172`), and `python -m app.perception.cases <dir>` to score them through
   `VlmPerception` + the automaton (markdown table, exit 1 unless all pass). Dry-run against a stub: plumbing OK.
 
+- Merged #33 (supervisor page + router): `/simulador` is a router page (copied to `simulador/index.html` like
+  `supervisor`), the simulator uses `session/server.ts` and a new `startCanvasCapture`; my `useSession` now
+  serves only the simulator. Simulator-only tasks (`c172_takeoff`) are hidden from the camera page
+  (`simulator/simOnly.ts`), so its default stays `hand_hygiene_basic` as 19a5021 intended.
+
 ## Decisions
 - The C172 simulator page as a second, practice-mode demo (→ D-016).
 
