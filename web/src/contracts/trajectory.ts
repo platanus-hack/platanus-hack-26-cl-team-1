@@ -15,6 +15,7 @@ export type MistakeId = string | null;
 export type MistakeKind = "out_of_order" | "wrong_action" | "incomplete" | "repeated";
 export type ObservedAction = string | null;
 export type ObservedConfidence = number;
+export type Quality = "ok" | "bad" | "unknown";
 export type Step = string | null;
 export type TMs = number;
 export type TrueAction = string | null;
@@ -42,6 +43,7 @@ export interface TrajectoryEvent {
   mistake_kind?: MistakeKind | null;
   observed_action: ObservedAction;
   observed_confidence: ObservedConfidence;
+  observed_quality?: Quality;
   step: Step;
   t_ms: TMs;
   true_action: TrueAction;
