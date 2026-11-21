@@ -52,13 +52,20 @@ jobs:
           SSH_KEY: ${{ secrets.DEMO_SSH_KEY }}
           KNOWN_HOSTS: ${{ secrets.DEMO_SSH_KNOWN_HOSTS }}
         run: |
-          missing=""
-          for name in GPU5090 GPU5090_PORT SSH_KEY KNOWN_HOSTS; do [ -n "${!name}" ] || missing="$missing $name"; done
-          if [ -n "$missing" ]; then
-            echo "::warning title=Demo deploy skipped::Missing secrets:$missing (see deploy/README.md § Continuous deployment)."
+          # None set = CD not configured yet: skip with a warning. Some set = a broken setup (a typo or a deleted
+          # secret after rotation): fail loudly, so the demo can't silently go stale.
+          missing="" n=0
+          for name in GPU5090 GPU5090_PORT SSH_KEY KNOWN_HOSTS; do
+            if [ -n "${!name}" ]; then n=$((n + 1)); else missing="$missing $name"; fi
+          done
+          if [ "$n" = 4 ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          elif [ "$n" = 0 ]; then
+            echo "::warning title=Demo deploy skipped::CD is not configured (see deploy/README.md § Continuous deployment)."
             echo "ready=false" >> "$GITHUB_OUTPUT"
           else
-            echo "ready=true" >> "$GITHUB_OUTPUT"
+            echo "::error title=Demo CD misconfigured::Missing secrets in the demo environment:$missing"
+            exit 1
           fi
 
       # CI runs can finish out of order: never replace a newer main with an older commit.
