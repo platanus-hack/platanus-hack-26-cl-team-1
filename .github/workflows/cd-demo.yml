@@ -1,0 +1,154 @@
+name: CD demo
+
+# After CI passes on a push to main, redeploy the public demo on the 5090 box with deploy/up-demo.sh (D-015,
+# D-016): same command a human runs, same link (only the server restarts). Setup and the pause switch:
+# deploy/README.md § Continuous deployment.
+#
+# Safety: `workflow_run` runs this file from main and only for CI runs on pushes to main, so PR code never sees
+# the secrets; a manual run is allowed from main only. It checks out exactly the commit CI tested.
+# Secrets: GPU5090 (user@host), GPU5090_PORT, DEMO_SSH_KEY (a key used only for this, `restrict`ed on the
+# box), DEMO_SSH_KNOWN_HOSTS (the box's host key).
+on:
+  workflow_run:  # zizmor: ignore[dangerous-triggers]
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Deploys queue up in order; a newer run never cancels a running deploy halfway.
+concurrency:
+  group: cd-demo
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy demo to the 5090
+    # A manual run deploys main only: picking another branch in "Run workflow" would put unreviewed code
+    # live with the deploy key.
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+      || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30  # a cold uv sync + health waits fit well inside; a kill mid-swap would leave the demo down
+    # The secrets live in this environment, restricted to `main` in the repo settings. That is the real guard:
+    # the `if` above is read from whichever branch is run, so a branch could drop it; the environment can't be.
+    environment: demo
+    defaults:
+      run:
+        shell: bash  # explicit: -eo pipefail, so `up-demo.sh | tee` fails when the deploy does
+    env:
+      SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    # Secrets are scoped to the steps that use them. The key is written only after every piece of third-party
+    # code has run (setup actions, `pnpm install`, `vite build`), so none of it can read the key.
+    steps:
+      - name: Check configuration
+        id: config
+        env:
+          GPU5090: ${{ secrets.GPU5090 }}
+          GPU5090_PORT: ${{ secrets.GPU5090_PORT }}
+          SSH_KEY: ${{ secrets.DEMO_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEMO_SSH_KNOWN_HOSTS }}
+        run: |
+          # None set = CD not configured yet: skip with a warning. Some set = a broken setup (a typo or a deleted
+          # secret after rotation): fail loudly, so the demo can't silently go stale.
+          missing="" n=0
+          for name in GPU5090 GPU5090_PORT SSH_KEY KNOWN_HOSTS; do
+            if [ -n "${!name}" ]; then n=$((n + 1)); else missing="$missing $name"; fi
+          done
+          if [ "$n" = 4 ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          elif [ "$n" = 0 ]; then
+            echo "::warning title=Demo deploy skipped::CD is not configured (see deploy/README.md § Continuous deployment)."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error title=Demo CD misconfigured::Missing secrets in the demo environment:$missing"
+            exit 1
+          fi
+
+      # CI runs can finish out of order: never replace a newer main with an older commit.
+      - name: Still the tip of main?
+        id: tip
+        if: steps.config.outputs.ready == 'true'
+        env:
+          REPO: ${{ github.repository }}
+        run: |
+          tip=$(git ls-remote "https://github.com/$REPO" refs/heads/main | cut -f1)
+          if [ "$tip" = "$SHA" ]; then
+            echo "go=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice title=Demo deploy skipped::${SHA:0:7} is no longer the tip of main (${tip:0:7}); that commit deploys once its CI passes (if it fails, run CD by hand after the fix)."
+            echo "go=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v5
+        if: steps.tip.outputs.go == 'true'
+        with:
+          ref: ${{ env.SHA }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        if: steps.tip.outputs.go == 'true'
+        with:
+          package_json_file: web/package.json
+      - uses: actions/setup-node@v5
+        if: steps.tip.outputs.go == 'true'
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Build web
+        if: steps.tip.outputs.go == 'true'
+        working-directory: web
+        run: pnpm install --frozen-lockfile && pnpm build
+
+      - name: SSH key
+        if: steps.tip.outputs.go == 'true'
+        env:
+          SSH_KEY: ${{ secrets.DEMO_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEMO_SSH_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf 'Host *\n  StrictHostKeyChecking yes\n  BatchMode yes\n  ConnectTimeout 15\n' > ~/.ssh/config
+
+      # `touch ~/sup/cd-paused` on the box stops automatic deploys (e.g. while judges use the demo);
+      # `rm ~/sup/cd-paused` resumes them. Manual deploys (deploy/up-demo.sh) ignore it.
+      - name: Pause switch
+        id: pause
+        if: steps.tip.outputs.go == 'true'
+        env:
+          GPU5090: ${{ secrets.GPU5090 }}
+          GPU5090_PORT: ${{ secrets.GPU5090_PORT }}
+        run: |
+          # 0 = paused, 1 = not paused, anything else (255: SSH failed) = fail: never deploy on a guess.
+          code=0
+          ssh -p "$GPU5090_PORT" "$GPU5090" 'test -e ~/sup/cd-paused' || code=$?
+          case "$code" in
+            0) echo "::notice title=Demo deploy paused::~/sup/cd-paused exists on the box; not deploying ${SHA:0:7}."
+               echo "paused=true" >> "$GITHUB_OUTPUT" ;;
+            1) echo "paused=false" >> "$GITHUB_OUTPUT" ;;
+            *) echo "::error title=Pause check failed::ssh to the box exited $code"; exit 1 ;;
+          esac
+
+      - name: Deploy
+        if: steps.tip.outputs.go == 'true' && steps.pause.outputs.paused == 'false'
+        env:
+          GPU5090: ${{ secrets.GPU5090 }}
+          GPU5090_PORT: ${{ secrets.GPU5090_PORT }}
+          DEMO_PREBUILT_WEB: "1"  # no npm code runs while the key is on disk
+        run: |
+          deploy/up-demo.sh | tee deploy.log
+          url=$(sed -n 's/^✔ public demo: //p' deploy.log)
+          {
+            echo "### Demo deployed: \`${SHA:0:7}\`"
+            echo
+            echo "$url"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove the SSH key
+        if: always()
+        run: rm -f ~/.ssh/id_ed25519

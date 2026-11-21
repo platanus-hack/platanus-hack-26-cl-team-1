@@ -30,8 +30,13 @@ check_public() {  # $1 = URL; the tunnel can take a few seconds to route after c
 }
 
 if [ "$MODE" != --url ]; then
-  echo "▶ building web/"
-  (cd "$ROOT/web" && pnpm install --frozen-lockfile >/dev/null && pnpm build >/dev/null)
+  if [ -n "${DEMO_PREBUILT_WEB:-}" ]; then  # CD builds web/ in an earlier step, before the SSH key exists
+    [ -f "$ROOT/web/dist/index.html" ] || { echo "✘ DEMO_PREBUILT_WEB is set but web/dist is missing"; exit 1; }
+    echo "▶ using the prebuilt web/dist"
+  else
+    echo "▶ building web/"
+    (cd "$ROOT/web" && pnpm install --frozen-lockfile >/dev/null && pnpm build >/dev/null)
+  fi
 
   echo "▶ shipping code to ~/sup/app"
   rev="$(git -C "$ROOT" rev-parse --short HEAD)$(git -C "$ROOT" diff --quiet HEAD -- contracts server tasks deploy web training/controller/weights || echo -dirty)"
