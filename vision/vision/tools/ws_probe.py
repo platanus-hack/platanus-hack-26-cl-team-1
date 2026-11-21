@@ -106,14 +106,56 @@ async def probe(url: str, frames: int, image: str | None, out: Path) -> None:
             )
 
 
+async def watch(url: str, hello_path: str, seconds: float, fps: float, image: str | None) -> None:
+    """Stream frames for `seconds` with a real hello and print steps, issues and spoken lines."""
+    jpeg = Path(image).read_bytes() if image else synthetic_frame()
+    hello = json.loads(Path(hello_path).read_text())
+    t0 = time.perf_counter()
+    async with websockets.connect(url, max_size=8 * 1024 * 1024) as ws:
+        await ws.send(json.dumps(hello))
+        seq, inflight = 0, False
+
+        async def reader():
+            nonlocal inflight
+            async for m in ws:
+                if isinstance(m, bytes):
+                    continue
+                d = json.loads(m)
+                t = time.perf_counter() - t0
+                if d["type"] == "debug":
+                    inflight = False
+                    if "vlm" in d["latency_ms"] and d["latency_ms"]["vlm"] != getattr(reader, "vlm", None):
+                        reader.vlm = d["latency_ms"]["vlm"]
+                        print(f"{t:6.1f}s  [vlm {reader.vlm} ms]")
+                elif d["type"] == "step":
+                    print(f"{t:6.1f}s  step → {d['current']}  {[k for k, v in d['status'].items() if v == 'done']}")
+                elif d["type"] in ("issue", "say", "issue_clear"):
+                    print(f"{t:6.1f}s  {d['type']}: {d.get('text') or d.get('step')}")
+
+        task = asyncio.create_task(reader())
+        while time.perf_counter() - t0 < seconds:
+            if not inflight:
+                seq += 1
+                inflight = True
+                await ws.send(encode_frame(seq, int(time.perf_counter() * 1000), jpeg))
+            await asyncio.sleep(1 / fps)
+        task.cancel()
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("url")
     ap.add_argument("--frames", type=int, default=30)
     ap.add_argument("--image")
     ap.add_argument("--out", default="out/probe.wav")
+    ap.add_argument("--hello", help="watch mode: hello JSON (e.g. tests/fixtures/blink-uno.json)")
+    ap.add_argument("--seconds", type=float, default=30)
+    ap.add_argument("--fps", type=float, default=6)
     a = ap.parse_args()
-    asyncio.run(probe(a.url, a.frames, a.image, Path(a.out)))
+    if a.hello:
+        asyncio.run(watch(a.url, a.hello, a.seconds, a.fps, a.image))
+    else:
+        asyncio.run(probe(a.url, a.frames, a.image, Path(a.out)))
 
 
 if __name__ == "__main__":
