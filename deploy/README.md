@@ -36,7 +36,8 @@ What `up-demo.sh` does:
 5. Restarts the server in tmux and waits for `/api/health`.
 6. Reads the tunnel URL and checks `/api/health` and the page through it.
 
-A plain redeploy restarts **only the server**. The tunnel keeps running, so **the link stays the same**. A
+A plain redeploy restarts **only the server**, unless the tunnel kind changed (a named tunnel was added or
+removed in `demo.env`). The tunnel keeps running, so **the link stays the same**. A
 quick-tunnel URL changes only when cloudflared restarts (`--new-url`, a box reboot, or cloudflared crashing
 and being restarted by its loop). If the link stops working, run `deploy/up-demo.sh --url` to get the new one.
 
@@ -74,13 +75,14 @@ reports the round trip:
 cd server && uv run python ../deploy/smoke.py https://<tunnel>.trycloudflare.com hand_hygiene_basic a.jpg b.jpg
 ```
 
-Measured 2026-11-21 from Santiago (8B FP8, 20 s, 119 frames, 14 observations: the 1.5 s rate limit):
+Measured 2026-11-21 from Santiago over three runs (8B FP8, 20 s, 119 frames, 13–14 observations: the 1.5 s
+rate limit). The ack time depends on which Cloudflare edge the quick tunnel lands on:
 
 | | p50 | p95 |
 |---|---|---|
-| Frame → server ack (network + tunnel round trip) | 88–94 ms | 113–119 ms |
-| Frame → VLM observation back in the client | 503–536 ms | 575–622 ms |
-| Perception as measured by the server | 377–425 ms | 452–455 ms |
+| Frame → server ack (network + tunnel round trip) | 25–94 ms | 62–119 ms |
+| Frame → VLM observation back in the client | 473–536 ms | 532–622 ms |
+| Perception as measured by the server | 377–427 ms | 452–481 ms |
 
 In the browser, open the link, pick a task, choose the webcam, and press the debug key (D) to see the
 observations.

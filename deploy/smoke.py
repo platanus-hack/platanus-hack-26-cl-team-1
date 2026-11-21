@@ -55,7 +55,7 @@ async def run(url: str, task_id: str, jpegs: list[bytes], seconds: float, fps: f
                         acks.append(rtt)
                     else:
                         obs.append(rtt)
-                        server_ms.append(msg["latency_ms"].get("perception", 0))
+                        server_ms.append(msg["latency_ms"]["perception"])  # missing: raise, below
                         actions.append(msg["observation"].get("action"))
                 elif msg["type"] == "error":
                     errors.append(msg["message"])
@@ -70,6 +70,8 @@ async def run(url: str, task_id: str, jpegs: list[bytes], seconds: float, fps: f
             seq += 1
             await asyncio.sleep(1 / fps)
         await asyncio.sleep(3)  # let the last observation land
+        if task.done():
+            task.result()  # the reader crashed (e.g. a malformed message): raise, report nothing
         task.cancel()
 
     print(f"frames sent: {seq}, acks: {len(acks)}, observations: {len(obs)}, errors: {len(errors)}")

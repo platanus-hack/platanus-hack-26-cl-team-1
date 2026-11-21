@@ -70,7 +70,11 @@ tmux kill-session -t sup-demo-server 2>/dev/null || true
 pkill -f "[u]vicorn --app-dir ../deploy demo_app:app" || true
 sleep 1
 tmux new-session -d -s sup-demo-server "bash ~/sup/app/deploy/box/run-server.sh >> ~/sup/logs/demo-server.log 2>&1"
-if [ "$MODE" = --new-url ] || ! tmux has-session -t sup-demo-tunnel 2>/dev/null; then
+# Also restart it when the kind changed (a named tunnel was added to or removed from demo.env).
+want="quick"; [ -n "${SUP_TUNNEL_TOKEN:-}" ] && want="named"
+if [ "$MODE" = --new-url ] || ! tmux has-session -t sup-demo-tunnel 2>/dev/null \
+  || [ "$(cat ~/sup/tunnel.kind 2>/dev/null)" != "$want" ]; then
+  echo "$want" > ~/sup/tunnel.kind
   tmux kill-session -t sup-demo-tunnel 2>/dev/null || true
   pkill -f "[c]loudflared tunnel --no-autoupdate" || true
   : > ~/sup/logs/tunnel.log  # so the URL we read back is this tunnel's
