@@ -12,6 +12,7 @@ from app.main import create_app
 from app.settings import PerceptionMode, Settings, VoiceMode
 
 TASKS_DIR = Path(__file__).resolve().parents[2] / "tasks"
+REPO_TASK_IDS = {"hand_hygiene_basic", "led_flashlight", "servo_scout_robot"}
 
 
 @pytest.fixture(scope="module")
@@ -30,7 +31,7 @@ def obs(action, t_ms=0, confidence=0.9, quality=None, seq=1):
 
 def test_library_loads_and_validates_the_repo_tasks():
     library = TaskLibrary.load(TASKS_DIR)
-    assert sorted(s.id for s in library.summaries()) == ["hand_hygiene_basic", "servo_scout_robot"]
+    assert {s.id for s in library.summaries()} == REPO_TASK_IDS
 
 
 def test_library_refuses_an_invalid_task(tmp_path):
@@ -160,7 +161,7 @@ def test_session_rejects_unknown_task():
 
 def test_tasks_api_lists_the_library():
     client = TestClient(create_app())
-    assert {t["id"] for t in client.get("/api/tasks").json()} == {"hand_hygiene_basic", "servo_scout_robot"}
+    assert {t["id"] for t in client.get("/api/tasks").json()} == REPO_TASK_IDS
     assert client.get("/api/tasks/nope").status_code == 404
 
 

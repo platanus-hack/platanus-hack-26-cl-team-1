@@ -73,7 +73,7 @@ def test_flags_the_tasks_wrong_action():
 
 
 def test_missing_weights_fail_at_startup(tmp_path):
-    with pytest.raises(FileNotFoundError, match="hand_hygiene_basic"):
+    with pytest.raises(FileNotFoundError, match="has no weights"):
         make_controller_factory(
             settings(controller=ControllerMode.LEARNED, controller_weights_dir=tmp_path), LIBRARY
         )
