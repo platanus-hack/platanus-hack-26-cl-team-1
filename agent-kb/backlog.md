@@ -5,7 +5,7 @@ Owner in brackets once someone takes an item. Blocks refer to the plan in `docs/
 ## Now (status 2026-11-21 16:55; critical path to the 18:00 webcam loop)
 - [ ] **Confirm the demo task.** Default: `tasks/robot_assembly/servo_scout_robot.json` (the only robot task). Optional second candidate: port the Arduino task from draft PR #19 onto the merged ontology. [team]
 - [ ] **Kit + fixed camera on a table**, matching the demo task's parts. Nothing recorded yet. [team]
-- [ ] Perception on the RTX 5090 over an SSH forward (`gpu/up-5090.sh`, PR #27; D-014). The 3090 refuses SSH (port 22), so it's parked. #27 is held by a real review finding (the "vLLM running?" `pgrep` matches its own shell). [Cote, W1 workspace]
+- [x] Perception on the RTX 5090 over an SSH forward (`gpu/up-5090.sh`, PR #27; D-014): 8B FP8 at p50 ≈ 0.4 s per frame, end to end through `/ws/session`. The 3090 refuses SSH (port 22), so it's parked as a fallback. [Cote]
 - [ ] **First real webcam run** of `servo_scout_robot`: `SUP_PERCEPTION=vlm` (5090), `SUP_CONTROLLER=rules|learned`, ElevenLabs voice. Tune the single-frame "runs ahead of the steps" false `out_of_order` seen in #27's test. [Cote + whoever has the kit]
 - [ ] ElevenLabs: key in the server's env, pick a Spanish voice (`SUP_ELEVENLABS_VOICE_ID`), hear it end to end. Code is in (`app/voice/elevenlabs.py`). [Alonso]
 - [ ] **Web demo screen** (N1): the UI is still the minimal skeleton plus the voice player; nobody has started the real screen (checklist, mistake banner, subtitles, debug overlay; port `frontend/src/assembly/*` at `2e9da7c`). [Anaís? confirm owner]

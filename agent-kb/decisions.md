@@ -109,6 +109,8 @@ with a pointer to their replacement; nothing is ever deleted from §3.
 - **Consequences:** backward compatible (defaulted); schemas and TS types regenerated. No other consumer yet.
 
 ### D-012 — Perception: Qwen3-VL-8B FP8 on vLLM behind a keyed tunnel (2026-11-21)
+- **Update:** the model and the client stand; where it is served (the 3090 behind a keyed tunnel) is replaced by
+  D-014 (the 5090 over an SSH port-forward). The 3090 setup stays as a fallback.
 - **Context:** the scripted fake must give way to a real video-language model behind `Perception`; the 3090 is
   on a private network and the server may run on a laptop.
 - **Decision:** `SUP_PERCEPTION=vlm` → `VlmPerception` (`server/app/perception/vlm.py`) calls Qwen3-VL-8B-Instruct-FP8
@@ -136,6 +138,16 @@ with a pointer to their replacement; nothing is ever deleted from §3.
 - **Consequences:** every new or changed task needs `make controller TASK=…` before running learned mode.
   Numbers in `training/results/controller.md` come only from `ctrl.evaluate`. Training tests need torch and run
   locally; CI lints the training code and tests the committed weights through the server.
+
+### D-014 — Perception is served from the RTX 5090 box, reached over an SSH port-forward (2026-11-21)
+- **Context:** SSH to the 3090 is refused. The team got a container with an RTX 5090 (32 GB, root, no
+  systemd), reachable on a public address.
+- **Decision:** vLLM runs on the 5090 with the same model as D-012 (Qwen3-VL-8B-Instruct-FP8) and listens on
+  127.0.0.1 only. The server reaches it with `ssh -L 8001:127.0.0.1:8001` (`gpu/up-5090.sh`): no public
+  tunnel, no API key. The box's address stays out of git.
+- **Consequences:** the session server must run on a machine with SSH access to the box (a team laptop). A
+  public demo URL would need a tunnel from that laptop, or the server running on the box. The 3090 scripts
+  (`gpu/up.sh`) remain as a fallback. 32 GB fits the 8B (~18 GB) next to a second model or a small training job.
 
 ## §2 Open (decide in block 1, see docs/VISION.md)
 
