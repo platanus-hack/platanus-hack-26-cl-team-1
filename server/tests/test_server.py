@@ -162,3 +162,73 @@ def test_tasks_api_lists_the_library():
     client = TestClient(create_app())
     assert client.get("/api/tasks").json()[0]["id"] == "hand_hygiene_basic"
     assert client.get("/api/tasks/nope").status_code == 404
+
+
+# ── after the task is complete (review finding on PR #14) ───────────────────
+
+ALL_STEPS = [
+    "wet_hands",
+    "apply_soap",
+    "rub_palms",
+    "rub_backs",
+    "rinse_hands",
+    "dry_hands",
+    "close_faucet_towel",
+]
+
+
+def finished_controller(task):
+    controller = RulesController()
+    controller.start(task)
+    for action in ALL_STEPS:
+        last = controller.decide(obs(action))
+    assert last.event is Event.TASK_DONE
+    return controller
+
+
+@pytest.mark.parametrize(
+    "observation",
+    [
+        pytest.param(obs("touch_faucet_bare"), id="defined_wrong_action"),
+        pytest.param(obs("juggle"), id="unknown_action"),
+        pytest.param(obs("rub_palms", quality=Quality.BAD), id="bad_quality"),
+        pytest.param(obs("wet_hands"), id="repeated"),
+    ],
+)
+def test_observations_after_completion_are_ignored(task, observation):
+    decision = finished_controller(task).decide(observation)
+    assert (decision.event, decision.say, decision.next_steps) == (Event.NONE, None, ())
+    assert set(decision.statuses.values()) == {StepStatus.DONE}
+
+
+def test_skip_after_completion_is_a_no_op(task):
+    controller = finished_controller(task)
+    decision = controller.skip(99_000)
+    assert (decision.event, decision.say) == (Event.NONE, None)
+    assert controller.tick(200_000) is None
+
+
+def test_session_survives_skip_after_completion():
+    settings = Settings(
+        tasks_dir=TASKS_DIR, perception=PerceptionMode.SCRIPTED, scripted_every_ms=10,
+        voice=VoiceMode.BROWSER, cors_origins=(),
+    )  # fmt: skip
+    client = TestClient(create_app(settings))
+    with client.websocket_connect("/ws/session") as ws:
+        ws.send_text(
+            json.dumps({"type": "hello", "protocol": 1, "task_id": "hand_hygiene_basic", "source": "sim"})
+        )
+        ws.receive_json()  # ready
+        for _ in range(7):
+            ws.send_text(json.dumps({"type": "skip_step"}))
+        for _ in range(3):
+            ws.send_text(json.dumps({"type": "skip_step"}))  # after completion
+        ws.send_bytes(pack_frame(0, 0, b"\xff\xd8fake"))
+        messages = []
+        while True:
+            message = ws.receive_json()
+            messages.append(message)
+            if message["type"] == "debug":
+                break
+    assert not [m for m in messages if m["type"] == "error"]
+    assert [m for m in messages if m["type"] == "state"][-1]["next_steps"] == []

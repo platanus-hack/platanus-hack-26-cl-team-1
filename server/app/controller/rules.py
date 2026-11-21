@@ -50,6 +50,8 @@ class RulesController:
     def decide(self, observation: Observation) -> Decision:
         self.seq = observation.seq
         out = observation.output
+        if self.automaton.is_complete(self.done):
+            return self._decision(Event.NONE)  # task finished: nothing left to supervise
         if out.action is None or out.confidence < self.min_confidence:
             return self._decision(Event.NONE)
 
@@ -96,6 +98,8 @@ class RulesController:
         return self._decision(Event.REMINDER, step=nxt.id, say=SayRequest(text=nxt.instruction_es))
 
     def skip(self, now_ms: int) -> Decision:
+        if self.automaton.is_complete(self.done):
+            return self._decision(Event.NONE)  # nothing left to skip
         step = self.task.step(self.automaton.legal_next(self.done)[0])
         observation_action = step.action
         transition = self.automaton.apply(self.done, observation_action)

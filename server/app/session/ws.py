@@ -189,6 +189,12 @@ async def run_session(
                     await session.on_text(message["text"])
             except (ValidationError, ValueError) as error:
                 await session.send(Error(code="bad_message", message=str(error)[:500]))
+            except Exception:
+                # A bug in a component must not kill the session silently: report it and keep going.
+                log.exception("session message failed")
+                await session.send(
+                    Error(code="internal", message="Error interno del servidor; revisa los logs.")
+                )
     except WebSocketDisconnect:
         pass
     finally:
