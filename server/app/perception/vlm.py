@@ -1,0 +1,153 @@
+"""`VlmPerception`: Qwen3-VL served by vLLM (OpenAI-compatible API) behind the `Perception` interface.
+
+- One call in flight, and at least `min_interval_ms` between calls: anything in between returns `None`.
+- The model sees the newest frame plus one about `span_ms` older (downscaled JPEG), and the task's actions,
+  objects, next steps and mistakes. Guided decoding forces the task-narrowed `VlmOutput` schema.
+- A bad answer (invalid JSON, an action outside the task, `null` action with quality `ok`…) becomes an
+  uncertain observation (`action=None`, `quality=unknown`) so the supervisor stays silent. Real failures
+  (server down, timeout, HTTP error, an undecodable frame) raise, and the session reports them.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import io
+import logging
+import time
+from collections.abc import Callable, Sequence
+from typing import Protocol
+
+from contracts import (
+    Frame,
+    InvalidVlmOutput,
+    Observation,
+    Ontology,
+    Quality,
+    Task,
+    VlmOutput,
+    parse_vlm_output,
+)
+from PIL import Image
+
+from .prompt import NOTE_MAX_CHARS, build_messages, task_json_schema
+
+log = logging.getLogger(__name__)
+
+MAX_TOKENS = 200
+JPEG_QUALITY = 85
+
+
+class ChatCompleter(Protocol):
+    """Sends chat messages with a JSON schema for guided decoding; returns the raw answer text."""
+
+    async def __call__(self, messages: list[dict], json_schema: dict) -> str: ...
+
+
+class OpenAICompleter:
+    """`ChatCompleter` over an OpenAI-compatible server (vLLM)."""
+
+    def __init__(self, base_url: str, model: str, api_key: str | None, timeout_s: float) -> None:
+        from openai import AsyncOpenAI
+
+        # vLLM without --api-key accepts any key; the SDK insists on one.
+        self._client = AsyncOpenAI(
+            base_url=base_url, api_key=api_key or "none", timeout=timeout_s, max_retries=0
+        )
+        self._model = model
+
+    async def __call__(self, messages: list[dict], json_schema: dict) -> str:
+        response = await self._client.chat.completions.create(
+            model=self._model,
+            messages=messages,  # type: ignore[arg-type]
+            temperature=0,
+            max_tokens=MAX_TOKENS,
+            response_format={
+                "type": "json_schema",
+                "json_schema": {"name": "vlm_output", "schema": json_schema, "strict": True},
+            },
+        )
+        return response.choices[0].message.content or ""
+
+
+def pick_frames(frames: Sequence[Frame], span_ms: int) -> list[Frame]:
+    """The newest frame plus the oldest one at most `span_ms` before it (if it's a different frame)."""
+    newest = frames[-1]
+    older = next(f for f in frames if newest.t_ms - f.t_ms <= span_ms)
+    return [newest] if older is newest else [older, newest]
+
+
+def downscale_jpeg(jpeg: bytes, max_side_px: int) -> bytes:
+    """Re-encode so the longest side is at most `max_side_px`; smaller frames pass through untouched.
+    Raises for bytes that aren't an image (a broken client is a real failure)."""
+    with Image.open(io.BytesIO(jpeg)) as img:
+        if max(img.size) <= max_side_px:
+            return jpeg
+        img = img.convert("RGB")
+        img.thumbnail((max_side_px, max_side_px))
+        out = io.BytesIO()
+        img.save(out, format="JPEG", quality=JPEG_QUALITY)
+        return out.getvalue()
+
+
+def uncertain(reason: str) -> VlmOutput:
+    return VlmOutput(action=None, confidence=0.0, quality=Quality.UNKNOWN, note=reason[:NOTE_MAX_CHARS])
+
+
+class VlmPerception:
+    def __init__(
+        self,
+        completer: ChatCompleter,
+        ontology: Ontology,
+        model: str,
+        min_interval_ms: int = 1500,
+        max_side_px: int = 640,
+        span_ms: int = 1000,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
+        self._completer = completer
+        self._ontology = ontology
+        self.model = model
+        self._min_interval_s = min_interval_ms / 1000
+        self._max_side_px = max_side_px
+        self._span_ms = span_ms
+        self._clock = clock
+        self._lock = asyncio.Lock()
+        self._last_call_at: float | None = None
+        self._schemas: dict[str, dict] = {}
+
+    def _encode(self, frames: Sequence[Frame]) -> list[bytes]:
+        return [downscale_jpeg(f.jpeg, self._max_side_px) for f in frames]
+
+    async def observe(
+        self, frames: Sequence[Frame], task: Task, next_steps: Sequence[str]
+    ) -> Observation | None:
+        if not frames or self._lock.locked():
+            return None
+        now = self._clock()
+        if self._last_call_at is not None and now - self._last_call_at < self._min_interval_s:
+            return None
+        async with self._lock:
+            self._last_call_at = now
+            picked = pick_frames(frames, self._span_ms)
+            jpegs = await asyncio.to_thread(self._encode, picked)
+            messages = build_messages(task, self._ontology, next_steps, jpegs)
+            if task.id not in self._schemas:
+                self._schemas[task.id] = task_json_schema(task)
+            schema = self._schemas[task.id]
+            t0 = time.perf_counter()
+            raw = await self._completer(messages, schema)
+            latency_ms = round((time.perf_counter() - t0) * 1000)
+            try:
+                output = parse_vlm_output(raw, task)
+            except InvalidVlmOutput as error:
+                log.warning("VLM answer rejected as uncertain (%s): %r", error, raw[:200])
+                output = uncertain(f"invalid model output: {error}")
+            last = picked[-1]
+            return Observation(
+                seq=last.seq,
+                t_ms=last.t_ms,
+                source=last.source,
+                model=self.model,
+                latency_ms=latency_ms,
+                output=output,
+            )
