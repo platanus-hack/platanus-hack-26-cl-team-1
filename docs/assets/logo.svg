@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000" viewBox="0 0 1000 1000">
+  <rect width="1000" height="1000" fill="#111418"/>
+  <!-- eye outline -->
+  <path d="M140 430 Q500 120 860 430 Q500 740 140 430 Z" fill="none" stroke="#F5F7FA" stroke-width="34" stroke-linejoin="round"/>
+  <!-- iris -->
+  <circle cx="500" cy="430" r="122" fill="#22C55E"/>
+  <!-- check mark as the pupil: the next step, done right -->
+  <path d="M445 432 L486 473 L560 393" fill="none" stroke="#111418" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- steps: done, done, current, next -->
+  <g>
+    <circle cx="380" cy="700" r="20" fill="#22C55E"/>
+    <circle cx="460" cy="700" r="20" fill="#22C55E"/>
+    <circle cx="540" cy="700" r="20" fill="none" stroke="#22C55E" stroke-width="10"/>
+    <circle cx="620" cy="700" r="20" fill="#3A414C"/>
+  </g>
+  <text x="500" y="870" text-anchor="middle" font-family="Arial Rounded MT Bold, Arial Black, Arial" font-weight="bold" font-size="150" letter-spacing="18" fill="#F5F7FA">OJO</text>
+</svg>

@@ -1,16 +1,18 @@
 {
   // Your project's name, as it will appear on the voting page.
-  "project-name": "<FILL THIS>",
+  "project-name": "Ojo",
 
   // Short one-line summary of your project (in Spanish).
-  "project-oneliner-spanish": "<FILL THIS>",
+  "project-oneliner-spanish": "Un supervisor que te mira hacer una tarea paso a paso por la cámara y te dice en voz alta qué sigue, o te corrige cuando te equivocas.",
 
   // Brief description of your project (in Spanish).
-  "project-description-spanish": "<FILL THIS>",
+  "project-description-spanish": "Ojo conoce la receta de una tarea (armar un circuito, un robot, lavarse las manos, despegar un avión en un simulador) y la mira por la cámara. Un modelo de visión reconoce qué acción estás haciendo, un controlador la compara con los pasos que la receta permite, y Ojo habla: te dice el siguiente paso o te corrige al momento (\"Ojo, el LED está al revés\"). Claude puede generar recetas nuevas a partir de una frase, validadas contra un vocabulario de acciones; un simulador de miles de ejecuciones con errores sirve para medir el controlador y entrenar una variante aprendida.",
 
   // Public URL where your project is deployed and running.
   // Must be a valid URL, for example: https://my-project.vercel.app
   // If your project is an app, put the download link here instead
   // (for example, a URL to download an APK).
+  // TODO(team): the demo runs on the 5090 box behind a Cloudflare tunnel; paste its link here
+  // (`deploy/up-demo.sh --url` prints the current one) once it is stable.
   "deploy-url": "<FILL THIS>"
 }
