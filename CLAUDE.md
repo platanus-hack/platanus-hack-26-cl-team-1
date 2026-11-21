@@ -33,7 +33,8 @@ make check     # what CI runs: lint, tests, schema + TS type freshness, web buil
 make schemas   # after changing contracts/: regenerate JSON Schemas and web/src/contracts/*.ts
 ```
 
-Server settings (env): `SUP_PERCEPTION=scripted`, `SUP_SCRIPTED_EVERY_MS=4000`, `SUP_VOICE=browser`,
+Server settings (env): `SUP_PERCEPTION=scripted`, `SUP_SCRIPTED_EVERY_MS=4000`, `SUP_SCRIPTED_MISTAKE=<action id>`
+(inject a mistake into the scripted run), `SUP_VOICE=browser`,
 `SUP_TASKS_DIR=tasks`. The web app takes `?server=wss://…` to talk to a remote server (the GPU box's tunnel).
 
 Where code goes: `server/app/{library,session,voice}` (Alonso), `server/app/{perception,controller}` and

@@ -28,6 +28,7 @@ export function App() {
   const [status, setStatus] = useState('Desconectado');
   const videoRef = useRef<HTMLVideoElement>(null);
   const stopRef = useRef<(() => void)[]>([]);
+  const sessionRef = useRef(0); // bumped on every start/stop: events from an older session are ignored
 
   useEffect(() => {
     fetch('/api/tasks')
@@ -85,6 +86,14 @@ export function App() {
     const video = videoRef.current;
     if (!video || !taskId) return;
     stop();
+    const session = sessionRef.current;
+    const current = () => sessionRef.current === session;
+    setTask(null);
+    setStatuses({});
+    setSubtitle('');
+    setIssue(null);
+    setDebug(null);
+    setStatus('Conectando…');
     try {
       const closeSource = source === 'webcam' ? await openWebcam(video) : clip ? await openClip(video, clip) : null;
       if (!closeSource) {
@@ -93,7 +102,11 @@ export function App() {
       }
       const client = new SessionClient(
         { type: 'hello', protocol: 1, task_id: taskId, source, debug: true, record: false },
-        { onMessage, onAudio: playAudio, onClose: (reason) => setStatus(`Desconectado: ${reason}`) },
+        {
+          onMessage: (message) => current() && onMessage(message),
+          onAudio: (id, audio) => current() && playAudio(id, audio),
+          onClose: (reason) => current() && setStatus(`Desconectado: ${reason}`),
+        },
       );
       const stopCapture = startCapture(video, FPS, (jpeg) => client.sendFrame(jpeg));
       stopRef.current = [stopCapture, () => client.close(), closeSource];
@@ -103,8 +116,10 @@ export function App() {
   }
 
   function stop() {
+    sessionRef.current += 1;
     stopRef.current.forEach((f) => f());
     stopRef.current = [];
+    speechSynthesis.cancel();
   }
 
   return (

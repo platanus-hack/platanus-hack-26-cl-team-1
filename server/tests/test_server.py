@@ -125,7 +125,7 @@ def test_reminder_after_inactivity(task):
 
 def test_session_runs_a_scripted_task_end_to_end():
     settings = Settings(
-        tasks_dir=TASKS_DIR, perception=PerceptionMode.SCRIPTED, scripted_every_ms=100,
+        tasks_dir=TASKS_DIR, perception=PerceptionMode.SCRIPTED, scripted_every_ms=100, scripted_mistake=None,
         voice=VoiceMode.BROWSER, cors_origins=(),
     )  # fmt: skip
     client = TestClient(create_app(settings))
@@ -210,7 +210,7 @@ def test_skip_after_completion_is_a_no_op(task):
 
 def test_session_survives_skip_after_completion():
     settings = Settings(
-        tasks_dir=TASKS_DIR, perception=PerceptionMode.SCRIPTED, scripted_every_ms=10,
+        tasks_dir=TASKS_DIR, perception=PerceptionMode.SCRIPTED, scripted_every_ms=10, scripted_mistake=None,
         voice=VoiceMode.BROWSER, cors_origins=(),
     )  # fmt: skip
     client = TestClient(create_app(settings))
@@ -252,7 +252,7 @@ def run_frames(ws, start_seq, count, step_ms=50, t0=0):
 
 def test_reset_clears_the_issue_and_replays_perception():
     settings = Settings(
-        tasks_dir=TASKS_DIR, perception=PerceptionMode.SCRIPTED, scripted_every_ms=100,
+        tasks_dir=TASKS_DIR, perception=PerceptionMode.SCRIPTED, scripted_every_ms=100, scripted_mistake=None,
         voice=VoiceMode.BROWSER, cors_origins=(),
     )  # fmt: skip
     client = TestClient(create_app(settings))
@@ -277,3 +277,130 @@ def test_reset_clears_the_issue_and_replays_perception():
         # A fresh scripted perception replays from the start on the new frames.
         replay = run_frames(ws, 100, 12, t0=10_000)
         assert [m for m in replay if m["type"] == "state"][-1]["statuses"]["wet"] == "done"
+
+
+def test_persistent_mistake_is_announced_once(task):
+    controller = RulesController()
+    controller.start(task)
+    first = controller.decide(obs("apply_soap"))
+    again = controller.decide(obs("apply_soap"))
+    assert (first.event, again.event, again.say) == (Event.MISTAKE, Event.NONE, None)
+    assert again.statuses["wet"] is StepStatus.MISTAKE  # still shown
+    controller.decide(obs("wet_hands"))  # progress clears it
+    assert controller.decide(obs("juggle")).event is Event.MISTAKE
+
+
+def scripted_client(mistake=None):
+    settings = Settings(
+        tasks_dir=TASKS_DIR, perception=PerceptionMode.SCRIPTED, scripted_every_ms=100,
+        scripted_mistake=mistake, voice=VoiceMode.BROWSER, cors_origins=(),
+    )  # fmt: skip
+    return TestClient(create_app(settings))
+
+
+def hello(**extra):
+    return json.dumps(
+        {"type": "hello", "protocol": 1, "task_id": "hand_hygiene_basic", "source": "sim", **extra}
+    )
+
+
+def test_reset_with_an_open_issue_sends_issue_clear():
+    with scripted_client(mistake="touch_faucet_bare").websocket_connect("/ws/session") as ws:
+        ws.send_text(hello())
+        ws.receive_json()  # ready
+        # wet at 100 ms, the mistake at 200 ms; stop before the next step (300 ms) would clear it.
+        messages = run_frames(ws, 0, 5)
+        while not any(m["type"] == "say" and m["priority"] == "urgent" for m in messages):
+            messages.append(ws.receive_json())  # the issue, then its spoken correction
+        assert next(m for m in messages if m["type"] == "issue")["mistake_id"] == "bare_faucet"
+        ws.send_text(json.dumps({"type": "reset"}))
+        after = []
+        while not after or after[-1]["type"] != "say":
+            after.append(ws.receive_json())
+    assert [m["type"] for m in after if m["type"] != "debug"] == ["issue_clear", "state", "say"]
+
+
+def test_reset_drops_a_perception_result_from_before_the_reset(task):
+    import asyncio
+
+    from contracts import Frame
+    from contracts.fakes import SilentVoice
+    from contracts.protocol import Hello
+
+    from app.session.ws import Session
+
+    class FakeWs:
+        def __init__(self):
+            self.sent = []
+
+        async def send_text(self, text):
+            self.sent.append(json.loads(text))
+
+        async def send_bytes(self, data):
+            self.sent.append(data)
+
+    class SlowPerception:
+        def __init__(self):
+            self.release = asyncio.Event()
+
+        async def observe(self, frames, task, next_steps):
+            await self.release.wait()
+            return obs("wet_hands", seq=frames[-1].seq)
+
+    async def scenario():
+        perceptions = []
+
+        def make(t):
+            perceptions.append(SlowPerception())
+            return perceptions[-1]
+
+        ws = FakeWs()
+        session = Session(
+            ws, task, Hello(task_id=task.id, source="sim"), make, RulesController(), SilentVoice()
+        )
+        await session.emit(session.controller.start(task))
+        frame = Frame(seq=1, t_ms=0, jpeg=b"x", source=Source.SIM)
+        stale = asyncio.create_task(session.perceive([frame], session.generation))
+        await asyncio.sleep(0)
+        generation = session.generation
+        session.generation += 1  # what reset does first, before awaiting anything
+        perceptions[0].release.set()
+        await stale
+        return ws.sent, generation
+
+    sent, _ = asyncio.run(scenario())
+    states = [m for m in sent if isinstance(m, dict) and m["type"] == "state"]
+    assert all(m["statuses"]["wet"] != "done" for m in states)
+
+
+def test_session_reset_clears_frames_and_rebuilds_perception():
+    with scripted_client().websocket_connect("/ws/session") as ws:
+        ws.send_text(hello())
+        ws.receive_json()
+        run_frames(ws, 0, 4)
+        ws.send_text(json.dumps({"type": "reset"}))
+        for _ in range(2):
+            ws.receive_json()  # state, say
+        # Frames restart at t=0 relative to a new perception: the first event comes 100 ms after them.
+        replay = run_frames(ws, 50, 4, t0=50_000)
+    assert [m for m in replay if m["type"] == "state"][-1]["statuses"]["wet"] == "done"
+
+
+@pytest.mark.parametrize(
+    ("first", "second", "expected_error"),
+    [
+        pytest.param(hello(record=True), None, "recording is not implemented", id="record_hello"),
+        pytest.param(hello(), json.dumps({"type": "label", "step": "wet"}), "label ignored", id="label"),
+    ],
+)
+def test_recording_fails_loudly_until_implemented(first, second, expected_error):
+    with scripted_client().websocket_connect("/ws/session") as ws:
+        ws.send_text(first)
+        message = ws.receive_json()
+        if second is not None:
+            assert message["type"] == "ready"
+            for _ in range(2):
+                ws.receive_json()  # initial state, greeting
+            ws.send_text(second)
+            message = ws.receive_json()
+    assert message["type"] == "error" and expected_error in message["message"]

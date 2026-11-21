@@ -160,7 +160,7 @@ class Session:
         elif isinstance(message, Mute):
             self.muted = message.on
         elif isinstance(message, Label):
-            pass  # dataset recording: not implemented yet
+            raise ValueError("dataset recording is not implemented yet: label ignored")
         elif isinstance(message, Hello):
             raise ValueError("hello was already received")
 
@@ -184,6 +184,10 @@ async def run_session(
             await ws.send_text(
                 Error(code="bad_message", message="first message must be hello").model_dump_json()
             )
+            return
+        if hello.record:
+            message = "dataset recording is not implemented yet: reconnect with record=false"
+            await ws.send_text(Error(code="bad_message", message=message).model_dump_json())
             return
         task = library.get(hello.task_id)
         if task is None:

@@ -11,5 +11,7 @@ from ..settings import PerceptionMode, Settings
 
 def make_perception(settings: Settings, task: Task) -> Perception:
     if settings.perception is PerceptionMode.SCRIPTED:
-        return ScriptedPerception.correct_run(task, every_ms=settings.scripted_every_ms)
+        return ScriptedPerception.correct_run(
+            task, every_ms=settings.scripted_every_ms, mistake=settings.scripted_mistake
+        )
     raise ValueError(f"unsupported perception mode {settings.perception!r}")
