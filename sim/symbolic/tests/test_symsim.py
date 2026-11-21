@@ -80,3 +80,12 @@ def test_cli_writes_valid_jsonl(tmp_path):
     lines = out.read_text().splitlines()
     assert len(lines) == 20
     assert all(Trajectory.model_validate_json(line).task_id == TASK.id for line in lines)
+
+
+@pytest.mark.parametrize(
+    "path", sorted(p for p in TASK_PATH.parents[1].glob("*/*.json") if p.name != "ontology.json"), ids=str
+)
+def test_every_repo_task_generates(path):
+    task, ontology = load_task(path)
+    runs = list(generate_trajectories(task, 50, 0, NOISE_LEVELS, ontology))
+    assert all(r.task_id == task.id and r.events for r in runs)
