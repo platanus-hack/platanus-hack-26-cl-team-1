@@ -44,6 +44,7 @@ class Settings:
     vlm_min_interval_ms: int = 1500  # minimum time between two VLM calls, so we don't hammer the GPU
     vlm_timeout_s: float = 10.0  # a slower answer is a real failure (raises)
     vlm_max_side_px: int = 640  # frames are downscaled so their longest side is at most this
+    vlm_record_dir: Path | None = None  # if set, every VLM call's frames + answer are saved here
     vlm_span_ms: int = 1000  # the prompt shows the newest frame plus one about this much older
 
     def __post_init__(self) -> None:
@@ -63,6 +64,7 @@ class Settings:
             vlm_min_interval_ms=int(os.environ.get("SUP_VLM_MIN_INTERVAL_MS", cls.vlm_min_interval_ms)),
             vlm_timeout_s=float(os.environ.get("SUP_VLM_TIMEOUT_S", cls.vlm_timeout_s)),
             vlm_max_side_px=int(os.environ.get("SUP_VLM_MAX_SIDE_PX", cls.vlm_max_side_px)),
+            vlm_record_dir=Path(d) if (d := os.environ.get("SUP_VLM_RECORD_DIR")) else None,
             vlm_span_ms=int(os.environ.get("SUP_VLM_SPAN_MS", cls.vlm_span_ms)),
             voice=VoiceMode(os.environ.get("SUP_VOICE", "browser")),
             elevenlabs_api_key=os.environ.get("ELEVENLABS_API_KEY", ""),
