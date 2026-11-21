@@ -12,11 +12,17 @@
 - Learned-controller weights for `c172_takeoff`; `training/results/controller.md` regenerated (other tasks unchanged).
 - Verified: vitest (16), `make check`, a full keyboard run in the browser (all 10 step actions to `establish_climb`), a recording with a flaps-30 mistake, and the page served by `deploy/demo_app.py`.
 
+- VLM test kit for a teammate with 5090 access: `sim/cockpit/c172_takeoff/` (16 labeled before/after frame pairs:
+  12 correct-run cases + the 4 mistakes), `sim/cockpit/capture_c172.js` to recapture (waits on the sim's real
+  state via a dev-only `window.__c172`), and `python -m app.perception.cases <dir>` to score them through
+  `VlmPerception` + the automaton (markdown table, exit 1 unless all pass). Dry-run against a stub: plumbing OK.
+
 ## Decisions
 - The C172 simulator page as a second, practice-mode demo (→ D-016).
 
 ## Open / blocked
-- Not tried with the real VLM: whether Qwen3-VL-8B reads the 640×480 cockpit (small ASI digits, knob positions) is the main risk. Scripted perception was used locally.
+- Not tried with the real VLM (no 5090 access from this machine): handed off; run `sim/cockpit/README.md`. Watch the
+  pitch cues: at 640×480 a 7° climb moves the horizon and the attitude ball only a few pixels.
 - The page asked for Render; D-015 dropped Render (the box serves the web build). `?server=`/`apiUrl` still allow a separate static host if that changes.
 - Recording upload is a mock: no endpoint; `ClipRecord` segments use `path#t=a,b`.
 - In a background tab the sim freezes (requestAnimationFrame); keep the cockpit tab in front during the demo.

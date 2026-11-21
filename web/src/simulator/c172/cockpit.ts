@@ -33,6 +33,13 @@ export class C172Cockpit implements Simulator {
     const ctx = this.canvas.getContext('2d');
     if (!ctx) throw new Error('canvas 2d context unavailable');
     this.ctx = ctx;
+    // Dev builds only: frame-capture tooling (sim/cockpit/) waits on real conditions (airspeed, airborne).
+    if (import.meta.env.DEV) (window as unknown as { __c172?: C172Cockpit }).__c172 = this;
+  }
+
+  /** Current state (read-only use: debugging and capture tooling). */
+  get state(): Sim {
+    return this.sim;
   }
 
   async load(): Promise<void> {
