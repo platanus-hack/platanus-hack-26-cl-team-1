@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import threading
 import webbrowser
 from collections import Counter, defaultdict
 from collections.abc import Callable, Sequence
@@ -226,6 +227,7 @@ class Review:
         self.library = library
         self.make_controller = make_controller
         self.labels_path = run_dir / "labels.json"
+        self._lock = threading.Lock()  # the server is threaded and the page can send label saves back to back
 
     def labels(self) -> dict[str, str]:
         return json.loads(self.labels_path.read_text()) if self.labels_path.exists() else {}
@@ -239,12 +241,13 @@ class Review:
             raise ValueError(f"no recorded call {key!r}")
         if value is not None and value != NONE and value not in session.task.actions:
             raise ValueError(f"label {value!r} is not an action of task {session.task.id!r}")
-        labels = self.labels()
-        if value is None:
-            labels.pop(key, None)
-        else:
-            labels[key] = value
-        self.labels_path.write_text(json.dumps(labels, indent=1, sort_keys=True))
+        with self._lock:
+            labels = self.labels()
+            if value is None:
+                labels.pop(key, None)
+            else:
+                labels[key] = value
+            self.labels_path.write_text(json.dumps(labels, indent=1, sort_keys=True))
 
     def data(self) -> dict:
         labels = self.labels()
