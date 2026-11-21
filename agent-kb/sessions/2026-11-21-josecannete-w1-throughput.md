@@ -1,7 +1,7 @@
 # 2026-11-21 — w1-throughput
 
 - **Who:** josecannete (+ agent, workspace W1)
-- **Branch / PRs:** `josecannete/vlm-pipelining` (PR link in backlog)
+- **Branch / PRs:** https://github.com/platanus-hack/platanus-hack-26-cl-team-1/pull/45
 - **Goal:** more perception calls per second, so brief actions get caught.
 
 ## Done
