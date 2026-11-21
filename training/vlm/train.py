@@ -73,9 +73,9 @@ def main() -> None:
     ap.add_argument("--max-steps", type=int, default=-1, help="smoke tests")
     a = ap.parse_args()
 
-    from trl import SFTConfig, SFTTrainer
     from unsloth import FastVisionModel  # must be imported before transformers/trl
     from unsloth.trainer import UnslothVisionDataCollator
+    from trl import SFTConfig, SFTTrainer  # noqa: I001 - after unsloth on purpose
 
     model, tokenizer = FastVisionModel.from_pretrained(a.base, load_in_4bit=True, use_gradient_checkpointing="unsloth")
     model = FastVisionModel.get_peft_model(

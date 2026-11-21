@@ -50,6 +50,8 @@ class Settings:
     vlm_frames: int = 3  # frames per call, spread over vlm_span_ms (vLLM's --limit-mm-per-prompt caps it)
 
     def __post_init__(self) -> None:
+        if self.vlm_frames < 1 or self.vlm_min_interval_ms < 0 or self.vlm_span_ms < 0:
+            raise ValueError("SUP_VLM_FRAMES must be ≥ 1, SUP_VLM_MIN_INTERVAL_MS and SUP_VLM_SPAN_MS ≥ 0")
         if self.perception is PerceptionMode.VLM and not self.vlm_base_url:
             raise ValueError("SUP_PERCEPTION=vlm needs SUP_VLM_BASE_URL (e.g. https://<tunnel>/v1)")
 
