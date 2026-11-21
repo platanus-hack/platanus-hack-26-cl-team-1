@@ -8,6 +8,7 @@ fine-tuned YOLO11s on the held-out TEST split (split by session) → training/re
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 import time
 from datetime import datetime
@@ -47,6 +48,7 @@ def main() -> None:
     a = ap.parse_args()
 
     from ultralytics import YOLO, YOLOWorld
+
     from vision.classes import CLASSES, PROMPTS
 
     cfg = yaml.safe_load(Path(a.data).read_text())
@@ -96,6 +98,15 @@ def main() -> None:
     out = Path(a.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text("\n".join(lines) + "\n")
+    summary = {
+        "test_images": len(images),
+        "rows": [{"model": "YOLO11s base (COCO)", "map50": 0.0, "map": 0.0, "ms": base_speed}]
+        + [
+            {"model": n, "map50": r["map50"], "map": r["map"], "ms": ms, "per_class": r["per_class"]}
+            for n, r, ms in rows
+        ],
+    }
+    out.with_suffix(".json").write_text(json.dumps(summary, ensure_ascii=False, indent=1))
     print("\n".join(lines))
     print(f"\n→ {out}")
 

@@ -82,7 +82,14 @@ def main() -> None:
     trainer = SFTTrainer(
         model=model,
         tokenizer=tokenizer,
-        data_collator=UnslothVisionDataCollator(model, tokenizer, train_on_responses_only=True),
+        data_collator=UnslothVisionDataCollator(
+            model,
+            tokenizer,
+            resize="max",  # keep 640x480 frames and <=512 px crops: exactly what production sends
+            train_on_responses_only=True,  # loss only on the JSON answer (Qwen ChatML turns)
+            instruction_part="<|im_start|>user\n",
+            response_part="<|im_start|>assistant\n",
+        ),
         train_dataset=data,
         args=SFTConfig(
             per_device_train_batch_size=a.batch,
