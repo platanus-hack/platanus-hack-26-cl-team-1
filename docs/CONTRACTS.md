@@ -58,6 +58,7 @@ program an **Arduino Uno** or **ESP32-C6** with blocks.
 | B3 Sim runtime | `sim/**`, `views/sim/**` | `simRuntime.{init,startProgram,pauseProgram,stopProgram,reset}`, `runHeadless`, `<SimPanel/>` |
 | B4 Compile & flash | `flash/**`, `backend/app/compile/**`, `backend/tests/test_compile*.py`, `docker/**` | `compileSketch`, `flashArtifact`, `downloadArtifact`, `webSerialSupported`, `<CompilePanel/>`; HTTP `POST /api/compile`, `GET /api/compile/{id}`, `GET /api/compile/{id}/artifact` |
 | C Agent | `agent/**`, `backend/app/agent/**`, `backend/tests/test_agent*.py` | `<AgentPanel/>`, `executeTool`, `describeToolCall`; HTTP `POST /api/agent/turn` (SSE) |
+| D Assembly (Modo Armado) | `assembly/**`, `views/assembly/**`, and at the repo root `vision/**`, `training/**`, `deploy/vision/**` | `<AssemblyView/>`; WS `/ws/session` on the vision server (protocol: `frontend/src/assembly/protocol.ts`, mirrored in `vision/vision/protocol.py`) |
 
 Cross-module imports are allowed **only through the public APIs above**
 (e.g. the agent imports `planAddPart` from `@/placement`, never internal files).
