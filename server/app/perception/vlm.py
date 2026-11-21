@@ -190,7 +190,8 @@ class VlmPerception:
         head = self._pending[0]
         if not head.done():
             # Wait for the oldest call, but only until the next call is due (until it finishes, at
-            # capacity): answers arrive even when frames stop, and calls keep their cadence when they don't.
+            # capacity), so calls keep their cadence. An answer that finishes later is delivered by the
+            # next `observe`, which the session makes on the next frame.
             full = len(self._pending) >= self._max_in_flight
             await asyncio.wait({head}, timeout=None if full else self._until_due())
         if head.done():
