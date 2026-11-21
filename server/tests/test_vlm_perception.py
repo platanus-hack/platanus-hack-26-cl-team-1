@@ -239,3 +239,13 @@ def test_session_runs_on_the_vlm(monkeypatch):
         assert observations[0]["output"]["action"] == "wet_hands"
         assert observations[0]["model"] == settings.vlm_model
     assert model.calls
+
+
+def test_records_frames_and_answers_when_asked(task, ontology, tmp_path):
+    model = FakeModel(answer(action="wet_hands", confidence=0.8, quality="ok"))
+    observe(make(model, ontology, record_dir=tmp_path), task, next_steps=["wet"])
+    lines = (tmp_path / "calls.jsonl").read_text().splitlines()
+    record = json.loads(lines[0])
+    assert record["output"]["action"] == "wet_hands"
+    assert record["next_steps"] == ["wet"]
+    assert [(tmp_path / f).exists() for f in record["frames"]] == [True, True]

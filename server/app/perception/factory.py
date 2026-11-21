@@ -44,5 +44,6 @@ def make_perception(settings: Settings, task: Task) -> Perception:
             min_interval_ms=settings.vlm_min_interval_ms,
             max_side_px=settings.vlm_max_side_px,
             span_ms=settings.vlm_span_ms,
+            record_dir=settings.vlm_record_dir,
         )
     raise ValueError(f"unsupported perception mode {settings.perception!r}")

@@ -14,9 +14,12 @@ from __future__ import annotations
 
 import asyncio
 import io
+import json
 import logging
 import time
+import uuid
 from collections.abc import Callable, Sequence
+from pathlib import Path
 from typing import Protocol
 
 from contracts import (
@@ -105,6 +108,7 @@ class VlmPerception:
         max_side_px: int = 640,
         span_ms: int = 1000,
         clock: Callable[[], float] = time.monotonic,
+        record_dir: Path | None = None,
     ) -> None:
         self._completer = completer
         self._ontology = ontology
@@ -116,9 +120,24 @@ class VlmPerception:
         self._lock = asyncio.Lock()
         self._last_call_at: float | None = None
         self._schemas: dict[str, dict] = {}
+        self._record_dir = record_dir
+        self._calls = 0
+        self._session = uuid.uuid4().hex[:8]  # one VlmPerception per session: groups recorded calls
 
     def _encode(self, frames: Sequence[Frame]) -> list[bytes]:
         return [downscale_jpeg(f.jpeg, self._max_side_px) for f in frames]
+
+    def _record(self, record: dict, jpegs: list[bytes]) -> None:
+        """Keep what the model saw and answered, to tune the prompt on real frames (SUP_VLM_RECORD_DIR)."""
+        assert self._record_dir is not None
+        self._record_dir.mkdir(parents=True, exist_ok=True)
+        names = []
+        for i, jpeg in enumerate(jpegs):
+            name = f"{self._session}_{record['call']:05d}_{i}.jpg"  # unique across sessions
+            (self._record_dir / name).write_bytes(jpeg)
+            names.append(name)
+        with (self._record_dir / "calls.jsonl").open("a") as f:
+            f.write(json.dumps({**record, "frames": names}) + "\n")
 
     async def observe(
         self, frames: Sequence[Frame], task: Task, next_steps: Sequence[str]
@@ -145,6 +164,29 @@ class VlmPerception:
                 log.warning("VLM answer rejected as uncertain (%s): %r", error, raw[:200])
                 output = uncertain(f"invalid model output: {error}")
             last = picked[-1]
+            self._calls += 1
+            log.info(
+                "VLM %s seq=%d %d ms: %s %.2f %s",
+                task.id,
+                last.seq,
+                latency_ms,
+                output.action,
+                output.confidence,
+                output.note,
+            )
+            if self._record_dir is not None:
+                record = {
+                    "session": self._session,
+                    "call": self._calls,
+                    "task": task.id,
+                    "next_steps": list(next_steps),
+                    "seqs": [f.seq for f in picked],
+                    "t_ms": [f.t_ms for f in picked],
+                    "latency_ms": latency_ms,
+                    "raw": raw,
+                    "output": output.model_dump(mode="json"),
+                }
+                await asyncio.to_thread(self._record, record, jpegs)
             return Observation(
                 seq=last.seq,
                 t_ms=last.t_ms,
