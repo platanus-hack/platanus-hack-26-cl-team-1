@@ -1,7 +1,7 @@
 # 2026-11-21 — w1-local-vlm
 
 - **Who:** josecannete (+ agent, workspace W1)
-- **Branch / PRs:** `josecannete/vlm-local-mac` (PR link in backlog)
+- **Branch / PRs:** `josecannete/vlm-local-mac` → https://github.com/platanus-hack/platanus-hack-26-cl-team-1/pull/26
 - **Goal:** a light model to prototype perception on the Mac while the GPU box is unreachable over SSH.
 
 ## Done
