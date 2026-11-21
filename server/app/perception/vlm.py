@@ -5,6 +5,9 @@
   batches up to `--max-num-seqs 4`). The demo runs one session.
 - The model sees the newest frame plus one about `span_ms` older (downscaled JPEG), and the task's actions,
   objects, next steps and mistakes. Guided decoding forces the task-narrowed `VlmOutput` schema.
+- An action whose own object (ontology `object`) is not among the answer's `objects` is rejected the same
+  way: the model must see the part it claims is being handled (an empty breadboard is not `place_button`).
+- Every observation is logged at INFO on this logger (task, next steps, answer), rejections at WARNING.
 - A bad answer (invalid JSON, an action outside the task, `null` action with quality `ok`…) becomes an
   uncertain observation (`action=None`, `quality=unknown`) so the supervisor stays silent. Real failures
   (server down, timeout, HTTP error, an undecodable frame) raise, and the session reports them.
@@ -124,6 +127,22 @@ class VlmPerception:
         self._calls = 0
         self._session = uuid.uuid4().hex[:8]  # one VlmPerception per session: groups recorded calls
 
+    def _require_object_seen(self, output: VlmOutput) -> VlmOutput:
+        """Uncertain unless the object the action acts on is among the objects the model says it sees."""
+        if output.action is None:
+            return output
+        obj = self._ontology.action(output.action).object
+        if obj is None or obj in output.objects:
+            return output
+        log.warning(
+            "VLM action %s rejected: its object %s is not in objects %s (note: %r)",
+            output.action,
+            obj,
+            list(output.objects),
+            output.note,
+        )
+        return uncertain(f"{output.action} rejected: {obj} not seen")
+
     def _encode(self, frames: Sequence[Frame]) -> list[bytes]:
         return [downscale_jpeg(f.jpeg, self._max_side_px) for f in frames]
 
@@ -165,15 +184,20 @@ class VlmPerception:
             except InvalidVlmOutput as error:
                 log.warning("VLM answer rejected as uncertain (%s): %r", error, raw[:200])
                 output = uncertain(f"invalid model output: {error}")
+            output = self._require_object_seen(output)
             last = picked[-1]
             self._calls += 1
             log.info(
-                "VLM %s seq=%d %d ms: %s %.2f %s",
+                "VLM %s %s seq=%d %d ms next=%s: %s %.2f %s objects=%s note=%r",
+                self._session,
                 task.id,
                 last.seq,
                 latency_ms,
+                list(next_steps),
                 output.action,
                 output.confidence,
+                output.quality,
+                list(output.objects),
                 output.note,
             )
             if self._record_dir is not None:

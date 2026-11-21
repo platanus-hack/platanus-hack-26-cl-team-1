@@ -10,6 +10,7 @@ Run from `server/` (deploy/box/run-server.sh):
 
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 
@@ -21,6 +22,12 @@ from app.main import create_app
 dist = Path(os.environ.get("SUP_WEB_DIST", Path(__file__).resolve().parents[1] / "web" / "dist"))
 if not (dist / "index.html").is_file():
     raise RuntimeError(f"no web build at {dist} (run `pnpm build` in web/, or set SUP_WEB_DIST)")
+
+# Root at WARNING (no httpx/openai noise); the VLM answers and controller decisions at INFO, so a wrong
+# step on the live demo can be traced in ~/sup/logs/demo-server.log. Frames are never logged.
+logging.basicConfig(level=logging.WARNING, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+for name in ("app.perception", "app.session"):
+    logging.getLogger(name).setLevel(logging.INFO)
 
 api = create_app()
 # Mounted last, so the API and WebSocket routes above still win; html=True serves index.html at /.

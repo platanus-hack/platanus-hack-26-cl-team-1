@@ -29,8 +29,8 @@
     {"id": "turn_landing_light_on", "verb": "turn_on", "object": "landing_light_switch", "label_es": "encender la luz de aterrizaje", "visual_cue": "the LAND rocker switch in the light switch row is flipped up to ON and the runway ahead is lit brighter"},
     {"id": "release_parking_brake", "verb": "release", "object": "parking_brake", "label_es": "soltar el freno de estacionamiento", "visual_cue": "the PARK BRAKE T-handle is pushed in flush with the panel and its red SET flag disappears"},
     {"id": "apply_full_throttle", "verb": "push", "object": "throttle_knob", "label_es": "dar potencia máxima", "visual_cue": "the black THROTTLE knob is pushed all the way in and the tachometer needle rises to about 2300 RPM"},
-    {"id": "rotate", "verb": "pull", "object": "yoke", "label_es": "rotar", "visual_cue": "with the airspeed needle at or above 55 knots the nose rises: the attitude indicator pitches up about 8 degrees and the runway drops away in the windshield"},
-    {"id": "rotate_early", "verb": "pull", "object": "yoke", "label_es": "rotar antes de tiempo", "visual_cue": "the nose rises (attitude indicator pitched up, horizon dropping in the windshield) while the airspeed needle is still below 50 knots and the red STALL light is lit"},
+    {"id": "rotate", "verb": "pull", "object": "attitude_indicator", "target": "yoke", "label_es": "rotar", "visual_cue": "with the airspeed needle at or above 55 knots the nose rises: the attitude indicator pitches up about 8 degrees and the runway drops away in the windshield"},
+    {"id": "rotate_early", "verb": "pull", "object": "attitude_indicator", "target": "yoke", "label_es": "rotar antes de tiempo", "visual_cue": "the nose rises (attitude indicator pitched up, horizon dropping in the windshield) while the airspeed needle is still below 50 knots and the red STALL light is lit"},
     {"id": "establish_climb", "verb": "climb", "label_es": "establecer el ascenso", "visual_cue": "the plane is airborne and climbing: attitude indicator about 7 degrees nose up, airspeed near 75 knots, vertical speed needle above 500 ft/min and the altimeter rising"}
   ]
 }

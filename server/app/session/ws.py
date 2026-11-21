@@ -179,7 +179,16 @@ class Session:
                         observation=observation,
                     )
                 )
-            await self.emit(self.controller.decide(observation))
+            decision = self.controller.decide(observation)
+            log.info(
+                "decision task=%s seq=%d event=%s step=%s mistake=%s",
+                self.task.id,
+                decision.seq,
+                decision.event,
+                decision.step,
+                decision.mistake_id,
+            )
+            await self.emit(decision)
         except Exception:
             log.exception("perception failed")
             await self.send(Error(code="internal", message="La percepción falló; revisa el servidor."))

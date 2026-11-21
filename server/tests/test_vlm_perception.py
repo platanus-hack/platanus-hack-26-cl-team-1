@@ -8,7 +8,7 @@ from pathlib import Path
 
 import openai
 import pytest
-from contracts import Frame, Ontology, Perception, Quality, Source
+from contracts import Frame, Ontology, Perception, Quality, Source, VlmOutput
 from contracts.protocol import pack_frame
 from fastapi.testclient import TestClient
 from PIL import Image
@@ -16,7 +16,7 @@ from PIL import Image
 from app.library.store import TaskLibrary
 from app.main import create_app
 from app.perception import factory
-from app.perception.prompt import task_json_schema
+from app.perception.prompt import task_context, task_json_schema
 from app.perception.vlm import VlmPerception, downscale_jpeg, pick_frames
 from app.settings import PerceptionMode, Settings, VoiceMode
 
@@ -93,9 +93,12 @@ def test_prompt_carries_the_task_and_the_frames(task, ontology):
     assert len(images) == 2  # newest + one ~1 s older
     assert images[0]["image_url"]["url"].startswith("data:image/jpeg;base64,")
     text = content[-1]["text"]
-    assert "wet_hands: hands held under running water from the faucet (mojar las manos)" in text
+    assert (
+        "wet_hands: hands held under running water from the faucet (mojar las manos) [acts on: hands]" in text
+    )
     assert "paper_towel" in text
     assert "Expected next" in text and "wet_hands: done when both hands are wet" in text
+    assert "should be doing" not in text  # the next steps are context, not a claim about the frame
     assert "action touch_faucet_bare: a clean bare hand turns the faucet off" in text  # wrong_action
     assert 'rub_palms with quality "bad"' in text  # incomplete
     assert schema == task_json_schema(task)
@@ -108,6 +111,13 @@ def test_schema_is_narrowed_to_the_task(task):
     assert schema["additionalProperties"] is False
 
 
+def test_schema_decodes_what_it_sees_before_the_action(task):
+    schema = task_json_schema(task)
+    assert list(schema["properties"]) == ["objects", "note", "action", "quality", "confidence"]
+    assert set(schema["properties"]) == set(VlmOutput.model_fields)  # reordering drops no field
+    assert schema["required"] == list(schema["properties"])
+
+
 def test_valid_answer_becomes_an_observation(task, ontology):
     model = FakeModel(answer(action="wet_hands", confidence=0.8, quality="ok", objects=["hands", "faucet"]))
     fs = frames()
@@ -117,6 +127,64 @@ def test_valid_answer_becomes_an_observation(task, ontology):
     assert obs.output.objects == ("hands", "faucet")
     assert (obs.seq, obs.t_ms, obs.source, obs.model) == (fs[-1].seq, fs[-1].t_ms, Source.WEBCAM, "qwen-test")
     assert obs.latency_ms >= 0
+
+
+def test_action_without_its_object_seen_becomes_uncertain(task, ontology):
+    model = FakeModel(answer(action="wet_hands", confidence=0.9, quality="ok", objects=["faucet"]))
+    obs = observe(make(model, ontology), task)
+    assert obs.output.action is None
+    assert obs.output.quality is Quality.UNKNOWN
+    assert obs.output.note == "wet_hands rejected: hands not seen"
+
+
+@pytest.mark.parametrize(
+    ("objects", "action"),
+    [
+        (["breadboard"], None),  # the field case: an empty breadboard is not place_button
+        ([], None),
+        (["push_button", "breadboard"], "place_button"),
+    ],
+)
+def test_breadboard_alone_is_not_placing_the_button(objects, action):
+    library = TaskLibrary.load(TASKS_DIR)
+    circuit = Ontology.model_validate_json((TASKS_DIR / "circuit_assembly" / "ontology.json").read_text())
+    model = FakeModel(answer(action="place_button", confidence=0.95, quality="ok", objects=objects))
+    obs = observe(make(model, circuit), library.get("led_flashlight"), next_steps=["button"])
+    assert obs.output.action == action
+
+
+def test_robot_motor_wiring_passes_the_guard_with_the_motor_in_view():
+    """The motor's own leads go into the driver: the action acts on the motor, not on a jumper wire."""
+    robot = Ontology.model_validate_json((TASKS_DIR / "robot_assembly" / "ontology.json").read_text())
+    task = TaskLibrary.load(TASKS_DIR).get("servo_scout_robot")
+    answer_ = answer(
+        action="connect_motor_wires", confidence=0.9, quality="ok", objects=["dc_motor", "motor_driver"]
+    )
+    obs = observe(make(FakeModel(answer_), robot), task, next_steps=["motor_wiring"])
+    assert obs.output.action == "connect_motor_wires"
+
+
+def test_context_says_what_each_action_acts_on():
+    circuit = Ontology.model_validate_json((TASKS_DIR / "circuit_assembly" / "ontology.json").read_text())
+    text = task_context(TaskLibrary.load(TASKS_DIR).get("led_flashlight"), circuit, ["button"])
+    assert "(poner el pulsador en la protoboard) [acts on: push_button]" in text
+    aviation = Ontology.model_validate_json((TASKS_DIR / "aviation" / "ontology.json").read_text())
+    text = task_context(TaskLibrary.load(TASKS_DIR).get("c172_takeoff"), aviation, [])
+    assert "acts on: None" not in text  # establish_climb acts on nothing
+
+
+@pytest.mark.parametrize(
+    ("action", "objects"),
+    [
+        ("rotate", ["attitude_indicator", "airspeed_indicator"]),  # the sim draws no yoke: the panel shows it
+        ("establish_climb", []),  # acts on no object: nothing to check
+    ],
+)
+def test_cockpit_actions_pass_the_guard_with_what_the_panel_shows(action, objects):
+    aviation = Ontology.model_validate_json((TASKS_DIR / "aviation" / "ontology.json").read_text())
+    task = TaskLibrary.load(TASKS_DIR).get("c172_takeoff")
+    model = FakeModel(answer(action=action, confidence=0.9, quality="ok", objects=objects))
+    assert observe(make(model, aviation), task, next_steps=[]).output.action == action
 
 
 @pytest.mark.parametrize(
@@ -219,7 +287,7 @@ def test_vlm_mode_needs_a_base_url():
 
 def test_session_runs_on_the_vlm(monkeypatch):
     """Through the WebSocket: real JPEG frames → fake model → observation → the controller advances."""
-    model = FakeModel(answer(action="wet_hands", confidence=0.9, quality="ok"))
+    model = FakeModel(answer(action="wet_hands", confidence=0.9, quality="ok", objects=["hands"]))
     monkeypatch.setattr(factory, "_completer", lambda *a: model)
     settings = Settings(
         tasks_dir=TASKS_DIR, perception=PerceptionMode.VLM, scripted_every_ms=0, scripted_mistake=None,
@@ -242,7 +310,7 @@ def test_session_runs_on_the_vlm(monkeypatch):
 
 
 def test_records_frames_and_answers_when_asked(task, ontology, tmp_path):
-    model = FakeModel(answer(action="wet_hands", confidence=0.8, quality="ok"))
+    model = FakeModel(answer(action="wet_hands", confidence=0.8, quality="ok", objects=["hands"]))
     observe(make(model, ontology, record_dir=tmp_path), task, next_steps=["wet"])
     lines = (tmp_path / "calls.jsonl").read_text().splitlines()
     record = json.loads(lines[0])

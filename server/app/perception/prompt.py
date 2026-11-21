@@ -9,23 +9,31 @@ import base64
 import copy
 from collections.abc import Sequence
 
-from contracts import MistakeKind, Ontology, Task
+from contracts import ActionDef, MistakeKind, Ontology, Task
 from contracts.perception import vlm_output_json_schema
 
 NOTE_MAX_CHARS = 160
+DECODE_ORDER = ("objects", "note", "action", "quality", "confidence")
 
 SYSTEM = """You supervise a person doing a step-by-step task in front of a camera. You look at the \
 newest camera frames and say which ONE action from the task's list is happening right now. Answer only \
-with JSON.
+with JSON, filling the fields in this order: look first, decide last.
 
 Rules:
-- "action": the id of the action you can actually SEE happening in the frames, or null when none of the \
-listed actions is happening, the view is blocked, blurry, or you are unsure. Never guess: when in doubt, null.
+- "objects": FIRST, the ids of the task's objects you can actually see in the frames right now. Only what \
+is visible, never the whole list.
+- "note": one short English sentence on what you see, before you decide.
+- "action": the id of the action you can actually SEE happening in the frames, or null. Report an action \
+only if the object it acts on (shown as "acts on" in the list) is visible and listed in "objects". \
+Handling anything else (for example setting down or moving the base the task is built on) is none of \
+the actions, and neither is an empty or unchanged scene: null. Never guess: when in doubt, null.
 - "quality": "ok" when the action is done correctly, "bad" when it is attempted but done wrongly (see the \
 listed mistakes), "unknown" when "action" is null (always).
-- "confidence": 0 to 1, how sure you are of "action".
-- "objects": ids of the task's objects visible in the frames.
-- "note": one short English sentence on what you see (for debugging)."""
+- "confidence": 0 to 1, how sure you are of "action"."""
+
+
+def _acts_on(action: ActionDef) -> str:
+    return f" [acts on: {action.object}]" if action.object is not None else ""
 
 
 def task_context(task: Task, ontology: Ontology, next_steps: Sequence[str]) -> str:
@@ -33,12 +41,18 @@ def task_context(task: Task, ontology: Ontology, next_steps: Sequence[str]) -> s
     next steps and the task's known mistakes."""
     actions = {a.id: a for a in ontology.actions}
     objects = {o.id: o for o in ontology.objects}
-    lines = [f"Task: {task.description}", "", "Actions (id: what it looks like on camera):"]
-    lines += [f"- {a}: {actions[a].visual_cue} ({actions[a].label_es})" for a in task.actions]
+    lines = [f"Task: {task.description}", "", "Actions (id: what it looks like on camera [what it acts on]):"]
+    lines += [
+        f"- {a}: {actions[a].visual_cue} ({actions[a].label_es}){_acts_on(actions[a])}" for a in task.actions
+    ]
     lines += ["", "Objects (id: what it is):"]
     lines += [f"- {o}: {objects[o].description} ({objects[o].label_es})" for o in task.objects]
     if next_steps:
-        lines += ["", "Expected next (the person should be doing one of these now):"]
+        lines += [
+            "",
+            "Expected next in the recipe (context only: the person may not have started any of these; "
+            "report one only when you see it happening and the object it acts on is visible):",
+        ]
         for step_id in next_steps:
             step = task.step(step_id)
             lines.append(f"- {step.action}: done when {step.completion_cue}")
@@ -80,5 +94,9 @@ def task_json_schema(task: Task) -> dict:
     props["action"] = {"anyOf": [{"type": "string", "enum": list(task.actions)}, {"type": "null"}]}
     props["objects"] = {"type": "array", "items": {"type": "string", "enum": list(task.objects)}}
     props["note"] = {"type": "string", "maxLength": NOTE_MAX_CHARS}
-    schema["required"] = ["action", "confidence", "quality", "objects", "note"]
+    # Guided decoding emits properties in schema order: the model lists what it sees (objects, note)
+    # before it commits to an action. Fields not named here keep their place after these.
+    order = [k for k in DECODE_ORDER if k in props] + [k for k in props if k not in DECODE_ORDER]
+    schema["properties"] = {k: props[k] for k in order}
+    schema["required"] = order
     return schema
