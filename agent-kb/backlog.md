@@ -30,7 +30,7 @@ Owner in brackets once someone takes an item. Blocks refer to the plan in `docs/
   `training/results/controller.md`), e.g. a hybrid that lets the rules flag high-confidence mistakes. [Cote]
 - [ ] Calibrate `symsim.NOISE_LEVELS` against the real M_VL's confusion matrix once it runs on sim clips. [Cote]
 - [ ] VLM fine-tune: pipeline ready (`app.perception.dataset` + `training/vlm/train.py`, README); needs ≥3 more labelled runs of the demo task before training, split by session. Target: palms vs backs-style confusions. [Cote]
-- [ ] Demo rehearsal ×3, backup video, `platanus-hack-project.jsonc`, `project-description.md`, README.
+- [ ] Demo rehearsal ×3, backup video. Submission files are filled (name **Ojo**, logo draft, README, `project-description.md`); **`deploy-url` in `platanus-hack-project.jsonc` is still `<FILL THIS>`** until there is a stable demo link. Re-score the C172 v2 cockpit before claiming it corrects mistakes live.
 
 ## Done
 - [x] Session WebSocket server per `contracts.protocol` (skeleton, D-010) with the voice queue (#22).
