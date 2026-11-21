@@ -173,6 +173,8 @@ export function SupervisorPage() {
         closeCamera(); // a newer start/stop happened while the camera was opening
         return;
       }
+      // Each cleanup is registered as soon as its resource exists, so a throw below still releases it.
+      stopRef.current = [closeCamera];
       if (video.videoWidth && video.videoHeight) setAspect(video.videoWidth / video.videoHeight);
       const client = new SessionClient(
         { type: 'hello', protocol: 1, task_id: taskId, source: 'webcam', debug: true, record: false },
@@ -182,6 +184,7 @@ export function SupervisorPage() {
           onClose: (reason) => current() && lose({ kind: 'closed', reason, serverError: serverErrorRef.current }),
         },
       );
+      stopRef.current = [() => client.close(), closeCamera];
       const stopCapture = startCapture(
         video,
         FPS,
