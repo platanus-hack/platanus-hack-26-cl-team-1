@@ -8,8 +8,9 @@ How the team and its agents work in parallel until the deadline: **everything on
 - **One agent workspace per work item**, on its own branch, touching only its folders. Small PRs straight
   to `main`; draft until ready; both agent reviews addressed.
 - **Contracts (`contracts/`) change only through a dedicated PR** with a decision entry (`make schemas`).
-- All agents currently run on Cote's machine (decision 2026-11-21): teammates review and steer them; they
-  don't start parallel agents on the same items.
+- **Before starting an item, check the table and open PRs** (`gh pr list`): if someone already has it,
+  don't start a second agent on it. Update the Status column when you start or finish one. Cote's machine
+  runs W1 and W2; Alonso runs A1/A2 from his own agent.
 - Missing access (SSH, API keys, photos) never blocks the whole item: build against fakes/mocks, then stop
   and ask a human for the live part.
 
@@ -18,9 +19,9 @@ How the team and its agents work in parallel until the deadline: **everything on
 | # | Item | Owner | Folders | Status |
 |---|---|---|---|---|
 | **W1** | GPU up (vLLM + Qwen3-VL-8B on the 3090, tunnel) + `VlmPerception` | Cote | `gpu/`, `server/app/perception/` | **running** (workspace W1) |
-| **W2** | Symbolic simulator + learned controller + rules-vs-learned eval | Cote | `sim/symbolic/`, `training/controller/`, `server/app/controller/` | **running** (workspace W2) |
-| **A1** | Robotics ontology, two candidate demo tasks, Claude task generator | Alonso | `tasks/`, `server/app/library/` | **running** (workspace A1) |
-| A2 | ElevenLabs `Voice` + anti-spam queue in the session | Alonso | `server/app/voice/`, `server/app/session/` | waiting for the ElevenLabs key |
+| **W2** | Symbolic simulator + learned controller + rules-vs-learned eval | Cote | `sim/symbolic/`, `training/controller/`, `server/app/controller/` | **running** (workspace W2); contract PR #18 (`observed_quality`) |
+| **A1** | Robotics ontology, first demo task, Claude task generator | Alonso | `tasks/`, `server/app/library/` | **PR #17** (Alonso's agent); #19 from Cote's machine is a duplicate, kept as draft for its extra candidate tasks |
+| A2 | ElevenLabs `Voice` + anti-spam queue in the session | Alonso | `server/app/voice/`, `server/app/session/` | next in Alonso's agent (needs the ElevenLabs key) |
 | A3 | Deploy: static web on Render, server on the 3090 behind the tunnel, `deploy-url` | Alonso | `deploy/`, `render.yaml` | after W1's tunnel |
 | N1 | Real web UI (port the old Modo Armado views, clip picker, debug overlay) | Anaís | `web/` | next |
 | N2 | Visual simulator: clips per (step, correct / mistake) + `ClipRecord` manifest | Anaís | `sim/video/` | after the demo task; see "Video generation" |
