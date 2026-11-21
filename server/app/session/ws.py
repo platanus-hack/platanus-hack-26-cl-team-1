@@ -3,7 +3,8 @@
 Wires the pieces through the interfaces in `contracts.interfaces`:
 frames → Perception → Observation → Controller → Decision → Voice → messages to the browser.
 Owns timing and concurrency: at most one `observe` call in flight; `Controller.tick` about once a
-second of client time; every send goes through one lock.
+second of client time; every send goes through one lock. Speech runs in background tasks (one line at
+a time, in order) so a slow TTS call never blocks reading frames or the user's messages.
 """
 
 from __future__ import annotations
@@ -13,10 +14,12 @@ import contextlib
 import itertools
 import logging
 from collections import deque
-from collections.abc import Callable
+from collections.abc import Callable, Coroutine
+from typing import Any
 
-from contracts import Controller, Decision, Event, Frame, Perception, Task, Voice
+from contracts import Controller, Decision, Event, Frame, Perception, SayRequest, Task, Voice
 from contracts.protocol import (
+    CancelSay,
     Debug,
     Error,
     Hello,
@@ -37,6 +40,7 @@ from fastapi import WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, ValidationError
 
 from ..library.store import TaskLibrary
+from ..voice.queue import VoiceQueue
 
 log = logging.getLogger(__name__)
 
@@ -54,6 +58,7 @@ class Session:
         make_perception: Callable[[Task], Perception],
         controller: Controller,
         voice: Voice,
+        voice_queue: VoiceQueue | None = None,
     ) -> None:
         self.ws, self.task, self.hello = ws, task, hello
         self.make_perception = make_perception
@@ -68,6 +73,9 @@ class Session:
         self.last_t_ms = 0
         self.last_tick_ms: int | None = None
         self.say_ids = itertools.count(1)
+        self.voice_queue = voice_queue or VoiceQueue()
+        self.voice_lock = asyncio.Lock()  # one line decided + synthesized at a time (FIFO)
+        self.voice_tasks: set[asyncio.Task] = set()
         self.latest: Decision | None = None
 
     async def send(self, message: BaseModel) -> None:
@@ -91,17 +99,56 @@ class Session:
         elif self.issue_open and decision.event in (Event.STEP_DONE, Event.MISTAKE_FIXED, Event.TASK_DONE):
             self.issue_open = False
             await self.send(IssueClear(step=decision.step))
+            playing = self.voice_queue.mistake_fixed(self.last_t_ms)
+            if playing is not None:
+                await self.send(CancelSay(id=playing))
         if decision.say is not None and not self.muted:
-            say_id = f"s{next(self.say_ids)}"
-            audio = await self.voice.synthesize(decision.say)
-            await self.send(
-                Say(
-                    id=say_id, text=decision.say.text, priority=decision.say.priority, audio=audio is not None
-                )
-            )
-            if audio is not None:
-                async with self.send_lock:
-                    await self.ws.send_bytes(pack_audio(say_id, audio))
+            self.in_background(self.offer_line(decision.say, self.last_t_ms, self.generation))
+
+    def in_background(self, work: Coroutine[Any, Any, None]) -> None:
+        task = asyncio.create_task(work)
+        self.voice_tasks.add(task)
+        task.add_done_callback(self.voice_tasks.discard)
+
+    async def offer_line(self, request: SayRequest, now_ms: int, generation: int) -> None:
+        async with self.voice_lock:
+            if generation != self.generation or self.muted:
+                return  # the session was reset or muted while this line waited for the lock
+            line = self.voice_queue.offer(request, now_ms)
+            if line is not None:
+                await self.speak(line)
+
+    async def speak(self, request: SayRequest) -> None:
+        """Synthesize and send one line the voice queue let through (caller holds `voice_lock`).
+        Errors are reported to the client: a background task must not fail silently."""
+        try:
+            await self._speak(request)
+        except Exception:
+            log.exception("voice failed")
+            await self.send(Error(code="internal", message="La voz falló; revisa el servidor."))
+
+    async def _speak(self, request: SayRequest) -> None:
+        say_id = f"s{next(self.say_ids)}"
+        audio = await self.voice.synthesize(request)
+        await self.send(Say(id=say_id, text=request.text, priority=request.priority, audio=audio is not None))
+        if audio is not None:
+            async with self.send_lock:
+                await self.ws.send_bytes(pack_audio(say_id, audio))
+        self.voice_queue.spoken(say_id, request, self.last_t_ms, audio)
+
+    async def flush_voice(self, now_ms: int, generation: int) -> None:
+        """Speak the waiting line once the queue allows it."""
+        async with self.voice_lock:
+            if generation != self.generation or self.muted:
+                return
+            request = self.voice_queue.due(now_ms)
+            if request is not None:
+                await self.speak(request)
+
+    async def close(self) -> None:
+        for task in list(self.voice_tasks):
+            task.cancel()
+        await asyncio.gather(*self.voice_tasks, return_exceptions=True)
 
     async def on_frame(self, data: bytes) -> None:
         seq, t_ms, jpeg = unpack_frame(data)
@@ -115,6 +162,8 @@ class Session:
             decision = self.controller.tick(t_ms)
             if decision is not None:
                 await self.emit(decision)
+            if self.voice_queue.pending is not None:
+                self.in_background(self.flush_voice(t_ms, self.generation))
 
     async def perceive(self, frames: list[Frame], generation: int) -> None:
         try:
@@ -146,9 +195,13 @@ class Session:
         self.frames.clear()
         self.perception = self.make_perception(self.task)
         self.last_tick_ms = None
+        playing = self.voice_queue.mistake_fixed(self.last_t_ms)
+        self.voice_queue.reset()
         if self.issue_open:
             self.issue_open = False
             await self.send(IssueClear(step=None))
+        if playing is not None:
+            await self.send(CancelSay(id=playing))
         await self.emit(self.controller.start(self.task))
 
     async def on_text(self, text: str) -> None:
@@ -171,8 +224,10 @@ async def run_session(
     make_perception: Callable[[Task], Perception],
     make_controller: Callable[[], Controller],
     voice: Voice,
+    make_voice_queue: Callable[[], VoiceQueue] = VoiceQueue,
 ) -> None:
     await ws.accept()
+    session: Session | None = None
     try:
         first = await ws.receive_text()
         try:
@@ -198,7 +253,7 @@ async def run_session(
 
         controller = make_controller()
         try:
-            session = Session(ws, task, hello, make_perception, controller, voice)
+            session = Session(ws, task, hello, make_perception, controller, voice, make_voice_queue())
         except ValueError as error:  # misconfigured component (e.g. a bad SUP_ setting): say so
             await ws.send_text(Error(code="internal", message=str(error)[:500]).model_dump_json())
             return
@@ -225,5 +280,7 @@ async def run_session(
     except WebSocketDisconnect:
         pass
     finally:
+        if session is not None:
+            await session.close()
         with contextlib.suppress(Exception):
             await ws.close()

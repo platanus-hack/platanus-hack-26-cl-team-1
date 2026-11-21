@@ -72,6 +72,8 @@ with a pointer to their replacement; nothing is ever deleted from §3.
   component, and it's a port of the old Modo Armado session he built); the web UI goes to Anaís (the webcam
   and sim-clip sources live in the page). Cote's area (two models + training) is the heaviest, so it gets nothing extra.
 - **Consequences:** each owner reviews changes to their area; the table in `docs/STACK.md` § Ownership is kept current.
+- **Amended 2026-11-21:** the **symbolic** simulator (`sim/symbolic/`) moves from Anaís to Cote: it exists to
+  train and test the controller. Anaís keeps the visual simulator.
 
 ### D-009 — Contracts as a pydantic package; the automaton is derived from a step DAG (2026-11-21)
 - **Context:** the pieces meet at six data shapes (ontology, task, perception output, controller decision,
@@ -98,6 +100,13 @@ with a pointer to their replacement; nothing is ever deleted from §3.
 - **Consequences:** the full loop (browser → server → controller → subtitles + browser speech) runs with no model
   and no API keys; each owner replaces a fake behind its interface. Message and output schemas are exported in
   serialization mode so TypeScript sees `type` as required.
+
+### D-011 — `TrajectoryEvent.observed_quality` (2026-11-21)
+- **Context:** `incomplete` (right action, done badly) reaches the controller only through `VlmOutput.quality`;
+  trajectories had no way to carry it, so neither controller could be trained or tested on it.
+- **Decision:** `TrajectoryEvent` gets `observed_quality: Quality = "unknown"`, the quality simulated perception
+  reports alongside `observed_action`/`observed_confidence`.
+- **Consequences:** backward compatible (defaulted); schemas and TS types regenerated. No other consumer yet.
 
 ### D-012 — Perception: Qwen3-VL-8B FP8 on vLLM behind a keyed tunnel (2026-11-21)
 - **Context:** the scripted fake must give way to a real video-language model behind `Perception`; the 3090 is

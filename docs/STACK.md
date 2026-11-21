@@ -40,6 +40,6 @@ scripts/ci/     CI tooling (review formatter, scope check) + its tests
 | Owner | Area | Folders |
 |---|---|---|
 | Alonso | Task library: ontology, recipe generation with Claude, validation; voice (ElevenLabs + anti-spam); **session server** wiring frames → perception → controller → voice | `tasks/`, `server/app/library/`, `server/app/voice/`, `server/app/session/` |
-| Cote | Models: video understanding (M_VL), controller (rules + learned), training and eval | `server/app/perception/`, `server/app/controller/`, `training/` |
-| Anaís | Simulator (symbolic + visual / Runway), the webcam / frame source, and the **web UI** (task picker, checklist, subtitles, debug overlay) | `sim/`, `web/` |
+| Cote | Models: video understanding (M_VL), controller (rules + learned), training and eval; the **symbolic simulator** (it exists to train the controller) | `server/app/perception/`, `server/app/controller/`, `training/`, `sim/symbolic/` |
+| Anaís | Visual simulator (Runway), the webcam / frame source, and the **web UI** (task picker, checklist, subtitles, debug overlay) | `sim/` (except `sim/symbolic/`), `web/` |
 | Shared | Contracts (change = decision entry); GPU ops | `contracts/`, `gpu/` |

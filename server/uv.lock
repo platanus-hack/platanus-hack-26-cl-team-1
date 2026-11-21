@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.12"
 
 [[package]]
@@ -779,6 +779,7 @@ dependencies = [
     { name = "anthropic" },
     { name = "contracts" },
     { name = "fastapi" },
+    { name = "httpx" },
     { name = "openai" },
     { name = "pillow" },
     { name = "uvicorn", extra = ["standard"] },
@@ -796,6 +797,7 @@ requires-dist = [
     { name = "anthropic", specifier = ">=0.70" },
     { name = "contracts", editable = "../contracts" },
     { name = "fastapi", specifier = ">=0.115" },
+    { name = "httpx", specifier = ">=0.27" },
     { name = "openai", specifier = ">=3.57.0" },
     { name = "pillow", specifier = ">=13.0.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },

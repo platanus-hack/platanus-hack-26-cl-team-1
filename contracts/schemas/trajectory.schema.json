@@ -11,6 +11,15 @@
       "title": "MistakeKind",
       "type": "string"
     },
+    "Quality": {
+      "enum": [
+        "ok",
+        "bad",
+        "unknown"
+      ],
+      "title": "Quality",
+      "type": "string"
+    },
     "Split": {
       "description": "Assigned per run / recording session, never per frame or clip of the same run.",
       "enum": [
@@ -69,6 +78,10 @@
           "minimum": 0.0,
           "title": "Observed Confidence",
           "type": "number"
+        },
+        "observed_quality": {
+          "$ref": "#/$defs/Quality",
+          "default": "unknown"
         },
         "step": {
           "anyOf": [

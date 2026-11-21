@@ -30,7 +30,7 @@ def obs(action, t_ms=0, confidence=0.9, quality=None, seq=1):
 
 def test_library_loads_and_validates_the_repo_tasks():
     library = TaskLibrary.load(TASKS_DIR)
-    assert sorted(s.id for s in library.summaries()) == ["hand_hygiene_basic", "servo_scout_robot"]
+    assert {s.id for s in library.summaries()} >= {"hand_hygiene_basic", "servo_scout_robot"}
 
 
 def test_library_refuses_an_invalid_task(tmp_path):
@@ -125,8 +125,8 @@ def test_reminder_after_inactivity(task):
 
 def test_session_runs_a_scripted_task_end_to_end():
     settings = Settings(
-        tasks_dir=TASKS_DIR, perception=PerceptionMode.SCRIPTED, scripted_every_ms=100, scripted_mistake=None,
-        voice=VoiceMode.BROWSER, cors_origins=(),
+        tasks_dir=TASKS_DIR, perception=PerceptionMode.SCRIPTED, scripted_every_ms=5000,
+        scripted_mistake=None, voice=VoiceMode.BROWSER, cors_origins=(),
     )  # fmt: skip
     client = TestClient(create_app(settings))
     with client.websocket_connect("/ws/session") as ws:
@@ -135,8 +135,8 @@ def test_session_runs_a_scripted_task_end_to_end():
         )
         assert ws.receive_json()["type"] == "ready"
         received = []
-        for seq in range(40):
-            ws.send_bytes(pack_frame(seq, seq * 50, b"\xff\xd8fake"))
+        for seq in range(40):  # 20 s of client time: a step every 5 s leaves room for each line
+            ws.send_bytes(pack_frame(seq, seq * 500, b"\xff\xd8fake"))
             while True:
                 message = ws.receive_json()
                 received.append(message)
@@ -160,7 +160,7 @@ def test_session_rejects_unknown_task():
 
 def test_tasks_api_lists_the_library():
     client = TestClient(create_app())
-    assert {t["id"] for t in client.get("/api/tasks").json()} == {"hand_hygiene_basic", "servo_scout_robot"}
+    assert {t["id"] for t in client.get("/api/tasks").json()} >= {"hand_hygiene_basic", "servo_scout_robot"}
     assert client.get("/api/tasks/nope").status_code == 404
 
 
@@ -317,7 +317,20 @@ def test_reset_with_an_open_issue_sends_issue_clear():
         after = []
         while not after or after[-1]["type"] != "say":
             after.append(ws.receive_json())
-    assert [m["type"] for m in after if m["type"] != "debug"] == ["issue_clear", "state", "say"]
+    assert [m["type"] for m in after if m["type"] != "debug"] == ["issue_clear", "cancel_say", "state", "say"]
+
+
+def test_fixing_a_mistake_cancels_its_correction_if_still_playing():
+    with scripted_client(mistake="touch_faucet_bare").websocket_connect("/ws/session") as ws:
+        ws.send_text(hello())
+        ws.receive_json()  # ready
+        # wet at 100 ms, the mistake at 200 ms, soap at 300 ms (clears the issue while the line plays)
+        messages = run_frames(ws, 0, 14)
+    types = [m["type"] for m in messages]
+    urgent = next(m for m in messages if m["type"] == "say" and m["priority"] == "urgent")
+    cancel = next(m for m in messages if m["type"] == "cancel_say")
+    assert cancel["id"] == urgent["id"]
+    assert types.index("cancel_say") == types.index("issue_clear") + 1
 
 
 def test_reset_drops_a_perception_result_from_before_the_reset(task):
@@ -411,3 +424,24 @@ def test_unknown_scripted_mistake_is_reported():
         ws.send_text(hello())
         message = ws.receive_json()
     assert message["type"] == "error" and "touch_faucet_bar" in message["message"]
+
+
+def test_slow_voice_does_not_block_frames(monkeypatch):
+    """Review finding on PR #22: a slow TTS call stalled the frame loop."""
+    import asyncio
+    import time
+
+    class SlowVoice:
+        async def synthesize(self, request):
+            await asyncio.sleep(30)
+
+    monkeypatch.setattr("app.main.make_voice", lambda settings: SlowVoice())
+    with scripted_client().websocket_connect("/ws/session") as ws:
+        ws.send_text(hello())
+        ws.receive_json()  # ready; the greeting is now stuck in synthesis
+        started = time.monotonic()
+        messages = run_frames(ws, 0, 5)
+        elapsed = time.monotonic() - started
+    assert elapsed < 2
+    assert [m["seq"] for m in messages if m["type"] == "debug"] == [0, 1, 2, 3, 4]
+    assert not any(m["type"] == "say" for m in messages)

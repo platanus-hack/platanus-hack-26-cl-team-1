@@ -4,6 +4,7 @@
 install: ## Install every part
 	cd contracts && uv sync
 	cd server && uv sync
+	cd sim/symbolic && uv sync
 	cd web && pnpm install
 
 dev: ## Server on :8000 + web on :5173 (Ctrl+C stops both)
@@ -26,11 +27,13 @@ test: ## All tests
 	python3 -I -m unittest discover -s scripts/ci/tests -t .
 	cd contracts && uv run pytest -q
 	cd server && uv run pytest -q
+	cd sim/symbolic && uv run pytest -q
 	cd web && pnpm test
 
 lint: ## Lint and format checks
 	cd contracts && uv run ruff check . && uv run ruff format --check .
 	cd server && uv run ruff check . && uv run ruff format --check .
+	cd sim/symbolic && uv run ruff check . && uv run ruff format --check .
 	cd web && pnpm typecheck
 
 check: lint test ## What CI runs (plus schema/type freshness)
