@@ -91,6 +91,10 @@ def main() -> None:
     settings = Settings.from_env()
     library = TaskLibrary.load(settings.tasks_dir)
     session = next(s for s in load_sessions(args.run_dir, library) if s.id == args.session)
+    if args.out.resolve() == args.run_dir.resolve() or args.run_dir.resolve().is_relative_to(
+        args.out.resolve()
+    ):
+        parser.error("--out must not be the recorded run (or contain it): it is replaced")
     if args.out.exists():
         shutil.rmtree(args.out)
     args.out.mkdir(parents=True)
