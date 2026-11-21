@@ -26,6 +26,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import unquote
 
 from contracts import Controller, Event, Observation, Quality, Source, Task, VlmOutput
 
@@ -230,6 +231,14 @@ class Review:
         return json.loads(self.labels_path.read_text()) if self.labels_path.exists() else {}
 
     def set_label(self, key: str, value: str | None) -> None:
+        """Labels are a closed set: `none` or one of the session's task actions, on a recorded call."""
+        sessions = {s.id: s for s in load_sessions(self.run_dir, self.library)}
+        sid, _, call = key.partition(":")
+        session = sessions.get(sid)
+        if session is None or not any(str(c["call"]) == call for c in session.calls):
+            raise ValueError(f"no recorded call {key!r}")
+        if value is not None and value != NONE and value not in session.task.actions:
+            raise ValueError(f"label {value!r} is not an action of task {session.task.id!r}")
         labels = self.labels()
         if value is None:
             labels.pop(key, None)
@@ -260,7 +269,7 @@ def serve(review: Review, port: int) -> None:
             elif self.path == "/data.json":
                 self._send(json.dumps(review.data()).encode(), "application/json")
             elif self.path.startswith("/frames/"):
-                path = review.run_dir / Path(self.path.removeprefix("/frames/")).name  # no traversal
+                path = review.run_dir / Path(unquote(self.path.removeprefix("/frames/"))).name  # no traversal
                 if path.suffix != ".jpg" or not path.exists():
                     self.send_error(404)
                     return
@@ -272,8 +281,16 @@ def serve(review: Review, port: int) -> None:
             if self.path != "/labels":
                 self.send_error(404)
                 return
+            origin = self.headers.get("Origin")
+            if origin is not None and origin != f"http://127.0.0.1:{self.server.server_port}":
+                self.send_error(403, "labels are only accepted from the review page")
+                return
             body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
-            review.set_label(body["key"], body["value"])
+            try:
+                review.set_label(body["key"], body["value"])
+            except ValueError as error:
+                self.send_error(400, str(error))
+                return
             self._send(json.dumps(review.data()).encode(), "application/json")
 
         def log_message(self, *args) -> None:

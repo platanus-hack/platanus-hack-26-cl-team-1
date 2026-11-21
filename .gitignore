@@ -14,3 +14,6 @@ frontend/.renders-ui
 .venv
 .ruff_cache
 tmp/
+
+# Workspace scratch (Conductor): recorded webcam runs, labels, model outputs. Never commit them.
+.context/

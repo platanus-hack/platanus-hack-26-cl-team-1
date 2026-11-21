@@ -63,3 +63,14 @@ def test_splits_a_perception_miss_from_the_controller(tmp_path, library):
     assert analysis["missed_segments"] == [["apply_soap", 3, 3]]
     assert analysis["accuracy"] == pytest.approx(4 / 5)
     assert ["apply_soap", "rub_palms", 1] in analysis["confusion"]
+
+
+def test_labels_are_a_closed_set(tmp_path, library):
+    run = write_run(tmp_path, [call(1, None, 0, "a")])
+    review = Review(run, library, RulesController)
+    with pytest.raises(ValueError, match="not an action"):
+        review.set_label("a:1", "juggle")
+    with pytest.raises(ValueError, match="no recorded call"):
+        review.set_label("a:9", "wet_hands")
+    review.set_label("a:1", "none")
+    assert review.labels() == {"a:1": "none"}

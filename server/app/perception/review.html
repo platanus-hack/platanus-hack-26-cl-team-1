@@ -21,25 +21,25 @@ async function load(post) {
   const r = await fetch(post ? '/labels' : '/data.json', post ? {method:'POST', body: JSON.stringify(post)} : {});
   data = await r.json();
   if (!sid) sid = data.sessions.reduce((a, b) => (b.calls.length > a.calls.length ? b : a)).id;
-  $('sess').innerHTML = data.sessions.map((s) => `<option value="${s.id}" ${s.id===sid?'selected':''}>${s.id} · ${s.task.id} · ${s.calls.length} calls</option>`).join('');
+  $('sess').innerHTML = data.sessions.map((s) => `<option value="${esc(s.id)}" ${s.id===sid?'selected':''}>${esc(s.id)} · ${esc(s.task.id)} · ${s.calls.length} calls</option>`).join('');
   render();
 }
 const S = () => data.sessions.find((s) => s.id === sid);
 function ctl(r) { if (!r) return ''; const say = r.say ? `<div class="dim">${esc(r.say)}</div>` : '';
-  return r.event === 'none' && !r.say ? '' : `<span class="ev-${r.event}">${r.event}${r.step ? ' '+r.step : ''}${r.mistake ? ' ('+r.mistake+')' : ''}</span>${say}`; }
+  return r.event === 'none' && !r.say ? '' : `<span class="ev-${esc(r.event)}">${esc(r.event)}${r.step ? ' '+esc(r.step) : ''}${r.mistake ? ' ('+esc(r.mistake)+')' : ''}</span>${say}`; }
 function render() {
   const s = S(); const acts = s.task.actions;
-  $('keys').innerHTML = acts.map((a, i) => `<span><b>${i+1}</b> ${a}</span>`).join('') + '<span><b>0</b> none</span><span><b>⌫</b> clear</span><span><b>j/k ↑↓</b> move</span>';
+  $('keys').innerHTML = acts.map((a, i) => `<span><b>${i+1}</b> ${esc(a)}</span>`).join('') + '<span><b>0</b> none</span><span><b>⌫</b> clear</span><span><b>j/k ↑↓</b> move</span>';
   $('report').textContent = data.reports[sid];
   const t0 = s.calls[0].t_ms.at(-1);
   $('rows').innerHTML = s.calls.map((c, i) => {
     const o = c.output, truth = s.truth[i], explicit = s.labels[String(c.call)];
     const cls = truth == null ? '' : ((o.action ?? 'none') === truth ? 'ok' : 'bad');
     return `<tr data-i="${i}" class="${cls} ${i===sel?'sel':''}"><td>${c.call}<div class="dim">${((c.t_ms.at(-1)-t0)/1000).toFixed(1)}s<br>${c.latency_ms}ms</div></td>
-    <td>${c.frames.map((f) => `<img src="/frames/${f}" loading="lazy">`).join('')}</td>
-    <td>${c.next_steps.join(', ')}</td>
+    <td>${c.frames.map((f) => `<img src="/frames/${encodeURIComponent(f)}" loading="lazy">`).join('')}</td>
+    <td>${esc(c.next_steps.join(', '))}</td>
     <td class="m"><b>${esc(o.action ?? '—')}</b> ${esc(o.confidence)} ${esc(o.quality)}<div class="dim">${esc(o.note)}</div></td>
-    <td class="lab">${explicit ? `<b>${explicit}</b>` : `<span class="dim">${truth ?? ''}</span>`}</td>
+    <td class="lab">${explicit ? `<b>${esc(explicit)}</b>` : `<span class="dim">${esc(truth)}</span>`}</td>
     <td>${ctl(s.model[i])}</td><td>${s.oracle ? ctl(s.oracle[i]) : ''}</td></tr>`; }).join('');
 }
 function move(d) { sel = Math.max(0, Math.min(S().calls.length - 1, sel + d)); render(); document.querySelector('tr.sel')?.scrollIntoView({block:'center'}); }
