@@ -57,6 +57,34 @@ jobs:
       - name: Run tests
         run: uv run pytest -q -ra
 
+  # Modo Armado vision server (vision/): lint + the tests that need no GPU (no torch/ultralytics/kokoro).
+  vision-lint:
+    name: Vision (ruff, pytest sin GPU)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: vision
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.13.5"
+          enable-cache: true
+          cache-dependency-glob: vision/uv.lock
+
+      - name: Install Python deps (sin extras de GPU)
+        run: uv sync --frozen --python 3.12
+
+      - name: Ruff
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+
+      - name: Tests
+        run: uv run pytest -q -ra
+
   frontend:
     name: Frontend (typecheck, test, build)
     runs-on: ubuntu-latest
