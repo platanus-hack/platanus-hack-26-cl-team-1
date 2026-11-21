@@ -11,5 +11,8 @@ export default defineConfig({
       '/ws': { target: 'ws://127.0.0.1:8000', ws: true },
     },
   },
+  // Two HTML entries: the box serves the build as static files (deploy/demo_app.py), so /simulador/ needs
+  // its own index.html. Both load the same bundle; main.tsx picks the page from the path.
+  build: { rollupOptions: { input: { main: 'index.html', simulador: 'simulador/index.html' } } },
   test: { environment: 'node' },
 });

@@ -8,7 +8,7 @@ export function Nav({ current }: { current: 'home' | 'simulator' }) {
       <a href={`/${q}`} aria-current={current === 'home' ? 'page' : undefined}>
         Supervisor
       </a>
-      <a href={`${SIMULATOR_PATH}${q}`} aria-current={current === 'simulator' ? 'page' : undefined}>
+      <a href={`${SIMULATOR_PATH}/${q}`} aria-current={current === 'simulator' ? 'page' : undefined}>
         Simulador
       </a>
     </nav>

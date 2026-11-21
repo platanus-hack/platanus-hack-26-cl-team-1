@@ -59,8 +59,10 @@ The plane task lives next to the robot task; it doesn't replace it.
   on Render can talk to the server through a tunnel.
 - Simple fake physics in a pure, tested module; ground-truth action events derived from control changes.
 
-## Deploy note (not built here)
+## Deploy note
 
-Render serves the static web. The session server must run where it can SSH-forward to the GPU box
-(D-014), so the page reaches it with `?server=wss://<tunnel>`; the server needs that Render origin in
-`SUP_CORS_ORIGINS`. Learned-controller mode needs `make controller TASK=tasks/aviation/c172_takeoff.json`.
+Asked for Render, but D-015 (merged while this was built) dropped Render: the 5090 box serves the web build
+and the session server on one origin behind a Cloudflare tunnel. The build has a second HTML entry
+(`web/simulador/index.html`) so the box's static mount serves `/simulador/`. If a separate static host comes
+back, `?server=wss://<host>` (or `VITE_SUP_SERVER`) points both the WebSocket and the API at the server, which
+then needs that origin in `SUP_CORS_ORIGINS`. Learned-controller weights for `c172_takeoff` are committed.

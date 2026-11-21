@@ -164,6 +164,23 @@ with a pointer to their replacement; nothing is ever deleted from §3.
   with a Cloudflare account. If the box goes down, so does the demo (fallback: `make dev` on a laptop +
   `gpu/up-5090.sh`).
 
+### D-016 — Simulator page: an in-browser C172 cockpit as a second, practice-mode demo (2026-11-21)
+- **Context:** besides the physical kit (webcam), Anaís wants a demo that needs no hardware: a simulated task
+  the presenter does live, making mistakes on purpose so the supervisor corrects them. It sits next to the
+  robot/circuit task; it doesn't replace it.
+- **Decision:** a `Simulador` page (`/simulador/`, `web/src/simulator/`): pick a library task that has a
+  simulator, then **Práctica** (live: the simulator's canvas is the frame source, `hello.source = sim`,
+  `hello.task_id` = the project, so perception and the controller use its recipe) or **Grabación (experto)**
+  (offline: the canvas is recorded to `.webm` and labeled from the simulator's ground truth as `ClipRecord`s;
+  **mocked**: downloaded, no upload endpoint yet). First simulator: a Cessna 172 cockpit (2D panel with the
+  MIT `flight-indicators-js` gauges + a three.js windshield), keyboard-driven, for the new
+  `tasks/aviation/c172_takeoff.json` (cold-and-dark start → takeoff → climb; 4 task mistakes). Only video goes
+  to the server in practice: the simulator's ground truth stays in the page (debug overlay, labels).
+- **Consequences:** no contract change (`source: sim` already covers it; `ClipRecord` has no start/end, so the
+  mock puts the segment in the path as a media fragment). The demo deploy (D-015) serves the page because the
+  build has a second HTML entry (`web/simulador/index.html`). `c172_takeoff` has learned-controller weights.
+  Design: `docs/superpowers/specs/2026-11-21-simulator-page-design.md`.
+
 ## §2 Open (decide in block 1, see docs/VISION.md)
 
 - **D-?? Demo scenario.** Direction: physical assembly in robotics (a contact who assembles robots will give a
