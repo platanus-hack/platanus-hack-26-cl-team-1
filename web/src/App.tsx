@@ -87,7 +87,7 @@ export function App() {
     setDebug(null);
     setStatus('Conectando…');
     try {
-      const closeSource = source === 'webcam' ? await openWebcam(video) : clip ? await openClip(video, clip) : null;
+      const closeSource = source === 'webcam' ? await openWebcam(video, null, () => {}) : clip ? await openClip(video, clip) : null;
       if (!closeSource) {
         setStatus('Elige un video de simulación');
         return;
