@@ -6,6 +6,7 @@ Owner in brackets once someone takes an item. Blocks refer to the plan in `docs/
 - [ ] Pick the exact demo task in the robotics-assembly direction once the contact's input arrives (candidates in `docs/VISION.md`). [Anaís + team]
 - [ ] Get the contact's testimonial (text, name, role, photo) with explicit consent to publish it; keep it out of the repo until then. [Anaís]
 - [ ] Bring the GPU server up again for the new repo: scripts ready in `gpu/` (`gpu/deploy.sh`); **blocked: `ssh 172.16.0.204` refuses port 22** (host pings). Then run it, record latency p50/p95 with `app.perception.bench`, and judge webcam frames end to end. [Cote]
+- [x] Local prototype on the Mac: Ollama + Qwen3-VL-2B runs through `VlmPerception` (about 2–10 s per frame on an M1 with 8 GB; too inaccurate to judge); `gpu/README.md` § Local on a Mac. [Cote]
 - [ ] ElevenLabs: get the API key into the server's env, pick a Spanish voice (`SUP_ELEVENLABS_VOICE_ID`), hear it end to end in the browser. Code is in (`app/voice/elevenlabs.py`). [Alonso]
 - [ ] Run the task generator live once a key is available (`servo_scout_robot` was hand-written to the generator's rules); regenerate or refine the demo task once the scenario is picked. [Alonso]
 - [ ] Close PR #8 (superseded by the pivot) and decide whether to turn off the old Render services. [Alonso]
