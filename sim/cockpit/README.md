@@ -21,6 +21,21 @@ A failing case says what to change: the drawing in `web/src/simulator/c172/panel
 or the cues in `tasks/aviation/ontology.json` / `c172_takeoff.json` (`visual_cue`, `completion_cue`). After
 changing the drawing, recapture.
 
+## Results so far
+
+- **v1 cockpit (PR #36), qwen3-vl-8b-fp8 on the 5090: 3/16 per pass** (9/48 over 3 passes, no variance). Read only
+  the big, high-contrast changes (master, flaps 10); every other step came back as `null` with ~0.95 confidence;
+  0/4 mistakes, and flaps 30 was read as flaps 10.
+- **v2 cockpit:** every control the recipe uses now changes on the control itself, large and in color (lit
+  ON pills, RICH/CUTOFF and FULL/IDLE placards, a color-coded FLAPS readout with 30° in red, a green/red fuel
+  selector, STARTER and PARK BRAKE annunciators, a darker propeller disc, windshield pitch ×1.6), and the cues in
+  `tasks/aviation/` (v2) name those exact things. Pixels changed per case (`diff_cases.py`, before → after):
+  fuel 59 → 3142, mixture 1520 → 3052, brake 2292 → 5408, power 1129 → 2394, power with brake 762 → 3042,
+  rotate 41.6k → 62.9k. **Not yet scored by the VLM.** `c05_running` and `c11_climb` stay small on purpose:
+  they're steady states, read from the cue, not from a change.
+
+`python ../sim/cockpit/diff_cases.py ../sim/cockpit/c172_takeoff` (from `server/`) prints the pixel table.
+
 ## Recapture
 
 1. `python3 -I sim/cockpit/receiver.py sim/cockpit/c172_takeoff` (saves what the page posts; port 8765).
