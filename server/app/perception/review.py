@@ -60,6 +60,7 @@ def load_sessions(run_dir: Path, library: TaskLibrary) -> list[Session]:
         groups[call["session"]].append(call)
     sessions = []
     for sid, calls in groups.items():
+        calls.sort(key=lambda c: c["call"])  # pipelined calls are recorded as they finish, numbered at launch
         task = library.get(calls[0]["task"])
         if task is None:
             raise ValueError(f"session {sid}: task {calls[0]['task']!r} is not in the library")

@@ -74,3 +74,8 @@ def test_labels_are_a_closed_set(tmp_path, library):
         review.set_label("a:9", "wet_hands")
     review.set_label("a:1", "none")
     assert review.labels() == {"a:1": "none"}
+
+
+def test_calls_recorded_out_of_order_are_replayed_in_launch_order(tmp_path, library):
+    run = write_run(tmp_path, [call(2, None, 1500, "a"), call(1, None, 0, "a"), call(3, None, 3000, "a")])
+    assert [c["call"] for c in load_sessions(run, library)[0].calls] == [1, 2, 3]

@@ -211,6 +211,8 @@ with a pointer to their replacement; nothing is ever deleted from §3.
     that prerequisite could be done now, and says so. 3 sightings skipped a real step on a run where the
     model hallucinated early rinses.
   - Numbers: `training/results/perception.md`.
+- **Update (D-018):** calls are now pipelined (3 in flight, starting every 0.25 s), and inference also needs the
+  4 sightings to span ≥ 2 s.
 - **Consequences:** a deliberate out-of-order action that lasts more than about 3 s gets accepted after one
   warning. A forbidden action more than one step before its step is ignored. 3 frames per call need vLLM
   started with `VLM_MAX_IMAGES` ≥ 3 (`gpu/vllm-5090.sh` defaults to 4); an older vLLM rejects every call

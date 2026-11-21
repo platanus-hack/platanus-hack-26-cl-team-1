@@ -32,7 +32,10 @@ def percentile(values: list[int], q: float) -> int:
 
 
 async def run(task_id: str, images: list[Path], repeat: int) -> None:
-    settings = replace(Settings.from_env(), perception=PerceptionMode.VLM, vlm_min_interval_ms=0)
+    # One call at a time: this mode measures a single call's latency and answer.
+    settings = replace(
+        Settings.from_env(), perception=PerceptionMode.VLM, vlm_min_interval_ms=0, vlm_max_in_flight=1
+    )
     task = TaskLibrary.load(settings.tasks_dir).get(task_id)
     if task is None:
         sys.exit(f"unknown task {task_id!r}")

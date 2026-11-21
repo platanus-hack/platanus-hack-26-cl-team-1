@@ -204,6 +204,8 @@ class VlmPerception:
         return max(0.0, self._min_interval_s - (self._clock() - self._last_call_at))
 
     async def _judge(self, frames: Sequence[Frame], task: Task, next_steps: Sequence[str]) -> Observation:
+        self._calls += 1
+        call = self._calls  # numbered at launch: pipelined calls can finish out of order
         picked = pick_frames(frames, self._span_ms, self._count)
         jpegs = await asyncio.to_thread(self._encode, picked)
         messages = build_messages(task, self._ontology, next_steps, jpegs)
@@ -219,7 +221,6 @@ class VlmPerception:
             log.warning("VLM answer rejected as uncertain (%s): %r", error, raw[:200])
             output = uncertain(f"invalid model output: {error}")
         last = picked[-1]
-        self._calls += 1
         log.info(
             "VLM %s seq=%d %d ms: %s %.2f %s",
             task.id,
@@ -232,7 +233,7 @@ class VlmPerception:
         if self._record_dir is not None:
             record = {
                 "session": self._session,
-                "call": self._calls,
+                "call": call,
                 "task": task.id,
                 "next_steps": list(next_steps),
                 "seqs": [f.seq for f in picked],
