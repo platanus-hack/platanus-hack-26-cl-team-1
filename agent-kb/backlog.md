@@ -4,6 +4,7 @@ Owner in brackets once someone takes an item. Blocks refer to the plan in `docs/
 
 ## Now (status 2026-11-21 16:55; critical path to the 18:00 webcam loop)
 - [ ] **Confirm the demo task.** Default: `tasks/robot_assembly/servo_scout_robot.json` (the only robot task). Optional second candidate: port the Arduino task from draft PR #19 onto the merged ontology. [team]
+- [ ] **Flashlight demo task** (the team chose a breadboard flashlight; demo mistake: LED backwards): draft steps, kit and open points in `docs/flashlight-task.md`; write it into `tasks/` (proposed `breadboard_circuits/`). [Alonso]
 - [ ] **Kit + fixed camera on a table**, matching the demo task's parts. Nothing recorded yet. [team]
 - [x] Perception on the RTX 5090 over an SSH forward (`gpu/up-5090.sh`, PR #27; D-014): 8B FP8 at p50 ≈ 0.4 s per frame, end to end through `/ws/session`. The 3090 refuses SSH (port 22), so it's parked as a fallback. [Cote]
 - [x] Public demo link (A3, D-015): `deploy/up-demo.sh` runs the server + web app on the 5090 next to vLLM behind a Cloudflare quick tunnel; `--url` prints the current link. Measured from Santiago: ack RTT p50 ≈ 90 ms, frame → VLM observation p50 ≈ 0.5 s. [Cote's agent, handed off from Alonso]
