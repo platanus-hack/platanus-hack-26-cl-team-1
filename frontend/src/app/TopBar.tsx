@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react';
 import {
-  Bot, Cpu, Download, FilePlus2, FolderOpen, Library, Pause, Play, Redo2, Square, Undo2, Upload, Workflow,
+  Bot, Cpu, Download, FilePlus2, FolderOpen, Library, Pause, Play, Redo2, ScanEye, Square, Undo2, Upload, Workflow,
 } from 'lucide-react';
+import { useAssembly } from '@/assembly/store';
 import { useProject } from '@/store/project';
 import { useUI } from '@/store/ui';
 import { useSim } from '@/store/sim';
@@ -48,6 +49,7 @@ export function TopBar() {
   const togglePanel = useUI((s) => s.togglePanel);
   const toast = useUI((s) => s.toast);
   const program = useSim((s) => s.program);
+  const assemblyOpen = useAssembly((s) => s.open);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const load = (p: ProjectModel, label: string) => {
@@ -158,6 +160,13 @@ export function TopBar() {
           <Square size={14} />
         </button>
         <div className="divider" />
+        <button
+          className={`btn ${assemblyOpen ? 'active-toggle' : ''}`}
+          onClick={() => useAssembly.getState().setOpen(!assemblyOpen)}
+          title="Arma el circuito real con la cámara: el agente revisa cada paso y te avisa si algo quedó mal"
+        >
+          <ScanEye size={16} /> Modo Armado
+        </button>
         <button className={`btn ${agentOpen ? 'active-toggle' : ''}`} onClick={() => togglePanel('agent')} title="Asistente con IA">
           <Bot size={16} /> Asistente
         </button>

@@ -9,6 +9,8 @@ import { SimPanel } from '@/views/sim/SimPanel';
 import { AgentPanel } from '@/agent/AgentPanel';
 import { simRuntime } from '@/sim/runtime';
 import { registerBlocks } from '@/program/blocks';
+import { useAssembly } from '@/assembly/store';
+import { AssemblyView } from '@/views/assembly/AssemblyView';
 import './app.css';
 
 function isTypingTarget(t: EventTarget | null): boolean {
@@ -24,6 +26,7 @@ export function App() {
   const view = useUI((s) => s.view);
   const agentOpen = useUI((s) => s.panels.agent);
   const simOpen = useUI((s) => s.panels.sim);
+  const assemblyOpen = useAssembly((s) => s.open);
 
   useEffect(() => {
     registerBlocks();
@@ -48,6 +51,18 @@ export function App() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
+
+  if (assemblyOpen) {
+    return (
+      <div className="app">
+        <TopBar />
+        <main className="app-main">
+          <AssemblyView />
+        </main>
+        <Toasts />
+      </div>
+    );
+  }
 
   return (
     <div className={`app ${agentOpen ? 'with-agent' : ''}`}>
