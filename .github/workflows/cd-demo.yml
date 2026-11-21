@@ -6,7 +6,8 @@ name: CD demo
 #
 # Safety: `workflow_run` runs this file from main and only for CI runs on pushes to main, so PR code never sees
 # the secrets; a manual run is allowed from main only. It checks out exactly the commit CI tested.
-# Secrets: GPU5090 (user@host), GPU5090_PORT, DEMO_SSH_KEY (a key used only for this, `restrict`ed on the box), DEMO_SSH_KNOWN_HOSTS (the box's host key).
+# Secrets: GPU5090 (user@host), GPU5090_PORT, DEMO_SSH_KEY (a key used only for this, `restrict`ed on the
+# box), DEMO_SSH_KNOWN_HOSTS (the box's host key).
 on:
   workflow_run:  # zizmor: ignore[dangerous-triggers]
     workflows: [CI]
