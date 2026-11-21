@@ -7,8 +7,8 @@ Bias: reuse what already worked in the old project (`docs/LEGACY.md`, commit `2e
 
 ```
 web/            browser app: task picker, sim/webcam source, live checklist, subtitles, debug
-server/         Python service: contracts, task library, controller, session WebSocket, TTS, VLM client
-  app/contracts/  pydantic models = the source of truth for the shared contracts
+contracts/      shared contracts: pydantic package + generated JSON Schemas (D-009, docs/CONTRACTS.md)
+server/         Python service: task library, controller, session WebSocket, TTS, VLM client
 tasks/          task library: one validated task JSON per scenario (+ generated prompts/assets refs)
 sim/            symbolic simulator (trajectories + mistakes + perception noise) and video-generation scripts
 training/       controller training (from scratch) and VLM QLoRA + eval scripts, run on the 3090
@@ -20,7 +20,7 @@ scripts/ci/     CI tooling (review formatter, scope check) + its tests
 
 | Component | Stack | Why / notes |
 |---|---|---|
-| **Contracts** (ontology, `task.json`, observation, controller output, WS messages) | **pydantic v2** models in `server/app/contracts/`; JSON Schema exported to `contracts/*.schema.json`; TS types generated for `web/` (`json-schema-to-typescript`); CI fails if generated files are stale | One source of truth; Claude structured output and VLM output both validate against the same schema |
+| **Contracts** (ontology, `task.json`, observation, controller output, WS messages) | **pydantic v2** package in `contracts/` (done, D-009); JSON Schema exported to `contracts/*.schema.json`; TS types generated for `web/` (`json-schema-to-typescript`); CI fails if generated files are stale | One source of truth; Claude structured output and VLM output both validate against the same schema |
 | **Task library / generator** | `anthropic` SDK, structured output against the `task.json` schema; a CLI (`uv run python -m app.tasks.generate "…"`); validator = pydantic + graph checks (reachability, legal transitions, every mistake has a correction) | Claude also writes the per-step prompts for video generation |
 | **Server** | Python 3.12, **FastAPI** + uvicorn, **uv**, `httpx` (async), `pytest` + `pytest-asyncio`, **ruff** (lint + format) | Same as the old `vision/` service; the WebSocket session code ports over |
 | **M_VL client** | `openai` SDK against **vLLM**'s OpenAI-compatible endpoint (Qwen3-VL-8B-Instruct-FP8 on the 3090); same interface for a Gemini fallback | Event-driven, ≤1 call in flight, JSON validated into the observation model |
@@ -34,3 +34,12 @@ scripts/ci/     CI tooling (review formatter, scope check) + its tests
 | **Deploy** | Server + vLLM on the 3090 behind one tunnel; web as a static build on Render (public `deploy-url` for the hackathon) pointing at the tunnel via `?server=wss://…` | Same pattern as before; browser talks to the 3090 directly |
 | **CI** | GitHub Actions (ubuntu): `actionlint`, tooling tests, then `server` (ruff + pytest), `web` (tsc + vitest + build), contracts freshness; `CI OK` aggregates | Jobs are added to `ci-ok.needs` as each folder appears |
 | **Agentic review** | `anthropics/claude-code-action`, Haiku + Sonnet in parallel, read-only tools, structured output validated by `scripts/ci/format_review.py`, guided by `docs/PR_REVIEW_FOCUS.md` | Ported from a private repo (D-006) |
+
+## Ownership (D-008, can change)
+
+| Owner | Area | Folders |
+|---|---|---|
+| Alonso | Task library: ontology, recipe generation with Claude, validation; voice (ElevenLabs + anti-spam); **session server** wiring frames → perception → controller → voice | `tasks/`, `server/app/library/`, `server/app/voice/`, `server/app/session/` |
+| Cote | Models: video understanding (M_VL), controller (rules + learned), training and eval | `server/app/perception/`, `server/app/controller/`, `training/` |
+| Anaís | Simulator (symbolic + visual / Runway), the webcam / frame source, and the **web UI** (task picker, checklist, subtitles, debug overlay) | `sim/`, `web/` |
+| Shared | Contracts (change = decision entry); GPU ops | `contracts/`, `gpu/` |

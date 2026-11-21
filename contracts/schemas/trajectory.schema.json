@@ -1,0 +1,176 @@
+{
+  "$defs": {
+    "MistakeKind": {
+      "description": "Closed set of mistake types.\n\n`out_of_order` and `repeated` are detected generically from the step graph; `wrong_action` and\n`incomplete` need a `MistakeDef` in the task to say what they look like and how to correct them.",
+      "enum": [
+        "out_of_order",
+        "wrong_action",
+        "incomplete",
+        "repeated"
+      ],
+      "title": "MistakeKind",
+      "type": "string"
+    },
+    "Split": {
+      "description": "Assigned per run / recording session, never per frame or clip of the same run.",
+      "enum": [
+        "train",
+        "val",
+        "test"
+      ],
+      "title": "Split",
+      "type": "string"
+    },
+    "TrajectoryEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "mistake_id": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z][a-z0-9_]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mistake Id"
+        },
+        "mistake_kind": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MistakeKind"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "observed_action": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z][a-z0-9_]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Observed Action"
+        },
+        "observed_confidence": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Observed Confidence",
+          "type": "number"
+        },
+        "step": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z][a-z0-9_]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Step"
+        },
+        "t_ms": {
+          "minimum": 0,
+          "title": "T Ms",
+          "type": "integer"
+        },
+        "true_action": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z][a-z0-9_]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "True Action"
+        }
+      },
+      "required": [
+        "t_ms",
+        "true_action",
+        "observed_action",
+        "observed_confidence",
+        "step"
+      ],
+      "title": "TrajectoryEvent",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "completed": {
+      "title": "Completed",
+      "type": "boolean"
+    },
+    "events": {
+      "items": {
+        "$ref": "#/$defs/TrajectoryEvent"
+      },
+      "minItems": 1,
+      "title": "Events",
+      "type": "array"
+    },
+    "id": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "title": "Id",
+      "type": "string"
+    },
+    "noise": {
+      "additionalProperties": {
+        "type": "number"
+      },
+      "title": "Noise",
+      "type": "object"
+    },
+    "seed": {
+      "title": "Seed",
+      "type": "integer"
+    },
+    "split": {
+      "$ref": "#/$defs/Split"
+    },
+    "task_id": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "title": "Task Id",
+      "type": "string"
+    },
+    "task_version": {
+      "title": "Task Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "id",
+    "task_id",
+    "task_version",
+    "seed",
+    "split",
+    "events",
+    "completed"
+  ],
+  "title": "Trajectory",
+  "type": "object"
+}

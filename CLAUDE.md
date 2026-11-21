@@ -7,6 +7,7 @@ correction. Trained with a simulator and fine-tuned per scenario.
 - **Read first:** [docs/VISION.md](docs/VISION.md) (idea, architecture, plan), then
   [agent-kb/README.md](agent-kb/README.md) (session protocol), `agent-kb/backlog.md` (Now), and the newest file in `agent-kb/sessions/`.
 - **Options and costs per component:** [docs/RESEARCH.md](docs/RESEARCH.md).
+- **Contracts between the pieces:** [docs/CONTRACTS.md](docs/CONTRACTS.md) (code in `contracts/`). **Owners:** `docs/STACK.md` § Ownership.
 - **Previous project (Circuito Vivo):** removed from the tree, last commit `2e9da7c`. Before writing
   camera streaming, a WebSocket session, a VLM call, a TTS queue, a QLoRA pipeline or GPU-server ops, read
   [docs/LEGACY.md](docs/LEGACY.md): most of it already exists there.
@@ -24,6 +25,9 @@ correction. Trained with a simulator and fine-tuned per scenario.
 
 ```bash
 python3 -I -m unittest discover -s scripts/ci/tests -t .   # CI tooling tests
+cd contracts && uv sync && uv run pytest -q                # contracts tests
+cd contracts && uv run python -m contracts.export          # regenerate JSON Schemas after a model change
+cd contracts && uv run ruff check . && uv run ruff format .
 ```
 
 _Add server/web commands here as soon as the skeleton exists._
@@ -37,8 +41,9 @@ _Add server/web commands here as soon as the skeleton exists._
    Fix every blocking finding or answer it on the PR; only a human adds the `skip-agent-review` label.
 2. **Log the session in `agent-kb/`** before ending (see [agent-kb/README.md](agent-kb/README.md)).
    Check `agent-kb/decisions.md` before proposing anything that sounds like a decision.
-3. **Contracts first.** The action ontology, `task.json` and the M_VL → M_C observation JSON are shared
-   contracts: change them only with a decision entry and update every side in the same PR.
+3. **Contracts first.** Everything in `contracts/` (ontology, task, VLM output, decision, WebSocket protocol,
+   datasets) is shared: change it only with a decision entry, update every consumer in the same PR, and
+   regenerate the schemas. Import the models; never redefine them locally.
 4. **UI copy in Spanish; code, identifiers and docs in English.**
 5. **Conventional commits** (`feat:`, `fix:`, `docs:`, `chore:`, …) in commit and PR titles.
 6. **No secrets in the repo**, ever, including in `agent-kb/`. **The repo is public:** don't name or quote

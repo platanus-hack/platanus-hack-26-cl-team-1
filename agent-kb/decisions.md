@@ -63,13 +63,36 @@ with a pointer to their replacement; nothing is ever deleted from §3.
   (until then the workflow refuses to arm). Merges made with `GITHUB_TOKEN` trigger no `push` run, so CI on `main`
   only runs on the next PR or by hand (`workflow_dispatch`). Workflow changes take effect only once merged.
 
+### D-008 — Ownership by workstream (2026-11-21)
+- **Context:** three people plus agents in parallel; without owners, agents edit the same files.
+- **Decision (can change):** **Alonso**: task library (ontology, recipe generation with Claude, `tasks/`) and
+  the voice component. **Cote**: models: video understanding (M_VL) and the controller (rules and learned),
+  their training and eval. **Anaís**: simulator (symbolic and visual) and the webcam/frame source. Contracts
+  are shared: any change needs a decision entry. The session server goes to Alonso (it hosts his voice
+  component, and it's a port of the old Modo Armado session he built); the web UI goes to Anaís (the webcam
+  and sim-clip sources live in the page). Cote's area (two models + training) is the heaviest, so it gets nothing extra.
+- **Consequences:** each owner reviews changes to their area; the table in `docs/STACK.md` § Ownership is kept current.
+
+### D-009 — Contracts as a pydantic package; the automaton is derived from a step DAG (2026-11-21)
+- **Context:** the pieces meet at six data shapes (ontology, task, perception output, controller decision,
+  WebSocket messages, datasets); they need one definition that Python code imports and the web app and
+  model prompts can read.
+- **Decision:** `contracts/` is a standalone uv package (`pydantic` v2) imported by every Python component;
+  JSON Schemas are generated into `contracts/schemas/` and CI fails when they're stale. A task's automaton is
+  derived from `steps[].requires` (DAG, listed in topological order; state = set of done steps), not written
+  by hand; each step is completed by exactly one action. Mistake kinds are the closed set `out_of_order`,
+  `wrong_action`, `incomplete`, `repeated`. A null VLM action means "uncertain": the supervisor stays silent.
+  WebSocket framing is the old Modo Armado's (little-endian `uint32 seq, uint32 t_ms` + JPEG; `uint8 len + id`
+  + audio, now mp3). Spec: `docs/CONTRACTS.md`.
+- **Consequences:** tasks that need loops or alternatives (do A *or* B) don't fit yet; revisit if the demo task
+  needs them. The web app generates TS types from the schemas.
+
 ## §2 Open (decide in block 1, see docs/VISION.md)
 
-- **D-?? Demo scenario.** Proposal: a surgery-adjacent task that can be shown live with a webcam (surgical hand
-  scrub / WHO hand hygiene, or sterile gloving). Surgery itself can't be demoed live and video generation may block it.
+- **D-?? Demo scenario.** Direction: physical assembly in robotics (a contact who assembles robots will give a
+  testimonial and a pitch framing). Exact task to pick when their input arrives; candidates in `docs/VISION.md`
+  § Demo scenario. Build task-agnostic until then.
 - **D-?? Repo layout and stack.** Proposal in `docs/STACK.md`.
-- **D-?? Task format.** Proposal: `task.json` = steps + objects + action vocabulary subset + automaton
-  (states, legal transitions) + mistakes with corrections; validated by a JSON schema plus code checks.
 - **D-?? M_VL.** Proposal: Qwen3-VL-8B FP8 on vLLM (3090) as the main model; a Gemini Flash-class API as labeller/fallback.
 - **D-?? M_C.** Proposal: automaton tracker (rules) as baseline + a small model trained from scratch on simulator
   trajectories, output masked to legal actions.

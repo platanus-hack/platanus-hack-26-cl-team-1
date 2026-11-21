@@ -1,0 +1,229 @@
+{
+  "$defs": {
+    "MistakeDef": {
+      "additionalProperties": false,
+      "description": "A task-specific mistake: what it looks like and what to say.",
+      "properties": {
+        "action": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z][a-z0-9_]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Action"
+        },
+        "correction_es": {
+          "minLength": 1,
+          "title": "Correction Es",
+          "type": "string"
+        },
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/MistakeKind"
+        },
+        "step": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Step",
+          "type": "string"
+        },
+        "visual_cue": {
+          "minLength": 1,
+          "title": "Visual Cue",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "step",
+        "description",
+        "visual_cue",
+        "correction_es"
+      ],
+      "title": "MistakeDef",
+      "type": "object"
+    },
+    "MistakeKind": {
+      "description": "Closed set of mistake types.\n\n`out_of_order` and `repeated` are detected generically from the step graph; `wrong_action` and\n`incomplete` need a `MistakeDef` in the task to say what they look like and how to correct them.",
+      "enum": [
+        "out_of_order",
+        "wrong_action",
+        "incomplete",
+        "repeated"
+      ],
+      "title": "MistakeKind",
+      "type": "string"
+    },
+    "Step": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Action",
+          "type": "string"
+        },
+        "completion_cue": {
+          "minLength": 1,
+          "title": "Completion Cue",
+          "type": "string"
+        },
+        "id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "instruction_es": {
+          "minLength": 1,
+          "title": "Instruction Es",
+          "type": "string"
+        },
+        "min_duration_s": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Min Duration S"
+        },
+        "requires": {
+          "default": [],
+          "items": {
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "type": "string"
+          },
+          "title": "Requires",
+          "type": "array"
+        },
+        "title_es": {
+          "minLength": 1,
+          "title": "Title Es",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title_es",
+        "instruction_es",
+        "action",
+        "completion_cue"
+      ],
+      "title": "Step",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "actions": {
+      "items": {
+        "maxLength": 64,
+        "minLength": 1,
+        "pattern": "^[a-z][a-z0-9_]*$",
+        "type": "string"
+      },
+      "title": "Actions",
+      "type": "array"
+    },
+    "description": {
+      "minLength": 1,
+      "title": "Description",
+      "type": "string"
+    },
+    "domain": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "title": "Domain",
+      "type": "string"
+    },
+    "id": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "title": "Id",
+      "type": "string"
+    },
+    "mistakes": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/MistakeDef"
+      },
+      "title": "Mistakes",
+      "type": "array"
+    },
+    "objects": {
+      "items": {
+        "maxLength": 64,
+        "minLength": 1,
+        "pattern": "^[a-z][a-z0-9_]*$",
+        "type": "string"
+      },
+      "title": "Objects",
+      "type": "array"
+    },
+    "ontology_version": {
+      "title": "Ontology Version",
+      "type": "integer"
+    },
+    "steps": {
+      "items": {
+        "$ref": "#/$defs/Step"
+      },
+      "minItems": 1,
+      "title": "Steps",
+      "type": "array"
+    },
+    "title_es": {
+      "minLength": 1,
+      "title": "Title Es",
+      "type": "string"
+    },
+    "version": {
+      "title": "Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "id",
+    "version",
+    "title_es",
+    "description",
+    "domain",
+    "ontology_version",
+    "objects",
+    "actions",
+    "steps"
+  ],
+  "title": "Task",
+  "type": "object"
+}
