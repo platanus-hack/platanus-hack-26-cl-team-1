@@ -147,8 +147,12 @@ class RulesController:
 
     def _infer(self, step_id: str | None, t_ms: int) -> Decision | None:
         """Mark `step_id` done together with its one missing prerequisite, if that prerequisite could be
-        done now. Returns None (keep warning) when more than one step is missing or it isn't due yet."""
-        if step_id is None:
+        done now. Returns None (keep warning) when more than one step is missing or it isn't due yet, or when
+        the task defines doing this step out of order as a mistake: then the out-of-order action is the
+        mistake itself (power with the parking brake set, the battery connected early), not a missed step."""
+        if step_id is None or any(
+            m.kind is MistakeKind.OUT_OF_ORDER and m.step == step_id for m in self.task.mistakes
+        ):
             return None
         step = self.task.step(step_id)
         missing = [r for r in step.requires if r not in self.done]

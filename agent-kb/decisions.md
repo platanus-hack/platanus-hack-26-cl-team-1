@@ -214,6 +214,10 @@ with a pointer to their replacement; nothing is ever deleted from §3.
   warning. A forbidden action more than one step before its step is ignored. 3 frames per call need vLLM
   started with `VLM_MAX_IMAGES` ≥ 3 (`gpu/vllm-5090.sh` defaults to 4); an older vLLM rejects every call
   loudly. Fine-tuning (`training/vlm`) is the next lever, and it needs more labelled runs.
+- **Amended 2026-11-21 (Anaís):** the controller never infers a step that has an `out_of_order` `MistakeDef`: the task
+  author declared doing it early a real mistake (power with the parking brake set, key to START with fuel off, a
+  battery connected early, soap before wetting), so it keeps warning instead of saying "doy por hecho". Before
+  this, the C172 demo's two deliberate order mistakes were accepted ~3 s after the warning.
 
 ### D-018 — Perception: look before labelling, and an action needs its own object in view (2026-11-21)
 - **Context:** on the live demo, putting down an empty breadboard completed `led_flashlight`'s first step
