@@ -2,30 +2,32 @@
 
 Owner in brackets once someone takes an item. Blocks refer to the plan in `docs/VISION.md`.
 
-## Now (block 1 · foundations, until ~14:00)
-- [ ] Pick the exact demo task in the robotics-assembly direction once the contact's input arrives (candidates in `docs/VISION.md`). [Anaís + team]
+## Now (status 2026-11-21 16:55; critical path to the 18:00 webcam loop)
+- [ ] **Confirm the demo task.** Default: `tasks/robot_assembly/servo_scout_robot.json` (the only robot task). Optional second candidate: port the Arduino task from draft PR #19 onto the merged ontology. [team]
+- [ ] **Kit + fixed camera on a table**, matching the demo task's parts. Nothing recorded yet. [team]
+- [ ] Perception on the RTX 5090 over an SSH forward (`gpu/up-5090.sh`, PR #27; D-014). The 3090 refuses SSH (port 22), so it's parked. #27 is held by a real review finding (the "vLLM running?" `pgrep` matches its own shell). [Cote, W1 workspace]
+- [ ] **First real webcam run** of `servo_scout_robot`: `SUP_PERCEPTION=vlm` (5090), `SUP_CONTROLLER=rules|learned`, ElevenLabs voice. Tune the single-frame "runs ahead of the steps" false `out_of_order` seen in #27's test. [Cote + whoever has the kit]
+- [ ] ElevenLabs: key in the server's env, pick a Spanish voice (`SUP_ELEVENLABS_VOICE_ID`), hear it end to end. Code is in (`app/voice/elevenlabs.py`). [Alonso]
+- [ ] **Web demo screen** (N1): the UI is still the minimal skeleton plus the voice player; nobody has started the real screen (checklist, mistake banner, subtitles, debug overlay; port `frontend/src/assembly/*` at `2e9da7c`). [Anaís? confirm owner]
 - [ ] Get the contact's testimonial (text, name, role, photo) with explicit consent to publish it; keep it out of the repo until then. [Anaís]
-- [ ] Bring the GPU server up again for the new repo: scripts ready in `gpu/` (`gpu/deploy.sh`); **blocked: `ssh 172.16.0.204` refuses port 22** (host pings). Then run it, record latency p50/p95 with `app.perception.bench`, and judge webcam frames end to end. [Cote]
-- [x] Local prototype on the Mac: Ollama + Qwen3-VL-2B runs through `VlmPerception` (about 2–10 s per frame on an M1 with 8 GB; too inaccurate to judge); `gpu/README.md` § Local on a Mac. [Cote]
-- [ ] ElevenLabs: get the API key into the server's env, pick a Spanish voice (`SUP_ELEVENLABS_VOICE_ID`), hear it end to end in the browser. Code is in (`app/voice/elevenlabs.py`). [Alonso]
-- [ ] Run the task generator live once a key is available (`servo_scout_robot` was hand-written to the generator's rules); regenerate or refine the demo task once the scenario is picked. [Alonso]
-- [ ] Close PR #8 (superseded by the pivot) and decide whether to turn off the old Render services. [Alonso]
-- [ ] Add the `ANTHROPIC_API_KEY` (+ `ANTHROPIC_BASE_URL`) repo secret for the agent reviews; a repo admin enables "Allow auto-merge" and protects `main` (PR required, 0 approvals, required checks `CI OK` + `Agent reviews OK`, no force-push). []
+- [ ] Repo admin: enable "Allow auto-merge" and protect `main` (PR required, 0 approvals, required checks `CI OK` + `Agent reviews OK`, no force-push). Until then green PRs are merged by hand. [Alonso]
+- [ ] Close PR #8 (superseded by the pivot); decide on #19 (port its Arduino task + task-list tests, or close); turn off the old Render services. [Alonso]
 
-## Next (block 2 · vertical slice, until ~18:00)
-- [ ] Session WebSocket server per `contracts.protocol`: frames + `hello` in; `ready` / `state` / `issue` / `say` out. Port `vision/vision/session.py`. [Alonso]
-- [ ] Web UI: task picker, source toggle (sim / webcam), live checklist, subtitles, debug overlay; port `frontend/src/assembly/*`. [Anaís]
+## Next (tonight)
+- [ ] Real recordings of the demo task on the fixed camera: correct runs + each mistake, labeled as `ClipRecord`, split per run. These replace generated video while there's no Runway key. [Anaís]
+- [ ] Deploy (A3): static web for the public `deploy-url`; the server needs a public path to the 5090 (today only an SSH forward). [Alonso]
 
 ## Later (blocks 3–5)
-- [ ] Visual simulator: Runway clips per (step, correct / mistake) + `ClipRecord` manifest. [Anaís]
+- [ ] Visual simulator: generated clips per (step, correct / mistake) (local Wan/LTX, or Runway if a key arrives) + `ClipRecord` manifest. [Anaís]
 - [ ] Label sim clips (Gemini or Claude as teacher); eval set split by run.
 - [ ] Learned controller: improve mistake recall under noise (it trades recall for 4-5x fewer false alarms; see
   `training/results/controller.md`), e.g. a hybrid that lets the rules flag high-confidence mistakes. [Cote]
 - [ ] Calibrate `symsim.NOISE_LEVELS` against the real M_VL's confusion matrix once it runs on sim clips. [Cote]
-- [ ] [Cote] M_VL eval base vs fine-tuned (QLoRA pipeline from `training/vlm/` at `2e9da7c`).
+- [ ] M_VL eval base vs fine-tuned on the recordings (on the 5090) (QLoRA pipeline from `training/vlm/` at `2e9da7c`). [Cote]
 - [ ] Demo rehearsal ×3, backup video, `platanus-hack-project.jsonc`, `project-description.md`, README.
 
 ## Done
+- [x] Session WebSocket server per `contracts.protocol` (skeleton, D-010) with the voice queue (#22).
 - [x] Symbolic simulator `sim/symbolic` (D-011 `observed_quality`), learned controller + eval + `SUP_CONTROLLER` (D-013). [Cote]
 - [x] Robot assembly ontology v0, first task `servo_scout_robot`, Claude task generator (https://github.com/platanus-hack/platanus-hack-26-cl-team-1/pull/17).
 - [x] ElevenLabs voice + anti-spam voice queue on the client clock, `cancel_say` honored by the web player (this session's voice PR).
