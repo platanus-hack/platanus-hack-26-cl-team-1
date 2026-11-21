@@ -1,0 +1,30 @@
+{
+  "id": "servo_wheel_module",
+  "version": 1,
+  "title_es": "Módulo de rueda con servo",
+  "description": "Candidate demo task: assemble one drive module of a small robot. Mount a micro servo on its bracket, fix the bracket to the chassis, put the horn and the wheel on the shaft, mount the controller board, plug the servo into the board and connect the battery last.",
+  "domain": "robot_assembly",
+  "ontology_version": 1,
+  "objects": ["chassis_plate", "servo", "servo_bracket", "screw", "screwdriver", "servo_horn", "wheel", "controller_board", "servo_header", "standoff", "battery_pack"],
+  "actions": [
+    "mount_servo_bracket", "screw_servo_bracket", "screw_bracket_chassis", "attach_horn_servo", "screw_wheel_horn",
+    "mount_board_standoffs", "plug_servo_cable_board", "plug_battery_board",
+    "mount_servo_flipped", "plug_servo_cable_reversed"
+  ],
+  "steps": [
+    {"id": "mount_servo", "title_es": "Montar el servo en el soporte", "instruction_es": "Pon el servo en el soporte, con el eje blanco hacia afuera.", "action": "mount_servo_bracket", "completion_cue": "servo seated in the bracket, white output shaft pointing outward"},
+    {"id": "screw_servo", "title_es": "Atornillar el servo", "instruction_es": "Atornilla el servo al soporte con los dos tornillos.", "action": "screw_servo_bracket", "requires": ["mount_servo"], "completion_cue": "a screw head in each of the servo's two mounting tabs"},
+    {"id": "attach_bracket", "title_es": "Fijar el soporte al chasis", "instruction_es": "Ahora atornilla el soporte al chasis.", "action": "screw_bracket_chassis", "requires": ["screw_servo"], "completion_cue": "bracket screwed flat on the chassis plate"},
+    {"id": "attach_horn", "title_es": "Poner el brazo del servo", "instruction_es": "Encaja el brazo blanco en el eje del servo, hasta el fondo.", "action": "attach_horn_servo", "requires": ["mount_servo"], "completion_cue": "white horn sitting flush on the servo shaft"},
+    {"id": "attach_wheel", "title_es": "Atornillar la rueda", "instruction_es": "Atornilla la rueda al brazo del servo.", "action": "screw_wheel_horn", "requires": ["attach_horn"], "completion_cue": "wheel fixed to the horn with a screw in its center"},
+    {"id": "mount_board", "title_es": "Montar la placa", "instruction_es": "Monta la placa Arduino sobre los separadores del chasis.", "action": "mount_board_standoffs", "completion_cue": "controller board resting on the standoffs, screwed at its corners"},
+    {"id": "connect_servo", "title_es": "Conectar el servo a la placa", "instruction_es": "Conecta el cable del servo a la placa: el café va en G.", "action": "plug_servo_cable_board", "requires": ["attach_bracket", "mount_board"], "completion_cue": "servo connector on the G/V/S header, brown wire on G"},
+    {"id": "connect_battery", "title_es": "Conectar la batería", "instruction_es": "Por último, conecta el portapilas a la placa.", "action": "plug_battery_board", "requires": ["attach_wheel", "connect_servo"], "completion_cue": "battery lead plugged into the board, power LED on"}
+  ],
+  "mistakes": [
+    {"id": "servo_flipped", "kind": "wrong_action", "step": "mount_servo", "action": "mount_servo_flipped", "description": "Mounts the servo upside down, with the shaft pointing into the bracket.", "visual_cue": "servo in the bracket with the white shaft pointing toward the bracket's base instead of outward", "correction_es": "Ojo, el servo quedó al revés: dalo vuelta para que el eje blanco quede hacia afuera."},
+    {"id": "missing_screw", "kind": "incomplete", "step": "screw_servo", "description": "Fixes the servo with only one of the two screws.", "visual_cue": "one mounting tab has a screw, the other tab's hole is empty", "correction_es": "Te falta un tornillo: el servo va con dos, uno en cada lado."},
+    {"id": "servo_cable_reversed", "kind": "wrong_action", "step": "connect_servo", "action": "plug_servo_cable_reversed", "description": "Plugs the servo connector turned around, signal on ground.", "visual_cue": "orange wire on the G pin and brown wire on the S pin of the header", "correction_es": "Ojo, el conector está al revés: el cable café va en G y el naranjo en S."},
+    {"id": "battery_too_early", "kind": "out_of_order", "step": "connect_battery", "description": "Connects the battery before the servo is wired and the wheel is on.", "visual_cue": "battery lead plugged into the board while the servo cable is still loose or the wheel is missing", "correction_es": "Ojo, desconecta la batería: primero termina el armado y conecta el servo; la batería va siempre al final."}
+  ]
+}

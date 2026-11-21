@@ -1,0 +1,26 @@
+{
+  "id": "arduino_led_breadboard",
+  "version": 1,
+  "title_es": "LED con Arduino en la protoboard",
+  "description": "Candidate demo task: wire a blinking LED on a breadboard to an Arduino whose blink sketch (pin 13) is already loaded. LED, resistor to the ground rail, signal wire from pin 13, ground wire, and the USB cable last; the LED blinking is the visible result.",
+  "domain": "robot_assembly",
+  "ontology_version": 1,
+  "objects": ["controller_board", "breadboard", "led", "resistor", "jumper_wire", "usb_cable"],
+  "actions": [
+    "insert_led_breadboard", "insert_resistor_breadboard", "connect_wire_pin13_breadboard", "connect_wire_gnd_rail", "plug_usb_board",
+    "insert_led_reversed", "connect_wire_wrong_pin"
+  ],
+  "steps": [
+    {"id": "place_led", "title_es": "Poner el LED", "instruction_es": "Pon el LED en la protoboard, cada pata en una columna distinta.", "action": "insert_led_breadboard", "completion_cue": "LED standing in the breadboard, legs in two different columns"},
+    {"id": "place_resistor", "title_es": "Poner la resistencia", "instruction_es": "Pon la resistencia desde la pata corta del LED hasta el riel azul.", "action": "insert_resistor_breadboard", "requires": ["place_led"], "completion_cue": "resistor from the LED's short-leg column to the blue rail"},
+    {"id": "wire_signal", "title_es": "Cable del pin 13", "instruction_es": "Conecta un cable rojo del pin 13 a la columna de la pata larga del LED.", "action": "connect_wire_pin13_breadboard", "requires": ["place_led"], "completion_cue": "red wire from pin 13 to the LED's long-leg column"},
+    {"id": "wire_ground", "title_es": "Cable de GND", "instruction_es": "Conecta un cable negro de GND en la placa al riel azul.", "action": "connect_wire_gnd_rail", "completion_cue": "black wire from a GND pin to the blue rail"},
+    {"id": "plug_usb", "title_es": "Conectar el USB", "instruction_es": "Listo el circuito: ahora conecta el cable USB a la placa.", "action": "plug_usb_board", "requires": ["place_resistor", "wire_signal", "wire_ground"], "completion_cue": "USB cable plugged into the board and the LED blinking"}
+  ],
+  "mistakes": [
+    {"id": "led_reversed", "kind": "wrong_action", "step": "place_led", "action": "insert_led_reversed", "description": "Inserts the LED with its legs swapped.", "visual_cue": "LED's short leg (flat side) in the signal column and its long leg toward the resistor", "correction_es": "Ojo, el LED está al revés: la pata larga va hacia el cable del pin 13."},
+    {"id": "resistor_same_column", "kind": "incomplete", "step": "place_resistor", "description": "Puts both resistor legs in the same column, so it doesn't reach the ground rail.", "visual_cue": "both resistor legs in one breadboard column, nothing reaching the blue rail", "correction_es": "La resistencia no está llegando al riel azul: una pata va junto al LED y la otra en el riel."},
+    {"id": "wire_wrong_pin", "kind": "wrong_action", "step": "wire_signal", "action": "connect_wire_wrong_pin", "description": "Plugs the signal wire into a pin other than 13.", "visual_cue": "red wire's board end in pin 12 or another pin, not 13", "correction_es": "Ojo, ese cable no está en el pin 13: muévelo al 13, al lado de GND."},
+    {"id": "usb_too_early", "kind": "out_of_order", "step": "plug_usb", "description": "Powers the board before the circuit is finished.", "visual_cue": "USB cable plugged in while the LED, resistor or wires are still missing", "correction_es": "Ojo, desconecta el USB: la placa se conecta al final, con el circuito listo."}
+  ]
+}

@@ -30,7 +30,9 @@ def obs(action, t_ms=0, confidence=0.9, quality=None, seq=1):
 
 def test_library_loads_and_validates_the_repo_tasks():
     library = TaskLibrary.load(TASKS_DIR)
-    assert [s.id for s in library.summaries()] == ["hand_hygiene_basic"]
+    task_files = [p for p in TASKS_DIR.glob("*/*.json") if p.name != "ontology.json"]
+    assert len(library.summaries()) == len(task_files)  # every file in tasks/ loads
+    assert "hand_hygiene_basic" in {s.id for s in library.summaries()}  # the fixture these tests use
 
 
 def test_library_refuses_an_invalid_task(tmp_path):
@@ -160,7 +162,7 @@ def test_session_rejects_unknown_task():
 
 def test_tasks_api_lists_the_library():
     client = TestClient(create_app())
-    assert client.get("/api/tasks").json()[0]["id"] == "hand_hygiene_basic"
+    assert "hand_hygiene_basic" in {t["id"] for t in client.get("/api/tasks").json()}
     assert client.get("/api/tasks/nope").status_code == 404
 
 

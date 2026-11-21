@@ -99,6 +99,19 @@ with a pointer to their replacement; nothing is ever deleted from §3.
   and no API keys; each owner replaces a fake behind its interface. Message and output schemas are exported in
   serialization mode so TypeScript sees `type` as required.
 
+### D-011 — One `robot_assembly` ontology with fine-grained actions; two candidate demo tasks (2026-11-21)
+- **Context:** the demo direction is physical assembly in robotics (see `docs/VISION.md`), the exact task isn't
+  picked yet, and both candidates (a servo + wheel module, an Arduino LED on a breadboard) mix mechanics and wiring.
+  The contracts require one action per step and no shared actions between steps.
+- **Decision:** a single domain `robot_assembly` (`tasks/robot_assembly/ontology.json`) covers parts, tools, wiring
+  and power. Actions are fine-grained `verb(object, target)` ids, one per visually distinct outcome
+  (`plug_servo_cable_board` vs `plug_battery_board`), and the typical wrong way of doing a step is its own action
+  (`mount_servo_flipped`, `insert_led_reversed`) so it can back a `wrong_action` mistake. Two candidate tasks,
+  `servo_wheel_module` (8 steps, partial order, 4 mistakes) and `arduino_led_breadboard` (5 steps, 4 mistakes), live
+  next to it; the team picks one, the other stays as a second scenario.
+- **Consequences:** adding a part or a step usually means adding actions to the ontology (human-approved; the
+  generator only proposes them). Every step's result is meant to be visible in a still frame from a fixed camera.
+
 ## §2 Open (decide in block 1, see docs/VISION.md)
 
 - **D-?? Demo scenario.** Direction: physical assembly in robotics (a contact who assembles robots will give a
