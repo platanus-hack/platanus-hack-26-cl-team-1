@@ -1,0 +1,63 @@
+{
+  "type": "buzzer",
+  "name": "Zumbador piezo",
+  "category": "output",
+  "description": "Produce sonidos y melodías.",
+  "idPrefix": "bz",
+  "defaultLabel": "Zumbador",
+  "bounds": {
+    "x": -1,
+    "y": -0.5,
+    "w": 5,
+    "h": 5.5
+  },
+  "pins": [
+    {
+      "id": "plus",
+      "label": "Positivo (+)",
+      "x": 0,
+      "y": 5,
+      "kind": "terminal",
+      "polarity": "+",
+      "hint": "Pata larga"
+    },
+    {
+      "id": "minus",
+      "label": "Negativo (−)",
+      "x": 3,
+      "y": 5,
+      "kind": "terminal",
+      "polarity": "-"
+    }
+  ],
+  "props": [],
+  "electrical": {
+    "model": "buzzer",
+    "kind": "passive",
+    "ohms": 800,
+    "minVolts": 1.5
+  },
+  "signalPins": [
+    "plus",
+    "minus"
+  ],
+  "blocks": [
+    "buzzerTone",
+    "buzzerOff"
+  ],
+  "schematic": {
+    "symbol": "buzzer"
+  },
+  "breadboard": {
+    "insertable": true
+  },
+  "kitQty": 1,
+  "education": {
+    "summary": "Vibra a la frecuencia que le indiques y así produce un tono.",
+    "howItWorks": "Es un zumbador PASIVO: un disco piezoeléctrico que se dobla con el voltaje. Para que suene, la placa debe encenderlo y apagarlo muy rápido: si lo hace 440 veces por segundo suena la nota La (440 Hz). El bloque \"tocar nota\" (tone) genera esa señal. Con voltaje fijo solo hace un \"clic\".",
+    "tips": [
+      "Frecuencias de 200 a 2000 Hz suenan bien.",
+      "Puedes conectarlo directo a un pin: consume poca corriente."
+    ]
+  }
+}

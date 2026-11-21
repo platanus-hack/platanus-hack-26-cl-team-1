@@ -1,0 +1,72 @@
+{
+  "type": "ldr",
+  "name": "Fotorresistencia (LDR)",
+  "category": "input",
+  "description": "Su resistencia baja cuando recibe más luz.",
+  "idPrefix": "ldr",
+  "defaultLabel": "LDR",
+  "bounds": {
+    "x": -0.5,
+    "y": 0,
+    "w": 3,
+    "h": 3
+  },
+  "pins": [
+    {
+      "id": "a",
+      "label": "Terminal 1",
+      "x": 0,
+      "y": 3,
+      "kind": "terminal"
+    },
+    {
+      "id": "b",
+      "label": "Terminal 2",
+      "x": 2,
+      "y": 3,
+      "kind": "terminal"
+    }
+  ],
+  "props": [
+    {
+      "key": "light",
+      "label": "Luz ambiente",
+      "type": "number",
+      "default": 60,
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "unit": "%",
+      "runtime": true
+    }
+  ],
+  "electrical": {
+    "model": "ldr",
+    "darkOhms": 1000000,
+    "brightOhms": 1000,
+    "lightProp": "light"
+  },
+  "interactive": "light",
+  "signalPins": [
+    "a",
+    "b"
+  ],
+  "blocks": [
+    "lightPercent",
+    "analogRaw"
+  ],
+  "schematic": {
+    "symbol": "ldr"
+  },
+  "breadboard": {
+    "insertable": true
+  },
+  "kitQty": 2,
+  "education": {
+    "summary": "Un sensor de luz: con mucha luz conduce bien, en la oscuridad casi no conduce.",
+    "howItWorks": "Para leerla se arma un divisor de voltaje con una resistencia de 10 kΩ: un extremo a 5 V, el otro a GND por la resistencia, y el punto medio a un pin analógico.",
+    "tips": [
+      "En la simulación, ajusta la luz con el control deslizante."
+    ]
+  }
+}

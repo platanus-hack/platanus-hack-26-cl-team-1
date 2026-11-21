@@ -1,0 +1,82 @@
+{
+  "type": "led-rgb",
+  "name": "LED RGB",
+  "category": "output",
+  "description": "Tres LED (rojo, verde, azul) en uno, cátodo común.",
+  "idPrefix": "rgb",
+  "defaultLabel": "LED RGB",
+  "bounds": {
+    "x": -0.5,
+    "y": 0,
+    "w": 4,
+    "h": 3
+  },
+  "pins": [
+    {
+      "id": "r",
+      "label": "Rojo",
+      "x": 0,
+      "y": 3,
+      "kind": "terminal"
+    },
+    {
+      "id": "com",
+      "label": "Cátodo común (−)",
+      "x": 1,
+      "y": 3,
+      "kind": "ground",
+      "polarity": "-",
+      "hint": "Pata más larga"
+    },
+    {
+      "id": "g",
+      "label": "Verde",
+      "x": 2,
+      "y": 3,
+      "kind": "terminal"
+    },
+    {
+      "id": "b",
+      "label": "Azul",
+      "x": 3,
+      "y": 3,
+      "kind": "terminal"
+    }
+  ],
+  "props": [],
+  "electrical": {
+    "model": "rgb-led",
+    "common": "cathode",
+    "vf": {
+      "r": 1.9,
+      "g": 2.8,
+      "b": 2.9
+    },
+    "seriesOhms": 15,
+    "ratedmA": 20,
+    "maxmA": 35
+  },
+  "signalPins": [
+    "r",
+    "g",
+    "b"
+  ],
+  "blocks": [
+    "rgb"
+  ],
+  "schematic": {
+    "symbol": "rgb-led"
+  },
+  "breadboard": {
+    "insertable": true
+  },
+  "kitQty": 1,
+  "education": {
+    "summary": "Mezclando rojo, verde y azul con distinta intensidad puedes crear casi cualquier color.",
+    "howItWorks": "Son tres LED con el cátodo (−) unido. Cada color necesita su propia resistencia y su propio pin. Con PWM controlas el brillo de cada uno y así mezclas colores: rojo + verde = amarillo.",
+    "tips": [
+      "La pata más larga es el cátodo común: va a GND.",
+      "Usa pines con PWM para mezclar colores."
+    ]
+  }
+}

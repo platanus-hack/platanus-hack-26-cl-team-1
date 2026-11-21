@@ -1,0 +1,98 @@
+name: CD
+
+# Every push to main: run the full CI, then deploy that exact commit to Render and wait until the
+# API reports it. One-time setup (deploy hook secrets, RENDER_WEB_URL variable): docs/DEPLOY.md.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Deploys queue up in order; a running deploy is never cancelled halfway.
+concurrency:
+  group: cd-production
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    name: CI
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    name: Deploy to Render
+    needs: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    environment:
+      name: production
+      url: ${{ vars.RENDER_WEB_URL }}
+    env:
+      SHA: ${{ github.sha }}
+      HOOK_API: ${{ secrets.RENDER_DEPLOY_HOOK_API }}
+      HOOK_WORKER: ${{ secrets.RENDER_DEPLOY_HOOK_WORKER }}
+      HOOK_WEB: ${{ secrets.RENDER_DEPLOY_HOOK_WEB }}
+      WEB_URL: ${{ vars.RENDER_WEB_URL }}
+    steps:
+      - name: Check configuration
+        id: config
+        run: |
+          missing=""
+          [ -n "$HOOK_API" ] || missing="$missing RENDER_DEPLOY_HOOK_API"
+          [ -n "$HOOK_WORKER" ] || missing="$missing RENDER_DEPLOY_HOOK_WORKER"
+          [ -n "$HOOK_WEB" ] || missing="$missing RENDER_DEPLOY_HOOK_WEB"
+          if [ -n "$missing" ]; then
+            echo "::warning title=Deploy skipped::Missing repository secrets:$missing (see docs/DEPLOY.md)."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # ref=<sha> deploys exactly the commit CI just tested (not whatever main is by now).
+      - name: Trigger Render deploys
+        if: steps.config.outputs.ready == 'true'
+        run: |
+          trigger() {
+            name="$1"; hook="$2"
+            sep='?'; case "$hook" in *\?*) sep='&';; esac
+            code=$(curl -sS -o /tmp/resp.json -w '%{http_code}' -X POST "${hook}${sep}ref=${SHA}")
+            echo "$name → HTTP $code $(cat /tmp/resp.json 2>/dev/null)"
+            case "$code" in
+              200|201|202) ;;
+              *) echo "::error title=Deploy hook failed::$name returned HTTP $code"; return 1 ;;
+            esac
+          }
+          trigger api "$HOOK_API"
+          trigger worker "$HOOK_WORKER"
+          trigger web "$HOOK_WEB"
+
+      # Goes through the public web service (nginx → private API), so it proves both are up and
+      # the API is running this commit (Render sets RENDER_GIT_COMMIT; /api/health reports it).
+      - name: Wait for the new release
+        if: steps.config.outputs.ready == 'true' && env.WEB_URL != ''
+        run: |
+          url="${WEB_URL%/}/api/health"
+          deadline=$(( $(date +%s) + 30 * 60 ))
+          while [ "$(date +%s)" -lt "$deadline" ]; do
+            body=$(curl -fsS --max-time 10 "$url" 2>/dev/null || true)
+            commit=$(printf '%s' "$body" | jq -r '.commit // empty' 2>/dev/null || true)
+            if [ "$commit" = "$SHA" ]; then
+              echo "Live: $body"
+              exit 0
+            fi
+            echo "waiting… live commit: ${commit:-unknown}"
+            sleep 20
+          done
+          echo "::error title=Deploy not live::$url did not report $SHA within 30 minutes"
+          exit 1
+
+      - name: Summary
+        if: steps.config.outputs.ready == 'true'
+        run: |
+          {
+            echo "### Deployed \`${SHA:0:7}\` to Render"
+            echo
+            echo "Services: circuito-vivo-api, circuito-vivo-worker, circuito-vivo-web"
+            if [ -n "$WEB_URL" ]; then echo; echo "App: $WEB_URL"; else echo; echo "_Set the RENDER_WEB_URL variable to verify releases._"; fi
+          } >> "$GITHUB_STEP_SUMMARY"

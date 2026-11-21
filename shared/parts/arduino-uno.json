@@ -1,0 +1,41 @@
+{
+  "type": "arduino-uno",
+  "name": "Arduino Uno",
+  "category": "boards",
+  "description": "Placa programable clásica de 5 V.",
+  "idPrefix": "uno",
+  "defaultLabel": "Arduino Uno",
+  "bounds": {
+    "x": 0,
+    "y": 0,
+    "w": 28,
+    "h": 21
+  },
+  "pins": [],
+  "generator": "board-profile",
+  "board": "uno",
+  "props": [],
+  "electrical": {
+    "model": "mcu",
+    "board": "uno"
+  },
+  "schematic": {
+    "symbol": "mcu"
+  },
+  "breadboard": {
+    "insertable": false
+  },
+  "kitQty": 1,
+  "education": {
+    "summary": "Un pequeño computador que lee sensores y controla luces, motores y sonidos según el programa que le escribas.",
+    "howItWorks": "El chip ATmega328P ejecuta tu programa una y otra vez. Cada pin digital puede ser SALIDA (entrega 5 V o 0 V) o ENTRADA (mide si hay voltaje). Los pines A0–A5 miden voltajes entre 0 y 5 V y los convierten en números de 0 a 1023.",
+    "tips": [
+      "Los pines marcados con ~ (3, 5, 6, 9, 10, 11) pueden \"atenuar\" con PWM.",
+      "Cada pin entrega como máximo ~20 mA de forma segura: suficiente para un LED, no para un motor.",
+      "Todos los GND están conectados entre sí."
+    ],
+    "warnings": [
+      "Nunca conectes 5V directo a GND: es un cortocircuito."
+    ]
+  }
+}

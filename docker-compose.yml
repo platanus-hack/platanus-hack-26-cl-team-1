@@ -1,0 +1,67 @@
+# Circuito Vivo — full stack:  docker compose up --build   →  http://localhost:8080
+# Needs ANTHROPIC_API_KEY (+ optional ANTHROPIC_BASE_URL for the LLM proxy) in the environment (or a .env next to this file) for the agent.
+name: circuito-vivo
+
+# Shared by api + worker. NO secrets here: the worker runs gcc on untrusted sketches, and a
+# sketch can make the compiler read /proc/self/environ. The API key goes to the api only.
+x-backend-env: &backend-env
+  REDIS_URL: redis://redis:6379/0
+  BUILD_DIR: /data/builds
+  SHARED_DIR: /app/shared
+  COMPILE_TIMEOUT_S: "180"
+
+services:
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    environment:
+      <<: *backend-env
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-opus-5-5}
+      CORS_ORIGINS: http://localhost:8080,http://127.0.0.1:8080
+    volumes:
+      - builds:/data/builds   # shared with the worker: artifacts are served by the API
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.worker
+    environment:
+      <<: *backend-env
+      ARDUINO_CLI: arduino-cli
+    volumes:
+      - builds:/data/builds
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.web
+    ports:
+      - "8080:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  builds:

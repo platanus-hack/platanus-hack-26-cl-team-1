@@ -1,0 +1,85 @@
+# Circuito Vivo on Render — Blueprint (https://render.com/docs/blueprint-spec).
+# Same topology as docker-compose.yml, one Render service per compose service:
+#
+#   browser ──► circuito-vivo-web (nginx: SPA + /api proxy, public)
+#                     │ private network
+#                     ▼
+#               circuito-vivo-api (FastAPI, private) ──► circuito-vivo-redis (Key Value)
+#                                                              ▲
+#               circuito-vivo-worker (Celery + arduino-cli) ───┘
+#
+# Render services do not share disks, so the worker hands compiled binaries to the API through
+# Redis (backend/app/compile/artifacts.py) instead of the shared `builds` volume used in compose.
+#
+# Deploys are driven by GitHub Actions (.github/workflows/cd.yml): CI must pass on main, then the
+# workflow calls each service's deploy hook with the exact commit and waits for /api/health to
+# report it. Auto-deploy is therefore off here; see docs/DEPLOY.md for the one-time setup.
+
+services:
+  - type: keyvalue
+    name: circuito-vivo-redis
+    region: oregon
+    # Celery broker + results + artifacts. Keys with a TTL (results, artifacts) are evicted first;
+    # queues (no TTL) never are.
+    maxmemoryPolicy: volatile-lru
+    ipAllowList: [] # private network only
+
+  - type: pserv
+    name: circuito-vivo-api
+    runtime: docker
+    region: oregon
+    dockerfilePath: ./docker/Dockerfile.api
+    dockerContext: .
+    autoDeployTrigger: "off"
+    envVars:
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: circuito-vivo-redis
+          property: connectionString
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ANTHROPIC_BASE_URL # optional LLM proxy; leave empty for api.anthropic.com
+        sync: false
+      - key: ANTHROPIC_MODEL
+        value: claude-opus-5-5
+      - key: COMPILE_TIMEOUT_S
+        value: "180"
+      # Browsers only talk to the web service (same origin), so CORS stays closed.
+      - key: CORS_ORIGINS
+        value: ""
+
+  - type: worker
+    name: circuito-vivo-worker
+    runtime: docker
+    region: oregon
+    dockerfilePath: ./docker/Dockerfile.worker
+    dockerContext: .
+    autoDeployTrigger: "off"
+    # One compile at a time keeps an ESP32 build inside the smallest instance's memory; raise it
+    # together with the plan.
+    dockerCommand: celery -A app.compile.celery_app worker --loglevel=info --concurrency=1 --without-gossip --without-mingle
+    # NO secrets here: the worker runs gcc on untrusted sketches (see docker-compose.yml).
+    envVars:
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: circuito-vivo-redis
+          property: connectionString
+      - key: COMPILE_TIMEOUT_S
+        value: "180"
+
+  - type: web
+    name: circuito-vivo-web
+    runtime: docker
+    region: oregon
+    dockerfilePath: ./docker/Dockerfile.web
+    dockerContext: .
+    autoDeployTrigger: "off"
+    healthCheckPath: /healthz
+    envVars:
+      - key: API_HOSTPORT
+        fromService:
+          type: pserv
+          name: circuito-vivo-api
+          property: hostport

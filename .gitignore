@@ -1,0 +1,13 @@
+node_modules
+dist
+.DS_Store
+.env
+*.local
+.claude/settings.local.json
+backend/.venv
+backend/.builds
+__pycache__
+.pytest_cache
+*.tsbuildinfo
+frontend/.renders
+frontend/.renders-ui

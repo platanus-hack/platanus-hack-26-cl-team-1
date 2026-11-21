@@ -1,0 +1,98 @@
+{
+  "type": "potentiometer",
+  "name": "Potenciómetro",
+  "category": "input",
+  "description": "Perilla giratoria: una resistencia variable.",
+  "idPrefix": "pot",
+  "defaultLabel": "Potenciómetro",
+  "bounds": {
+    "x": -0.5,
+    "y": 0,
+    "w": 5,
+    "h": 4
+  },
+  "pins": [
+    {
+      "id": "a",
+      "label": "Extremo 1",
+      "x": 0,
+      "y": 4,
+      "kind": "terminal"
+    },
+    {
+      "id": "wiper",
+      "label": "Cursor (centro)",
+      "x": 2,
+      "y": 4,
+      "kind": "terminal"
+    },
+    {
+      "id": "b",
+      "label": "Extremo 2",
+      "x": 4,
+      "y": 4,
+      "kind": "terminal"
+    }
+  ],
+  "props": [
+    {
+      "key": "resistance",
+      "label": "Resistencia total",
+      "type": "enum",
+      "options": [
+        {
+          "value": 1000,
+          "label": "1 kΩ"
+        },
+        {
+          "value": 10000,
+          "label": "10 kΩ"
+        },
+        {
+          "value": 100000,
+          "label": "100 kΩ"
+        }
+      ],
+      "default": 10000,
+      "unit": "Ω"
+    },
+    {
+      "key": "position",
+      "label": "Posición",
+      "type": "number",
+      "default": 50,
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "unit": "%",
+      "runtime": true
+    }
+  ],
+  "electrical": {
+    "model": "potentiometer",
+    "resistanceProp": "resistance",
+    "positionProp": "position"
+  },
+  "interactive": "knob",
+  "signalPins": [
+    "wiper"
+  ],
+  "blocks": [
+    "potPercent",
+    "analogRaw"
+  ],
+  "schematic": {
+    "symbol": "potentiometer"
+  },
+  "breadboard": {
+    "insertable": true
+  },
+  "kitQty": 2,
+  "education": {
+    "summary": "Al girar la perilla cambias el voltaje de la pata central entre 0 V y el voltaje de alimentación.",
+    "howItWorks": "Es un divisor de voltaje: los extremos van a 5 V (o 3,3 V) y GND, y el cursor recorre la pista resistiva. Conecta el cursor a un pin analógico para leer la posición.",
+    "tips": [
+      "En la simulación, arrastra o usa la rueda del mouse sobre la perilla."
+    ]
+  }
+}

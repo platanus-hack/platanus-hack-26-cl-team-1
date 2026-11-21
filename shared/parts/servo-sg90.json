@@ -1,0 +1,66 @@
+{
+  "type": "servo-sg90",
+  "name": "Servomotor SG90",
+  "category": "output",
+  "description": "Motor que gira a un ángulo exacto entre 0° y 180°.",
+  "idPrefix": "servo",
+  "defaultLabel": "Servo",
+  "bounds": {
+    "x": 0,
+    "y": -2,
+    "w": 11,
+    "h": 11
+  },
+  "pins": [
+    {
+      "id": "gnd",
+      "label": "GND (café)",
+      "x": 1,
+      "y": 9,
+      "kind": "ground",
+      "polarity": "-"
+    },
+    {
+      "id": "vcc",
+      "label": "V+ (rojo)",
+      "x": 2,
+      "y": 9,
+      "kind": "power",
+      "polarity": "+"
+    },
+    {
+      "id": "signal",
+      "label": "Señal (naranja)",
+      "x": 3,
+      "y": 9,
+      "kind": "terminal"
+    }
+  ],
+  "props": [],
+  "electrical": {
+    "model": "servo",
+    "loadOhms": 100,
+    "minVolts": 4
+  },
+  "signalPins": [
+    "signal"
+  ],
+  "blocks": [
+    "servo"
+  ],
+  "schematic": {
+    "symbol": "servo"
+  },
+  "breadboard": {
+    "insertable": true
+  },
+  "kitQty": 1,
+  "education": {
+    "summary": "Le indicas un ángulo y se mueve a esa posición y la mantiene.",
+    "howItWorks": "Tiene un motor, engranajes y un circuito de control. Recibe pulsos por el cable naranja: el ancho del pulso (1–2 ms) indica el ángulo. Se alimenta con 5 V (cable rojo) y GND (café).",
+    "tips": [
+      "Alimenta el servo con 5 V, no con 3,3 V.",
+      "El GND del servo debe estar unido al GND de la placa."
+    ]
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "type": "motor-dc",
+  "name": "Motor DC",
+  "category": "output",
+  "description": "Motor de corriente continua para ruedas y ventiladores.",
+  "idPrefix": "m",
+  "defaultLabel": "Motor",
+  "bounds": {
+    "x": 0,
+    "y": 0,
+    "w": 10,
+    "h": 12
+  },
+  "pins": [
+    {
+      "id": "a",
+      "label": "Terminal A",
+      "x": 3,
+      "y": 12,
+      "kind": "terminal"
+    },
+    {
+      "id": "b",
+      "label": "Terminal B",
+      "x": 6,
+      "y": 12,
+      "kind": "terminal"
+    }
+  ],
+  "props": [],
+  "electrical": {
+    "model": "motor",
+    "ohms": 20,
+    "minVolts": 1.0,
+    "ratedVolts": 6,
+    "stallmA": 300
+  },
+  "signalPins": [
+    "a",
+    "b"
+  ],
+  "blocks": [
+    "motor"
+  ],
+  "schematic": {
+    "symbol": "motor"
+  },
+  "breadboard": {
+    "insertable": true
+  },
+  "kitQty": 1,
+  "education": {
+    "summary": "Convierte electricidad en movimiento giratorio. Si inviertes los cables, gira al revés.",
+    "howItWorks": "Un motor necesita mucha más corriente (100–300 mA) de la que puede dar un pin de la placa (20 mA). Por eso se controla con un transistor que actúa como interruptor, alimentado desde una batería o los 5 V.",
+    "tips": [
+      "Usa un transistor NPN y una resistencia de 1 kΩ en la base.",
+      "Agrega un diodo en paralelo al motor para proteger el transistor."
+    ],
+    "warnings": [
+      "Nunca conectes un motor directo a un pin de la placa."
+    ]
+  }
+}

@@ -1,0 +1,123 @@
+{
+  "type": "button",
+  "name": "Pulsador",
+  "category": "input",
+  "description": "Botón que conecta mientras lo mantienes presionado.",
+  "idPrefix": "btn",
+  "defaultLabel": "Botón",
+  "bounds": {
+    "x": -0.5,
+    "y": -0.5,
+    "w": 3,
+    "h": 4
+  },
+  "pins": [
+    {
+      "id": "a1",
+      "label": "Pata A1",
+      "x": 0,
+      "y": 0,
+      "kind": "terminal"
+    },
+    {
+      "id": "b1",
+      "label": "Pata B1",
+      "x": 2,
+      "y": 0,
+      "kind": "terminal"
+    },
+    {
+      "id": "a2",
+      "label": "Pata A2",
+      "x": 0,
+      "y": 3,
+      "kind": "terminal"
+    },
+    {
+      "id": "b2",
+      "label": "Pata B2",
+      "x": 2,
+      "y": 3,
+      "kind": "terminal"
+    }
+  ],
+  "internalBuses": [
+    [
+      "a1",
+      "a2"
+    ],
+    [
+      "b1",
+      "b2"
+    ]
+  ],
+  "props": [
+    {
+      "key": "pressed",
+      "label": "Presionado",
+      "type": "boolean",
+      "default": false,
+      "runtime": true
+    },
+    {
+      "key": "cap",
+      "label": "Color del botón",
+      "type": "enum",
+      "options": [
+        {
+          "value": "black",
+          "label": "Negro"
+        },
+        {
+          "value": "red",
+          "label": "Rojo"
+        },
+        {
+          "value": "blue",
+          "label": "Azul"
+        },
+        {
+          "value": "yellow",
+          "label": "Amarillo"
+        },
+        {
+          "value": "green",
+          "label": "Verde"
+        }
+      ],
+      "default": "black"
+    }
+  ],
+  "electrical": {
+    "model": "switch",
+    "kind": "push",
+    "stateProp": "pressed",
+    "onOhms": 0.1
+  },
+  "interactive": "press",
+  "signalPins": [
+    "a1",
+    "a2",
+    "b1",
+    "b2"
+  ],
+  "blocks": [
+    "buttonPressed",
+    "buttonClicked"
+  ],
+  "schematic": {
+    "symbol": "push-button"
+  },
+  "breadboard": {
+    "insertable": true
+  },
+  "kitQty": 4,
+  "education": {
+    "summary": "Cierra el circuito solo mientras lo presionas.",
+    "howItWorks": "Tiene 4 patas: las A1–A2 están siempre unidas, igual que B1–B2. Al presionar, se unen A con B. Para leerlo con la placa, conecta un lado al pin y el otro a GND: el programa usa la resistencia pull-up interna, así el pin lee ALTO suelto y BAJO al presionar.",
+    "tips": [
+      "Ponlo a caballo sobre el canal central del protoboard.",
+      "En la simulación, haz clic sobre el botón para presionarlo."
+    ]
+  }
+}

@@ -1,0 +1,371 @@
+/* <CompilePanel/> — "Compilar y cargar". Theme tokens only (app/theme.css). */
+
+.flash-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  min-width: 260px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+/* ---------- header ---------- */
+.flash-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, var(--surface-2), var(--surface));
+}
+.flash-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.flash-title-icon {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px rgba(61, 220, 151, 0.25);
+}
+.flash-board {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 60%;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-sunken);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.flash-board.is-empty { color: var(--text-dim); border-style: dashed; }
+
+/* ---------- body ---------- */
+.flash-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.flash-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.flash-compile { height: 34px; padding: 0 16px; font-size: 13px; box-shadow: 0 0 0 0 rgba(61, 220, 151, 0); transition: box-shadow 0.2s, background 0.12s; }
+.flash-compile:hover:not(:disabled) { box-shadow: 0 0 0 4px var(--accent-soft); }
+.flash-chip { height: 24px; padding: 0 10px; gap: 6px; }
+.flash-chip-time { font-family: var(--font-mono); font-weight: 500; font-variant-numeric: tabular-nums; opacity: 0.85; }
+
+.flash-pulse {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: flash-pulse 1.1s ease-in-out infinite;
+}
+@keyframes flash-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.75); }
+}
+.flash-spin { animation: flash-spin 0.9s linear infinite; }
+@keyframes flash-spin { to { transform: rotate(360deg); } }
+
+/* ---------- progress bars ---------- */
+.flash-progress {
+  position: relative;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--bg-sunken);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+.flash-progress > div {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--blue), var(--accent));
+  transition: width 0.25s ease-out;
+}
+.flash-progress.is-indeterminate > div {
+  width: 35%;
+  animation: flash-indeterminate 1.3s ease-in-out infinite;
+}
+@keyframes flash-indeterminate {
+  0% { transform: translateX(-110%); }
+  100% { transform: translateX(310%); }
+}
+
+.flash-hint { margin: 0; font-size: 12px; color: var(--text-dim); }
+.flash-muted { color: var(--text-dim); font-weight: 400; }
+.flash-mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.flash-pre { white-space: pre-wrap; word-break: break-word; font-family: var(--font-mono); font-size: 11.5px; }
+.flash-inline-error { margin: 0; font-size: 12px; color: var(--danger); }
+
+/* ---------- notices / banners ---------- */
+.flash-notice {
+  display: flex;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  border: 1px dashed var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text-muted);
+}
+.flash-notice > svg { flex: none; margin-top: 2px; color: var(--blue); }
+.flash-notice strong { display: block; color: var(--text); font-size: 13px; margin-bottom: 2px; }
+.flash-notice p { margin: 0 0 8px; font-size: 12px; }
+.flash-notice.is-error { border-color: rgba(255, 92, 108, 0.35); background: var(--danger-soft); }
+.flash-notice.is-error > svg { color: var(--danger); }
+
+.flash-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  font-size: 12.5px;
+  animation: flash-in 0.2s ease-out;
+}
+.flash-banner > svg { flex: none; margin-top: 1px; }
+.flash-banner strong { display: block; font-weight: 600; }
+.flash-banner-hint { display: block; margin-top: 3px; color: var(--text-muted); }
+.flash-banner.is-ok { background: var(--accent-soft); color: var(--accent); border: 1px solid rgba(61, 220, 151, 0.28); }
+.flash-banner.is-ok span { color: var(--text); }
+.flash-banner.is-error { background: var(--danger-soft); color: var(--danger); border: 1px solid rgba(255, 92, 108, 0.3); }
+.flash-banner.is-error strong { color: var(--text); }
+@keyframes flash-in { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+
+.flash-stale {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--warning-soft);
+  border: 1px solid rgba(255, 181, 71, 0.25);
+  color: var(--warning);
+  font-size: 12px;
+}
+
+/* ---------- empty state ---------- */
+.flash-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.flash-step {
+  display: flex;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.flash-step-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+.flash-step:first-child .flash-step-icon { background: var(--accent-soft); color: var(--accent); }
+.flash-step-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.flash-step-title { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 13px; }
+.flash-step-num {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--surface-3);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+.flash-step-text { color: var(--text-muted); font-size: 12px; }
+
+/* ---------- success card ---------- */
+.flash-success {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background:
+    radial-gradient(120% 80% at 0% 0%, rgba(61, 220, 151, 0.07), transparent 60%),
+    var(--surface-2);
+  animation: flash-in 0.2s ease-out;
+}
+.flash-success-head { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13px; }
+.flash-success-head > svg { color: var(--accent); }
+.flash-usages { display: grid; gap: 10px; }
+
+.flash-usage { display: flex; flex-direction: column; gap: 5px; }
+.flash-usage-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.flash-usage-label { font-size: 12px; color: var(--text-muted); }
+.flash-usage-pct { font-family: var(--font-mono); font-size: 11.5px; font-variant-numeric: tabular-nums; color: var(--accent); }
+.flash-usage-pct.is-warn { color: var(--warning); }
+.flash-usage-pct.is-danger { color: var(--danger); }
+.flash-usage-track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--bg-sunken);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+.flash-usage-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent-strong), var(--accent));
+  box-shadow: 0 0 10px rgba(61, 220, 151, 0.35);
+  transition: width 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.flash-usage-fill.is-warn { background: var(--warning); box-shadow: 0 0 10px rgba(255, 181, 71, 0.35); }
+.flash-usage-fill.is-danger { background: var(--danger); box-shadow: 0 0 10px rgba(255, 92, 108, 0.35); }
+.flash-usage-text { font-family: var(--font-mono); font-size: 11.5px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+
+.flash-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.flash-btn-wrap { display: inline-flex; }
+.flash-usb { background: var(--blue-soft); border-color: rgba(76, 194, 255, 0.4); color: var(--blue); font-weight: 600; }
+.flash-usb:hover:not(:disabled) { background: rgba(76, 194, 255, 0.2); border-color: var(--blue); }
+
+/* ---------- flashing ---------- */
+.flash-flashing {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--blue-soft);
+  border: 1px solid rgba(76, 194, 255, 0.25);
+  font-size: 12px;
+}
+.flash-flashing-head { display: flex; justify-content: space-between; gap: 8px; color: var(--text); }
+.flash-flashing-head .flash-mono { color: var(--blue); }
+
+/* ---------- diagnostics ---------- */
+.flash-diags { display: flex; flex-direction: column; gap: 8px; }
+.flash-section-title { display: flex; gap: 6px; }
+.flash-count {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.flash-count.is-error { background: var(--danger-soft); color: var(--danger); }
+.flash-count.is-warning { background: var(--warning-soft); color: var(--warning); }
+.flash-diag-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.flash-diag {
+  display: flex;
+  gap: 9px;
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--danger);
+  background: var(--surface-2);
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+.flash-diag.is-warning { border-left-color: var(--warning); }
+.flash-diag.is-link { cursor: pointer; transition: background 0.12s, border-color 0.12s, transform 0.12s; }
+.flash-diag.is-link:hover { background: var(--surface-3); border-color: var(--border-strong); }
+.flash-diag.is-link:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--blue-soft); border-color: var(--blue); }
+.flash-diag-icon { flex: none; margin-top: 1px; color: var(--danger); }
+.flash-diag.is-warning .flash-diag-icon { color: var(--warning); }
+.flash-diag-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
+.flash-diag-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.flash-diag-line { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); }
+.flash-diag-goto { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 600; color: var(--blue); opacity: 0.85; }
+.flash-diag.is-link:hover .flash-diag-goto { opacity: 1; }
+.flash-diag-msg { font-size: 12.5px; color: var(--text); word-break: break-word; }
+.flash-diag-code {
+  display: block;
+  padding: 4px 7px;
+  border-radius: 5px;
+  background: var(--bg-sunken);
+  border: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: pre;
+  overflow-x: auto;
+}
+
+/* ---------- raw log ---------- */
+.flash-log { border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-sunken); overflow: hidden; }
+.flash-log-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  height: 32px;
+  padding: 0 10px;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.flash-log-toggle:hover { color: var(--text); background: var(--surface); }
+.flash-log-caret {
+  margin-left: auto;
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 0.15s;
+}
+.flash-log.is-open .flash-log-caret { transform: rotate(45deg); }
+.flash-log-pre {
+  margin: 0;
+  max-height: 260px;
+  overflow: auto;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flash-pulse, .flash-spin, .flash-progress.is-indeterminate > div { animation: none; }
+  .flash-banner, .flash-success { animation: none; }
+}
