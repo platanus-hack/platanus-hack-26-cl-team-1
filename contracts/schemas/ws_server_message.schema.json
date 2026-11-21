@@ -15,6 +15,7 @@
         }
       },
       "required": [
+        "type",
         "id"
       ],
       "title": "CancelSay",
@@ -54,7 +55,10 @@
         }
       },
       "required": [
-        "seq"
+        "type",
+        "seq",
+        "latency_ms",
+        "observation"
       ],
       "title": "Debug",
       "type": "object"
@@ -85,6 +89,7 @@
         }
       },
       "required": [
+        "type",
         "code",
         "message"
       ],
@@ -139,8 +144,10 @@
         }
       },
       "required": [
+        "type",
         "step",
         "kind",
+        "mistake_id",
         "text_es"
       ],
       "title": "Issue",
@@ -171,6 +178,7 @@
         }
       },
       "required": [
+        "type",
         "step"
       ],
       "title": "IssueClear",
@@ -232,6 +240,7 @@
         "id",
         "kind",
         "step",
+        "action",
         "description",
         "visual_cue",
         "correction_es"
@@ -329,6 +338,7 @@
         }
       },
       "required": [
+        "type",
         "session_id",
         "task"
       ],
@@ -365,8 +375,10 @@
         }
       },
       "required": [
+        "type",
         "id",
         "text",
+        "priority",
         "audio"
       ],
       "title": "Say",
@@ -420,6 +432,7 @@
         }
       },
       "required": [
+        "type",
         "seq",
         "statuses",
         "next_steps"
@@ -489,7 +502,9 @@
         "title_es",
         "instruction_es",
         "action",
-        "completion_cue"
+        "requires",
+        "completion_cue",
+        "min_duration_s"
       ],
       "title": "Step",
       "type": "object"
@@ -585,7 +600,8 @@
         "ontology_version",
         "objects",
         "actions",
-        "steps"
+        "steps",
+        "mistakes"
       ],
       "title": "Task",
       "type": "object"
@@ -644,7 +660,9 @@
       "required": [
         "action",
         "confidence",
-        "quality"
+        "quality",
+        "objects",
+        "note"
       ],
       "title": "VlmOutput",
       "type": "object"

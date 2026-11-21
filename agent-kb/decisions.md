@@ -87,12 +87,23 @@ with a pointer to their replacement; nothing is ever deleted from §3.
 - **Consequences:** tasks that need loops or alternatives (do A *or* B) don't fit yet; revisit if the demo task
   needs them. The web app generates TS types from the schemas.
 
+### D-010 — Stack confirmed; skeleton runs end to end on fakes (2026-11-21)
+- **Context:** owners need a place for their code, a way to run it, and something to build against before the
+  other pieces exist.
+- **Decision:** `docs/STACK.md` is the stack. Skeleton: `server/` (FastAPI + uv, depends on `contracts/` by path)
+  with the task library, the session WebSocket, a rule controller v0 and factories for perception and voice;
+  `web/` (Vite + React + TS + pnpm) with types generated from the schemas; `tasks/<domain>/` holds the library;
+  `make dev/test/check`; CI jobs `server` and `web` in `CI OK`. In-process interfaces `Perception`, `Controller`,
+  `Voice` live in `contracts.interfaces`; `ScriptedPerception` and `SilentVoice` fakes are the defaults.
+- **Consequences:** the full loop (browser → server → controller → subtitles + browser speech) runs with no model
+  and no API keys; each owner replaces a fake behind its interface. Message and output schemas are exported in
+  serialization mode so TypeScript sees `type` as required.
+
 ## §2 Open (decide in block 1, see docs/VISION.md)
 
 - **D-?? Demo scenario.** Direction: physical assembly in robotics (a contact who assembles robots will give a
   testimonial and a pitch framing). Exact task to pick when their input arrives; candidates in `docs/VISION.md`
   § Demo scenario. Build task-agnostic until then.
-- **D-?? Repo layout and stack.** Proposal in `docs/STACK.md`.
 - **D-?? M_VL.** Proposal: Qwen3-VL-8B FP8 on vLLM (3090) as the main model; a Gemini Flash-class API as labeller/fallback.
 - **D-?? M_C.** Proposal: automaton tracker (rules) as baseline + a small model trained from scratch on simulator
   trajectories, output masked to legal actions.

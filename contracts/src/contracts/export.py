@@ -22,6 +22,10 @@ from .task import Task, TaskSummary
 
 SCHEMAS_DIR = Path(__file__).resolve().parents[2] / "schemas"
 
+# Messages and outputs use the serialization schema: fields with defaults are always present, so
+# they are required (e.g. `type`, which TypeScript needs to narrow the WebSocket unions).
+SERIALIZATION = {"task_summary", "observation", "decision", "ws_client_message", "ws_server_message"}
+
 TARGETS: dict[str, type[BaseModel] | TypeAdapter] = {
     "ontology": Ontology,
     "task": Task,
@@ -39,7 +43,11 @@ TARGETS: dict[str, type[BaseModel] | TypeAdapter] = {
 def render() -> dict[str, str]:
     out = {}
     for name, target in TARGETS.items():
-        schema = target.json_schema() if isinstance(target, TypeAdapter) else target.model_json_schema()
+        mode = "serialization" if name in SERIALIZATION else "validation"
+        if isinstance(target, TypeAdapter):
+            schema = target.json_schema(mode=mode)
+        else:
+            schema = target.model_json_schema(mode=mode)
         out[f"{name}.schema.json"] = json.dumps(schema, indent=2, ensure_ascii=False, sort_keys=True) + "\n"
     return out
 

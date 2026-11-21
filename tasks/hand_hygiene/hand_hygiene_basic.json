@@ -1,0 +1,24 @@
+{
+  "id": "hand_hygiene_basic",
+  "version": 1,
+  "title_es": "Lavado de manos (ejemplo)",
+  "description": "Example task to exercise the contracts: a short hand-washing routine. Not the chosen demo scenario.",
+  "domain": "hand_hygiene",
+  "ontology_version": 1,
+  "objects": ["faucet", "soap", "hands", "paper_towel"],
+  "actions": ["wet_hands", "apply_soap", "rub_palms", "rub_backs", "rinse_hands", "dry_hands", "close_faucet_towel", "touch_faucet_bare"],
+  "steps": [
+    {"id": "wet", "title_es": "Mojar las manos", "instruction_es": "Moja tus manos con agua.", "action": "wet_hands", "completion_cue": "both hands are wet"},
+    {"id": "soap", "title_es": "Aplicar jabón", "instruction_es": "Ahora aplica jabón en la palma.", "action": "apply_soap", "requires": ["wet"], "completion_cue": "soap visible on the palm"},
+    {"id": "palms", "title_es": "Frotar las palmas", "instruction_es": "Frota las palmas entre sí.", "action": "rub_palms", "requires": ["soap"], "completion_cue": "foam between the palms", "min_duration_s": 3},
+    {"id": "backs", "title_es": "Frotar el dorso", "instruction_es": "Frota el dorso de cada mano.", "action": "rub_backs", "requires": ["soap"], "completion_cue": "foam on the backs of both hands", "min_duration_s": 3},
+    {"id": "rinse", "title_es": "Enjuagar", "instruction_es": "Enjuaga bien las manos.", "action": "rinse_hands", "requires": ["palms", "backs"], "completion_cue": "no foam left on the hands"},
+    {"id": "dry", "title_es": "Secar", "instruction_es": "Sécate con una toalla de papel.", "action": "dry_hands", "requires": ["rinse"], "completion_cue": "hands dry, towel in hand"},
+    {"id": "close", "title_es": "Cerrar la llave", "instruction_es": "Cierra la llave usando la toalla.", "action": "close_faucet_towel", "requires": ["dry"], "completion_cue": "faucet off, closed through the towel"}
+  ],
+  "mistakes": [
+    {"id": "soap_before_wet", "kind": "out_of_order", "step": "soap", "description": "Applies soap on dry hands.", "visual_cue": "soap applied while the hands are still dry", "correction_es": "Ojo, primero hay que mojarse las manos."},
+    {"id": "short_rub", "kind": "incomplete", "step": "palms", "description": "Rubs palms for only a moment.", "visual_cue": "palms touch briefly, almost no foam", "correction_es": "Frota un poco más, al menos unos segundos."},
+    {"id": "bare_faucet", "kind": "wrong_action", "step": "close", "action": "touch_faucet_bare", "description": "Closes the faucet with a clean bare hand.", "visual_cue": "a clean bare hand turns the faucet off", "correction_es": "Ojo, no toques la llave con la mano limpia: ciérrala con la toalla."}
+  ]
+}

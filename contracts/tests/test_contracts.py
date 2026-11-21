@@ -276,3 +276,32 @@ def test_clip_mistake_id_is_set_exactly_when_incorrect():
 
 def test_committed_schemas_are_up_to_date():
     assert export_main(["--check"]) == 0
+
+
+# ── interfaces and fakes ─────────────────────────────────────────────────────
+
+
+def test_fakes_satisfy_the_interfaces():
+    from contracts import Perception, Voice
+    from contracts.fakes import ScriptedPerception, SilentVoice
+
+    assert isinstance(ScriptedPerception([]), Perception)
+    assert isinstance(SilentVoice(), Voice)
+
+
+def test_scripted_perception_replays_on_the_client_clock(task):
+    import asyncio
+
+    from contracts import Frame, Source
+    from contracts.fakes import ScriptedPerception
+
+    perception = ScriptedPerception.correct_run(task, every_ms=1000, mistake="touch_faucet_bare")
+
+    def at(seq, t_ms):
+        frame = Frame(seq=seq, t_ms=t_ms, jpeg=b"x", source=Source.SIM)
+        observation = asyncio.run(perception.observe([frame], task, []))
+        return observation.output.action if observation else None
+
+    assert [at(0, 5000), at(1, 5500), at(2, 6000), at(3, 6100), at(4, 7000)] == [
+        None, None, "wet_hands", None, "touch_faucet_bare",
+    ]  # fmt: skip

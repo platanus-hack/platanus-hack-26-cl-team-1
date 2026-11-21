@@ -72,7 +72,9 @@
       "required": [
         "action",
         "confidence",
-        "quality"
+        "quality",
+        "objects",
+        "note"
       ],
       "title": "VlmOutput",
       "type": "object"

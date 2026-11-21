@@ -25,7 +25,7 @@ Millis = Annotated[int, Field(ge=0)]
 class Strict(BaseModel):
     """Base for every contract: unknown fields are an error, instances are immutable."""
 
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = ConfigDict(extra="forbid", frozen=True, json_schema_serialization_defaults_required=True)
 
 
 class Source(enum.StrEnum):

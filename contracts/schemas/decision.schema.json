@@ -45,7 +45,8 @@
         }
       },
       "required": [
-        "text"
+        "text",
+        "priority"
       ],
       "title": "SayRequest",
       "type": "object"
@@ -150,8 +151,12 @@
   "required": [
     "seq",
     "event",
+    "step",
+    "mistake_kind",
+    "mistake_id",
     "statuses",
-    "next_steps"
+    "next_steps",
+    "say"
   ],
   "title": "Decision",
   "type": "object"

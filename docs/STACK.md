@@ -1,6 +1,6 @@
 # Stack per component (proposal, 2026-11-21)
 
-Status: **proposal** until the team confirms it (then it becomes a decision in `agent-kb/decisions.md`).
+Status: **in use** (D-010). The skeleton in `contracts/`, `server/`, `web/` follows this; change it with a decision.
 Bias: reuse what already worked in the old project (`docs/LEGACY.md`, commit `2e9da7c`); pick boring tools.
 
 ## Repo layout
