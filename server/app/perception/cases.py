@@ -43,7 +43,10 @@ def outcome(automaton: TaskAutomaton, done: frozenset[str], action: str | None, 
 
 async def run(root: Path, repeat: int) -> int:
     spec = json.loads((root / "cases.json").read_text())
-    settings = replace(Settings.from_env(), perception=PerceptionMode.VLM, vlm_min_interval_ms=0)
+    # One call at a time: each case needs its own answer before the next.
+    settings = replace(
+        Settings.from_env(), perception=PerceptionMode.VLM, vlm_min_interval_ms=0, vlm_max_in_flight=1
+    )
     task = TaskLibrary.load(settings.tasks_dir).get(spec["task_id"])
     if task is None:
         sys.exit(f"unknown task {spec['task_id']!r}")

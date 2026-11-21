@@ -53,6 +53,7 @@ def make_perception(settings: Settings, task: Task) -> Perception:
             max_side_px=settings.vlm_max_side_px,
             span_ms=settings.vlm_span_ms,
             frames_per_call=settings.vlm_frames,
+            max_in_flight=settings.vlm_max_in_flight,
             record_dir=settings.vlm_record_dir,
         )
     raise ValueError(f"unsupported perception mode {settings.perception!r}")

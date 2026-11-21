@@ -1,8 +1,11 @@
 """`VlmPerception`: Qwen3-VL served by vLLM (OpenAI-compatible API) behind the `Perception` interface.
 
-- One call in flight, and at least `min_interval_ms` between calls: anything in between returns `None`.
-  Both hold per instance, i.e. per session: N open sessions can have N calls in flight on the GPU (vLLM
-  batches up to `--max-num-seqs 4`). The demo runs one session.
+- At least `min_interval_ms` between call starts, and at most `max_in_flight` calls at once (per
+  instance, i.e. per session). With 1, `observe` awaits its call. With more, calls are pipelined:
+  `observe` starts a call when one is due and returns the oldest answer once it's in, waiting at most
+  until the next call is due (else `None`, and the next frame's `observe` picks it up). Answers come in
+  launch order; the session keeps one `observe` at a time while vLLM batches several calls at about the
+  latency of one (D-018).
 - The model sees `frames_per_call` frames spread over the last `span_ms` (downscaled JPEG), the task's
   actions, objects, next steps and mistakes. Guided decoding forces the task-narrowed `VlmOutput` schema.
 - A bad answer (invalid JSON, an action outside the task, `null` action with quality `ok`…) becomes an
@@ -16,8 +19,10 @@ import asyncio
 import io
 import json
 import logging
+import threading
 import time
 import uuid
+from collections import deque
 from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Protocol
@@ -122,6 +127,7 @@ class VlmPerception:
         clock: Callable[[], float] = time.monotonic,
         record_dir: Path | None = None,
         session: str | None = None,
+        max_in_flight: int = 1,
     ) -> None:
         self._completer = completer
         self._ontology = ontology
@@ -135,6 +141,9 @@ class VlmPerception:
         self._last_call_at: float | None = None
         self._schemas: dict[str, dict] = {}
         self._record_dir = record_dir
+        self._record_lock = threading.Lock()  # pipelined calls record from several threads
+        self._max_in_flight = max_in_flight
+        self._pending: deque[asyncio.Task[Observation]] = deque()
         self._calls = 0
         # One VlmPerception per session: the id groups recorded calls (re-judging keeps the original id).
         self._session = session or uuid.uuid4().hex[:8]
@@ -153,62 +162,93 @@ class VlmPerception:
             name = f"{self._session}_{record['call']:05d}_{i}.jpg"  # unique across sessions
             (self._record_dir / name).write_bytes(jpeg)
             names.append(name)
-        with (self._record_dir / "calls.jsonl").open("a") as f:
+        with self._record_lock, (self._record_dir / "calls.jsonl").open("a") as f:
             f.write(json.dumps({**record, "frames": names}) + "\n")
 
     async def observe(
         self, frames: Sequence[Frame], task: Task, next_steps: Sequence[str]
     ) -> Observation | None:
-        if not frames or self._lock.locked():
-            return None
-        now = self._clock()
-        if self._last_call_at is not None and now - self._last_call_at < self._min_interval_s:
+        if self._max_in_flight > 1:
+            return await self._observe_pipelined(frames, task, next_steps)
+        if not frames or self._lock.locked() or not self._due():
             return None
         async with self._lock:
-            self._last_call_at = now
-            picked = pick_frames(frames, self._span_ms, self._count)
-            jpegs = await asyncio.to_thread(self._encode, picked)
-            messages = build_messages(task, self._ontology, next_steps, jpegs)
-            if task.id not in self._schemas:
-                self._schemas[task.id] = task_json_schema(task)
-            schema = self._schemas[task.id]
-            t0 = time.perf_counter()
-            raw = await self._completer(messages, schema)
-            latency_ms = round((time.perf_counter() - t0) * 1000)
-            try:
-                output = parse_vlm_output(raw, task)
-            except InvalidVlmOutput as error:
-                log.warning("VLM answer rejected as uncertain (%s): %r", error, raw[:200])
-                output = uncertain(f"invalid model output: {error}")
-            last = picked[-1]
-            self._calls += 1
-            log.info(
-                "VLM %s seq=%d %d ms: %s %.2f %s",
-                task.id,
-                last.seq,
-                latency_ms,
-                output.action,
-                output.confidence,
-                output.note,
-            )
-            if self._record_dir is not None:
-                record = {
-                    "session": self._session,
-                    "call": self._calls,
-                    "task": task.id,
-                    "next_steps": list(next_steps),
-                    "seqs": [f.seq for f in picked],
-                    "t_ms": [f.t_ms for f in picked],
-                    "latency_ms": latency_ms,
-                    "raw": raw,
-                    "output": output.model_dump(mode="json"),
-                }
-                await asyncio.to_thread(self._record, record, jpegs)
-            return Observation(
-                seq=last.seq,
-                t_ms=last.t_ms,
-                source=last.source,
-                model=self.model,
-                latency_ms=latency_ms,
-                output=output,
-            )
+            self._last_call_at = self._clock()
+            return await self._judge(frames, task, next_steps)
+
+    def _due(self) -> bool:
+        return self._last_call_at is None or self._clock() - self._last_call_at >= self._min_interval_s
+
+    async def _observe_pipelined(
+        self, frames: Sequence[Frame], task: Task, next_steps: Sequence[str]
+    ) -> Observation | None:
+        if frames and len(self._pending) < self._max_in_flight and self._due():
+            self._last_call_at = self._clock()
+            self._pending.append(asyncio.create_task(self._judge(list(frames), task, list(next_steps))))
+        if not self._pending:
+            return None
+        head = self._pending[0]
+        if not head.done():
+            # Wait for the oldest call, but only until the next call is due (until it finishes, at
+            # capacity), so calls keep their cadence. An answer that finishes later is delivered by the
+            # next `observe`, which the session makes on the next frame.
+            full = len(self._pending) >= self._max_in_flight
+            await asyncio.wait({head}, timeout=None if full else self._until_due())
+        if head.done():
+            self._pending.popleft()
+            return head.result()  # re-raises a real failure of that call
+        return None
+
+    def _until_due(self) -> float:
+        if self._last_call_at is None:
+            return 0.0
+        return max(0.0, self._min_interval_s - (self._clock() - self._last_call_at))
+
+    async def _judge(self, frames: Sequence[Frame], task: Task, next_steps: Sequence[str]) -> Observation:
+        self._calls += 1
+        call = self._calls  # numbered at launch: pipelined calls can finish out of order
+        picked = pick_frames(frames, self._span_ms, self._count)
+        jpegs = await asyncio.to_thread(self._encode, picked)
+        messages = build_messages(task, self._ontology, next_steps, jpegs)
+        if task.id not in self._schemas:
+            self._schemas[task.id] = task_json_schema(task)
+        schema = self._schemas[task.id]
+        t0 = time.perf_counter()
+        raw = await self._completer(messages, schema)
+        latency_ms = round((time.perf_counter() - t0) * 1000)
+        try:
+            output = parse_vlm_output(raw, task)
+        except InvalidVlmOutput as error:
+            log.warning("VLM answer rejected as uncertain (%s): %r", error, raw[:200])
+            output = uncertain(f"invalid model output: {error}")
+        last = picked[-1]
+        log.info(
+            "VLM %s seq=%d %d ms: %s %.2f %s",
+            task.id,
+            last.seq,
+            latency_ms,
+            output.action,
+            output.confidence,
+            output.note,
+        )
+        if self._record_dir is not None:
+            record = {
+                "session": self._session,
+                "call": call,
+                "task": task.id,
+                "next_steps": list(next_steps),
+                "seqs": [f.seq for f in picked],
+                "t_ms": [f.t_ms for f in picked],
+                "latency_ms": latency_ms,
+                "raw": raw,
+                "output": output.model_dump(mode="json"),
+            }
+            await asyncio.to_thread(self._record, record, jpegs)
+        return Observation(
+            seq=last.seq,
+            t_ms=last.t_ms,
+            source=last.source,
+            model=self.model,
+            latency_ms=latency_ms,
+            output=output,
+        )
