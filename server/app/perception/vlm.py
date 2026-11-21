@@ -128,7 +128,9 @@ class VlmPerception:
         return [downscale_jpeg(f.jpeg, self._max_side_px) for f in frames]
 
     def _record(self, record: dict, jpegs: list[bytes]) -> None:
-        """Keep what the model saw and answered, to tune the prompt on real frames (SUP_VLM_RECORD_DIR)."""
+        """Keep what the model saw and answered, to tune the prompt on real frames (SUP_VLM_RECORD_DIR).
+        Only answered calls are recorded: a call that raises has no answer to label, and the session
+        reports it as an error."""
         assert self._record_dir is not None
         self._record_dir.mkdir(parents=True, exist_ok=True)
         names = []

@@ -227,10 +227,13 @@ class Review:
         self.library = library
         self.make_controller = make_controller
         self.labels_path = run_dir / "labels.json"
-        self._lock = threading.Lock()  # the server is threaded and the page can send label saves back to back
+        self._lock = (
+            threading.RLock()
+        )  # the server is threaded and the page can send label saves back to back
 
     def labels(self) -> dict[str, str]:
-        return json.loads(self.labels_path.read_text()) if self.labels_path.exists() else {}
+        with self._lock:  # never read a half-written file
+            return json.loads(self.labels_path.read_text()) if self.labels_path.exists() else {}
 
     def set_label(self, key: str, value: str | None) -> None:
         """Labels are a closed set: `none` or one of the session's task actions, on a recorded call."""
