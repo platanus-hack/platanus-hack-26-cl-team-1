@@ -263,7 +263,16 @@ def serve(review: Review, port: int) -> None:
             self.end_headers()
             self.wfile.write(body)
 
+        def _local(self) -> bool:
+            """Only answer requests addressed to our own host (no DNS rebinding to the webcam frames)."""
+            if self.headers.get("Host") == f"127.0.0.1:{self.server.server_port}":
+                return True
+            self.send_error(403, "open the review at http://127.0.0.1:<port>/")
+            return False
+
         def do_GET(self) -> None:
+            if not self._local():
+                return
             if self.path == "/":
                 self._send(PAGE.read_bytes(), "text/html; charset=utf-8")
             elif self.path == "/data.json":
@@ -278,6 +287,8 @@ def serve(review: Review, port: int) -> None:
                 self.send_error(404)
 
         def do_POST(self) -> None:
+            if not self._local():
+                return
             if self.path != "/labels":
                 self.send_error(404)
                 return

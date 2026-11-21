@@ -45,7 +45,8 @@ function render() {
 function move(d) { sel = Math.max(0, Math.min(S().calls.length - 1, sel + d)); render(); document.querySelector('tr.sel')?.scrollIntoView({block:'center'}); }
 async function label(value) {
   const key = `${sid}:${S().calls[sel].call}`; $('saved').textContent = 'saving…';
-  await load({key, value}); $('saved').textContent = 'saved to labels.json'; move(1);
+  move(1); // advance before the request, so fast keypresses label consecutive calls
+  await load({key, value}); $('saved').textContent = 'saved to labels.json';
 }
 document.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'SELECT') return;
