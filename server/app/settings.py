@@ -20,6 +20,11 @@ class VoiceMode(enum.StrEnum):
     ELEVENLABS = "elevenlabs"  # server TTS; needs ELEVENLABS_API_KEY and SUP_ELEVENLABS_VOICE_ID
 
 
+class ControllerMode(enum.StrEnum):
+    RULES = "rules"  # automaton tracker (baseline)
+    LEARNED = "learned"  # tiny GRU trained on simulator runs (training/controller), numpy inference
+
+
 @dataclass(frozen=True)
 class Settings:
     tasks_dir: Path
@@ -31,6 +36,8 @@ class Settings:
     elevenlabs_api_key: str = field(default="", repr=False)  # secret: environment only, never logged
     elevenlabs_voice_id: str = ""
     voice_min_gap_ms: int = 4000  # anti-spam: at least this long between the starts of two normal lines
+    controller: ControllerMode = ControllerMode.RULES
+    controller_weights_dir: Path = REPO_ROOT / "training" / "controller" / "weights"
     vlm_base_url: str | None = None  # OpenAI-compatible base URL, e.g. https://<tunnel>/v1
     vlm_model: str = "qwen3-vl-8b-fp8"  # served model name in vLLM; also recorded in every Observation
     vlm_api_key: str | None = None  # vLLM --api-key; never commit it (gpu/README.md)
@@ -61,6 +68,10 @@ class Settings:
             elevenlabs_api_key=os.environ.get("ELEVENLABS_API_KEY", ""),
             elevenlabs_voice_id=os.environ.get("SUP_ELEVENLABS_VOICE_ID", ""),
             voice_min_gap_ms=int(os.environ.get("SUP_VOICE_MIN_GAP_MS", "4000")),
+            controller=ControllerMode(os.environ.get("SUP_CONTROLLER", "rules")),
+            controller_weights_dir=Path(
+                os.environ.get("SUP_CONTROLLER_WEIGHTS", REPO_ROOT / "training" / "controller" / "weights")
+            ),
             cors_origins=tuple(
                 o for o in os.environ.get("SUP_CORS_ORIGINS", "http://localhost:5173").split(",") if o
             ),

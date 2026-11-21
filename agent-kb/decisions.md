@@ -122,14 +122,27 @@ with a pointer to their replacement; nothing is ever deleted from §3.
   tunnel restarts (named tunnel via `SUP_TUNNEL_TOKEN` if that hurts). Resolves the M_VL proposal in §2 for the
   main model; the API labeller/fallback stays open.
 
+### D-013 — M_C: rules baseline + a tiny GRU per task, numpy inference in the server (2026-11-21)
+- **Context:** the controller must turn noisy perception into the same `Decision`s as the rules, train in
+  minutes per task, and run in the server without adding torch.
+- **Decision:** `RulesController` stays the baseline. The learned controller is a 1-layer GRU (64 units) per
+  task, trained from scratch in `training/controller/` on `sim/symbolic` runs (noise levels mixed, split per
+  run). Inputs are the perception output only (no controller state: feeding the tracked state measured worse,
+  by exposure bias); outputs are P(step done) and P(mistake kind). The server restricts them to the automaton
+  (a step is marked done only when legal next; mistakes attributed via `TaskAutomaton.apply`) and reuses the
+  rules' texts, reminders and skip. Weights (`training/controller/weights/<task>.npz`, ~100 KB, with task
+  version/actions/steps) are committed; the server runs a numpy forward pass. `SUP_CONTROLLER=rules|learned`;
+  learned refuses to start when a library task lacks matching weights.
+- **Consequences:** every new or changed task needs `make controller TASK=…` before running learned mode.
+  Numbers in `training/results/controller.md` come only from `ctrl.evaluate`. Training tests need torch and run
+  locally; CI lints the training code and tests the committed weights through the server.
+
 ## §2 Open (decide in block 1, see docs/VISION.md)
 
 - **D-?? Demo scenario.** Direction: physical assembly in robotics (a contact who assembles robots will give a
   testimonial and a pitch framing). Exact task to pick when their input arrives; candidates in `docs/VISION.md`
   § Demo scenario. Build task-agnostic until then.
 - **D-?? M_VL labeller/fallback.** Main model decided (D-012); proposal: a Gemini Flash-class API as labeller/fallback.
-- **D-?? M_C.** Proposal: automaton tracker (rules) as baseline + a small model trained from scratch on simulator
-  trajectories, output masked to legal actions.
 - **D-?? Visual simulator.** Proposal: Runway Gen-4.5 image-to-video (and Aleph for mistake variants) per step,
   starting from photos of our real setup; local Wan 2.2 as fallback. Budget to agree.
 - **D-?? Deploy.** Where the web app runs for the demo (Render again, or local + tunnel to the 3090).

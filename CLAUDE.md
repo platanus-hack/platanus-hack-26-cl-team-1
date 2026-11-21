@@ -36,13 +36,14 @@ make schemas   # after changing contracts/: regenerate JSON Schemas and web/src/
 
 Server settings (env): `SUP_PERCEPTION=scripted`, `SUP_SCRIPTED_EVERY_MS=4000`, `SUP_SCRIPTED_MISTAKE=<action id>`
 (inject a mistake into the scripted run), `SUP_VOICE=browser`,
-`SUP_TASKS_DIR=tasks`. Server TTS: `SUP_VOICE=elevenlabs` + `ELEVENLABS_API_KEY` + `SUP_ELEVENLABS_VOICE_ID`
+`SUP_TASKS_DIR=tasks`, `SUP_CONTROLLER=rules|learned` (learned: weights in
+`training/controller/weights/`, retrain with `make controller TASK=tasks/<domain>/<task>.json`). Server TTS: `SUP_VOICE=elevenlabs` + `ELEVENLABS_API_KEY` + `SUP_ELEVENLABS_VOICE_ID`
 (missing → the server refuses to start); `SUP_VOICE_MIN_GAP_MS=4000` (anti-spam gap between lines).
 Task generator: `cd server && uv run python -m app.library.generate <domain> <task_id> "…"` (needs `ANTHROPIC_API_KEY`,
 + `ANTHROPIC_BASE_URL` for the proxy). The web app takes `?server=wss://…` to talk to a remote server (the GPU box's tunnel).
 
 Where code goes: `server/app/{library,session,voice}` (Alonso), `server/app/{perception,controller}` and
-`training/` (Cote), `sim/` and `web/` (Anaís), `tasks/<domain>/` (task library), `contracts/` (shared).
+`training/` and `sim/symbolic/` (Cote), the rest of `sim/` and `web/` (Anaís), `tasks/<domain>/` (task library), `contracts/` (shared).
 
 ## Rules
 
