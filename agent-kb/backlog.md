@@ -12,6 +12,7 @@ Owner in brackets once someone takes an item. Blocks refer to the plan in `docs/
 - [ ] **Turn on demo CD (D-016):** a repo admin restricts the `demo` environment to `main` and adds the secrets `GPU5090`, `GPU5090_PORT`, `DEMO_SSH_KEY`, `DEMO_SSH_KNOWN_HOSTS` there (values from Cote); see `deploy/README.md` § Continuous deployment. Pause with `touch ~/sup/cd-paused` on the box before judging. [Alonso]
 - [ ] **Stable demo link:** create a named Cloudflare tunnel (needs an account + domain) and put `SUP_TUNNEL_TOKEN` + `SUP_TUNNEL_URL` in `~/sup/demo.env` on the box; otherwise re-check the quick-tunnel link (`deploy/up-demo.sh --url`) before judging. [Alonso?]
 - [ ] **First real webcam run** of `servo_scout_robot`: `SUP_PERCEPTION=vlm` (5090), `SUP_CONTROLLER=rules|learned`, ElevenLabs voice. Tune the single-frame "runs ahead of the steps" false `out_of_order` seen in #27's test. [Cote + whoever has the kit]
+- [x] First real webcam run (hand washing, iPhone): recording + `app.perception.review` (labels, model vs oracle controller) + `app.perception.rejudge`; prompt, cues and controller fixes measured in `training/results/perception.md` (D-017). Next: a labelled run of the demo task with the new defaults (3 frames, a call every 0.75 s). [Cote]
 - [ ] ElevenLabs: key in the server's env, pick a Spanish voice (`SUP_ELEVENLABS_VOICE_ID`), hear it end to end. Code is in (`app/voice/elevenlabs.py`). [Alonso]
 - [ ] **Web demo screen** (N1): `/supervisor` page (camera picker for the iPhone, checklist, correction banner, subtitles, debug, voice, Reconectar) in the `feat/supervisor-view` PR; still to check on the demo Mac with the real iPhone. [Anaís]
 - [ ] Get the contact's testimonial (text, name, role, photo) with explicit consent to publish it; keep it out of the repo until then. [Anaís]
@@ -28,7 +29,7 @@ Owner in brackets once someone takes an item. Blocks refer to the plan in `docs/
 - [ ] Learned controller: improve mistake recall under noise (it trades recall for 4-5x fewer false alarms; see
   `training/results/controller.md`), e.g. a hybrid that lets the rules flag high-confidence mistakes. [Cote]
 - [ ] Calibrate `symsim.NOISE_LEVELS` against the real M_VL's confusion matrix once it runs on sim clips. [Cote]
-- [ ] M_VL eval base vs fine-tuned on the recordings (on the 5090) (QLoRA pipeline from `training/vlm/` at `2e9da7c`). [Cote]
+- [ ] VLM fine-tune: pipeline ready (`app.perception.dataset` + `training/vlm/train.py`, README); needs ≥3 more labelled runs of the demo task before training, split by session. Target: palms vs backs-style confusions. [Cote]
 - [ ] Demo rehearsal ×3, backup video, `platanus-hack-project.jsonc`, `project-description.md`, README.
 
 ## Done

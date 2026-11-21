@@ -194,6 +194,24 @@ with a pointer to their replacement; nothing is ever deleted from §3.
   demo server for a few seconds, so pause CD during judging. A broken merge reaches the demo once CI passes;
   revert it, or redeploy a good commit by hand. vLLM is never touched.
 
+### D-017 — Perception tuning on real frames: keep the 8B, describe-then-decide prompt, controller infers one unseen step (2026-11-21)
+- **Context:** the first real webcam run (hand washing, 138 calls, labelled) showed perception right on 60% of
+  calls; it missed brief actions (taking soap) and confused similar ones (palms vs backs). With perfect
+  perception the rules controller was fine, but one missed step blocked the rest of the task.
+- **Decision:** keep Qwen3-VL-8B FP8. The 30B-A3B Instruct and Thinking (4-bit AWQ) were worse on the same
+  frames (52–56%), and the Thinking model is too slow (p95 12.8 s).
+  - The prompt has the model describe the hands first (`note` is the first key under guided decoding),
+    then compare similar actions.
+  - Task cues say what tells similar actions apart.
+  - Live defaults: 3 frames over 1.1 s, a call every 0.75 s.
+  - The rules controller ignores a forbidden action whose step isn't due yet.
+  - After 4 out-of-order sightings in a row, it takes the step's single missing prerequisite as done if
+    that prerequisite could be done now, and says so. 3 sightings skipped a real step on a run where the
+    model hallucinated early rinses.
+  - Numbers: `training/results/perception.md`.
+- **Consequences:** a deliberate out-of-order action that lasts more than about 3 s gets accepted after one
+  warning. Fine-tuning (`training/vlm`) is the next lever, and it needs more labelled runs.
+
 ## §2 Open (decide in block 1, see docs/VISION.md)
 
 - **D-?? Demo scenario.** Direction: physical assembly in robotics (a contact who assembles robots will give a
