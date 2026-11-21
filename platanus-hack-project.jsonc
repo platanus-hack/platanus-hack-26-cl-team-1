@@ -1,16 +1,16 @@
 {
   // Your project's name, as it will appear on the voting page.
-  "project-name": "<FILL THIS>",
+  "project-name": "Circuito Vivo",
 
   // Short one-line summary of your project (in Spanish).
-  "project-oneliner-spanish": "<FILL THIS>",
+  "project-oneliner-spanish": "Diseña, simula y programa tu circuito Arduino en el navegador, y ármalo de verdad con un agente que te mira por la cámara y te avisa en voz alta cuando algo quedó mal.",
 
   // Brief description of your project (in Spanish).
-  "project-description-spanish": "<FILL THIS>",
+  "project-description-spanish": "Circuito Vivo enseña electrónica a principiantes: diseñas el circuito sobre una protoboard y un Arduino a escala real, lo simulas en vivo, lo programas con bloques y lo subes a tu placa desde el navegador, con un asistente de IA al lado. Su Modo Armado cierra la brecha con el mundo real: la webcam mira tu protoboard y un agente basado en modelos abiertos con fine-tuning propio (YOLO11s y Qwen3-VL-8B con una LoRA entrenada por nosotros, en nuestra propia RTX 3090) marca cada paso completado y te habla en español chileno cuando detecta un LED al revés, una resistencia corrida o un cable en el pin equivocado.",
 
   // Public URL where your project is deployed and running.
   // Must be a valid URL, for example: https://my-project.vercel.app
   // If your project is an app, put the download link here instead
   // (for example, a URL to download an APK).
-  "deploy-url": "<FILL THIS>"
+  "deploy-url": "https://circuito-vivo-web.onrender.com"
 }
