@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadCameraId, pickCamera } from './camera';
+import { cameraToOpen, loadCameraId, pickCamera } from './camera';
 
 const devs = [
   { deviceId: 'a', label: 'FaceTime' },
@@ -27,5 +27,26 @@ describe('pickCamera', () => {
 describe('loadCameraId', () => {
   it('returns null when storage is unavailable', () => {
     expect(loadCameraId()).toBeNull();
+  });
+});
+
+describe('cameraToOpen', () => {
+  const withPhone = [
+    { deviceId: 'facetime', label: 'FaceTime' },
+    { deviceId: 'iphone', label: 'Cámara del iPhone' },
+  ];
+  const withoutPhone = [{ deviceId: 'facetime', label: 'FaceTime' }];
+
+  it('goes back to the chosen camera when it reconnects after a fallback', () => {
+    expect(cameraToOpen(withoutPhone, 'iphone', null)).toEqual({ deviceId: 'facetime', missing: true });
+    expect(cameraToOpen(withPhone, 'iphone', null)).toEqual({ deviceId: 'iphone', missing: false });
+  });
+
+  it('uses the saved camera when nothing was chosen in this page', () => {
+    expect(cameraToOpen(withPhone, null, 'iphone')).toEqual({ deviceId: 'iphone', missing: false });
+  });
+
+  it('ignores empty ids (devices listed before camera permission)', () => {
+    expect(cameraToOpen(withoutPhone, '', '')).toEqual({ deviceId: 'facetime', missing: false });
   });
 });

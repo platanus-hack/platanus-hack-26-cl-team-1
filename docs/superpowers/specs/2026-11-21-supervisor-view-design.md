@@ -14,8 +14,8 @@ controller) are fine-tuned on real videos of this same build; this page is the l
 - A `/supervisor` page: pick the task, pick the camera (the iPhone via Continuity Camera in Chrome on
   the demo Mac), stream frames to the session server, render the checklist, subtitles, correction
   banner and debug view, and play the supervisor's voice.
-- Works when the web is a static site on Render and the session server sits on the GPU box behind a
-  public tunnel.
+- Works where the demo runs: same origin as the session server (D-015: the 5090 serves the web build and
+  the server behind one tunnel), and also from a separate static host via `VITE_SERVER_URL`.
 
 ## Non-goals
 
@@ -66,6 +66,7 @@ File split inside `web/src/`, exact CSS, and copy wording.
 
 ## Others must do (listed in the PR)
 
-- A tunnel to the session server (`:8000`) on the GPU box (today's tunnel points at vLLM `:8001`).
-- Add the Render origin to `SUP_CORS_ORIGINS`.
-- Render static site with `VITE_SERVER_URL` and the SPA rewrite.
+- Nothing for the D-015 demo deploy: `deploy/up-demo.sh` builds and serves this page; the build also
+  writes `supervisor/index.html` so a reload of `/supervisor` works on the demo server.
+- Only if a separate static host is used again (D-015 dropped Render): set `VITE_SERVER_URL`, add that
+  origin to `SUP_CORS_ORIGINS`, and rewrite `/* → /index.html`.

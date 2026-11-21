@@ -25,3 +25,15 @@ export function saveCameraId(id: string): void {
     // storage blocked: the choice just isn't remembered
   }
 }
+
+/**
+ * The camera to open after a device-list change: the one chosen on this page, else the saved one, so a
+ * camera that drops and comes back (Continuity Camera) wins again over the fallback used meanwhile.
+ */
+export function cameraToOpen(
+  devices: Camera[],
+  chosen: string | null,
+  saved: string | null,
+): { deviceId: string | null; missing: boolean } {
+  return pickCamera(devices, chosen || saved || null);
+}

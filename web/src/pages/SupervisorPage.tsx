@@ -6,9 +6,10 @@ import { useEffect, useRef, useState } from 'react';
 import type { TaskSummary } from '../contracts/task_summary';
 import type { Debug, Issue, Task, WsServerMessage } from '../contracts/ws_server_message';
 import { SessionClient } from '../session/client';
+import { describeLoss, type Loss } from '../session/loss';
 import { apiUrl, serverUrls } from '../session/server';
 import { VoicePlayer } from '../session/voice';
-import { loadCameraId, pickCamera, saveCameraId } from '../source/camera';
+import { cameraToOpen, loadCameraId, saveCameraId } from '../source/camera';
 import { listCameras, openWebcam, startCapture, type Camera } from '../source/capture';
 
 const FPS = 6;
@@ -28,6 +29,7 @@ export function SupervisorPage() {
   const [debug, setDebug] = useState<Debug | null>(null);
   const [showDebug, setShowDebug] = useState(false);
   const [status, setStatus] = useState('Desconectado');
+  const [statusError, setStatusError] = useState(false);
   const [connection, setConnection] = useState<Connection>('idle');
   const [lostReason, setLostReason] = useState('');
   const [aspect, setAspect] = useState(16 / 9);
@@ -35,7 +37,8 @@ export function SupervisorPage() {
   const stopRef = useRef<(() => void)[]>([]);
   const sessionRef = useRef(0); // bumped on every start/stop: events from an older session are ignored
   const voiceRef = useRef(new VoicePlayer());
-  const cameraIdRef = useRef<string | null>(null);
+  const chosenCameraRef = useRef<string | null>(null); // picked in this page; wins whenever it's connected
+  const serverErrorRef = useRef<string | null>(null); // the server sends `error`, then closes
 
   useEffect(() => {
     let base = '';
@@ -71,9 +74,8 @@ export function SupervisorPage() {
     async function refresh() {
       const list = await listCameras();
       if (!alive) return;
-      const choice = pickCamera(list, cameraIdRef.current ?? loadCameraId());
+      const choice = cameraToOpen(list, chosenCameraRef.current, loadCameraId());
       setCameras(list);
-      cameraIdRef.current = choice.deviceId;
       setCameraId(choice.deviceId);
       if (list.length === 0) setCameraNote('No hay cámaras conectadas.');
       else if (choice.missing) {
@@ -101,7 +103,7 @@ export function SupervisorPage() {
   }, []);
 
   function chooseCamera(id: string) {
-    cameraIdRef.current = id;
+    chosenCameraRef.current = id;
     setCameraId(id);
     setCameraNote('');
     saveCameraId(id);
@@ -131,7 +133,9 @@ export function SupervisorPage() {
         if (message.observation) setDebug(message);
         break;
       case 'error':
+        serverErrorRef.current = message.message;
         setStatus(`Error del servidor: ${message.message}`);
+        setStatusError(true);
         break;
       case 'cancel_say':
         voiceRef.current.cancel(message.id);
@@ -139,11 +143,12 @@ export function SupervisorPage() {
     }
   }
 
-  function lose(reason: string) {
+  function lose(loss: Loss) {
     stop();
+    const text = describeLoss(loss);
     setConnection('lost');
-    setLostReason(`Se cortó la conexión: ${reason}`);
-    setStatus(`Desconectado: ${reason}`);
+    setLostReason(text);
+    setStatus(text);
   }
 
   async function start() {
@@ -158,10 +163,12 @@ export function SupervisorPage() {
     setIssue(null);
     setDebug(null);
     setLostReason('');
+    serverErrorRef.current = null;
+    setStatusError(false);
     setConnection('connecting');
     setStatus('Conectando…');
     try {
-      const closeCamera = await openWebcam(video, cameraId, () => current() && lose('Se desconectó la cámara'));
+      const closeCamera = await openWebcam(video, cameraId, () => current() && lose({ kind: 'camera' }));
       if (!current()) {
         closeCamera(); // a newer start/stop happened while the camera was opening
         return;
@@ -172,17 +179,18 @@ export function SupervisorPage() {
         {
           onMessage: (message) => current() && onMessage(message),
           onAudio: (id, audio) => current() && voiceRef.current.play(id, audio),
-          onClose: (reason) => current() && lose(reason),
+          onClose: (reason) => current() && lose({ kind: 'closed', reason, serverError: serverErrorRef.current }),
         },
       );
-      const stopCapture = startCapture(video, FPS, (jpeg) => client.sendFrame(jpeg));
+      const stopCapture = startCapture(
+        video,
+        FPS,
+        (jpeg) => client.sendFrame(jpeg),
+        () => current() && lose({ kind: 'camera_stalled' }),
+      );
       stopRef.current = [stopCapture, () => client.close(), closeCamera];
     } catch (error) {
-      if (!current()) return;
-      stop();
-      setConnection('lost');
-      setLostReason(`No pude empezar: ${String(error)}`);
-      setStatus(`No pude empezar: ${String(error)}`);
+      if (current()) lose({ kind: 'start', error: String(error) });
     }
   }
 
@@ -201,7 +209,7 @@ export function SupervisorPage() {
     <main className="supervisor">
       <header>
         <h1>Supervisor</h1>
-        <span className={`status ${connection}`}>{status}</span>
+        <span className={`status ${statusError ? 'lost' : connection}`}>{status}</span>
       </header>
       <section className="controls">
         <label>

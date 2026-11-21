@@ -1,6 +1,8 @@
 // Frame source (owner: Anaís): a camera played in a <video>, captured to JPEG on a canvas. Frames keep the camera's aspect ratio (the iPhone
 // is 16:9), long side at most 640 px, never upscaled.
 
+import { FrameGate } from './frameGate';
+
 const MAX_SIDE = 640;
 
 export type Camera = { deviceId: string; label: string };
@@ -50,14 +52,48 @@ export async function openWebcam(
   };
 }
 
-/** Grab JPEG frames from `video` at `fps`; returns a stop function. Skips a tick while one is encoding. */
-export function startCapture(video: HTMLVideoElement, fps: number, onJpeg: (jpeg: ArrayBuffer) => void): () => void {
+/**
+ * Grab JPEG frames from `video` at `fps`; returns a stop function. Only frames the camera actually
+ * presented are sent (a frozen camera isn't resent as if live); no new frame for `stallMs` stops the
+ * capture and calls `onStall` once. Skips a tick while one is encoding.
+ */
+export function startCapture(
+  video: HTMLVideoElement,
+  fps: number,
+  onJpeg: (jpeg: ArrayBuffer) => void,
+  onStall: () => void,
+  stallMs = 3000,
+): () => void {
+  if (!('requestVideoFrameCallback' in video)) {
+    throw new Error('este navegador no avisa cuándo llega cada cuadro de la cámara; usa Chrome');
+  }
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('canvas 2d context unavailable');
+  const gate = new FrameGate(stallMs, performance.now());
+  let stopped = false;
+  let frameHandle = 0;
+  const onFrame = () => {
+    if (stopped) return;
+    gate.markFrame(performance.now());
+    frameHandle = video.requestVideoFrameCallback(onFrame);
+  };
+  frameHandle = video.requestVideoFrameCallback(onFrame);
   let encoding = false;
+  const stop = () => {
+    stopped = true;
+    window.clearInterval(timer);
+    video.cancelVideoFrameCallback(frameHandle);
+  };
   const timer = window.setInterval(() => {
-    if (encoding || video.readyState < 2 || !video.videoWidth || !video.videoHeight) return;
+    if (encoding) return;
+    const verdict = gate.take(performance.now());
+    if (verdict === 'stalled') {
+      stop();
+      onStall();
+      return;
+    }
+    if (verdict === 'skip' || video.readyState < 2 || !video.videoWidth || !video.videoHeight) return;
     const { width, height } = frameSize(video.videoWidth, video.videoHeight);
     if (canvas.width !== width || canvas.height !== height) {
       canvas.width = width;
@@ -74,5 +110,5 @@ export function startCapture(video: HTMLVideoElement, fps: number, onJpeg: (jpeg
       0.7,
     );
   }, 1000 / fps);
-  return () => window.clearInterval(timer);
+  return stop;
 }
