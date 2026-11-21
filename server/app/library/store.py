@@ -11,6 +11,17 @@ from pathlib import Path
 from contracts import Ontology, Task, TaskSummary
 
 
+def check_objects_cover_actions(task: Task, ontology: Ontology) -> None:
+    """Raise ValueError unless the task lists every object its actions use (prompts and the simulator
+    describe the scene from `task.objects`)."""
+    listed = set(task.objects)
+    for action_id in task.actions:
+        action = ontology.action(action_id)
+        missing = [o for o in (action.object, action.target) if o is not None and o not in listed]
+        if missing:
+            raise ValueError(f"task {task.id!r}: action {action_id!r} uses objects {missing} it doesn't list")
+
+
 class TaskLibrary:
     def __init__(self, tasks: dict[str, Task]) -> None:
         self._tasks = tasks
@@ -25,6 +36,7 @@ class TaskLibrary:
                     continue
                 task = Task.model_validate_json(path.read_text())
                 task.check_against(ontology)
+                check_objects_cover_actions(task, ontology)
                 if task.id in tasks:
                     raise ValueError(f"duplicate task id {task.id!r} in {path}")
                 tasks[task.id] = task
