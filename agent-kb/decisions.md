@@ -18,6 +18,7 @@ with a pointer to their replacement; nothing is ever deleted from §3.
   pins its last commit `2e9da7c`, and maps what to reuse and how (`git show 2e9da7c:<path>`).
 - **Consequences:** CI/CD and `render.yaml` are gone too, so pushes to `main` no longer deploy; the old Render
   services keep serving the old build until someone turns them off.
+- **Amended by D-016:** green pushes to `main` deploy again, now to the demo on the 5090 (D-015), not Render.
 
 ### D-003 — Lightweight agent-kb: backlog, decisions, per-session files (2026-11-21)
 - **Context:** three people plus parallel agents; ~18 h left. A heavier protocol (per-file decisions, generated index,
@@ -165,7 +166,7 @@ with a pointer to their replacement; nothing is ever deleted from §3.
   `gpu/up-5090.sh`).
 
 ### D-016 — Continuous deployment of the demo from GitHub Actions over SSH (2026-11-21)
-- **Context:** D-015's deploy was manual, so merged PRs (e.g. #31's new task) didn't reach the public link until
+- **Context:** D-002 removed the old CI/CD, and D-015's deploy was manual, so merged PRs (e.g. #31's new task) didn't reach the public link until
   someone remembered to run `deploy/up-demo.sh`.
 - **Decision:** `.github/workflows/cd-demo.yml` runs `deploy/up-demo.sh` on a runner after CI passes on a push to
   `main` (`workflow_run`, from main only, for the tested commit), queued, never cancelled halfway. It logs in
