@@ -21,6 +21,7 @@ import httpx
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 
+from .assembly import AssemblySession
 from .session import Config, Session
 
 log = logging.getLogger("vision")
@@ -33,6 +34,9 @@ DATA = Path(os.environ.get("CV_DATA", "data")).expanduser()
 class State:
     tts = None
     voice: str | None = None
+    detector = None
+    judge = None
+    warmup = None
 
 
 STATE = State()
@@ -40,6 +44,18 @@ STATE = State()
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    if os.environ.get("CV_DETECTOR", "1") != "0":
+        try:
+            from .detector import Detector
+
+            STATE.detector = await asyncio.to_thread(Detector)
+        except Exception as e:  # noqa: BLE001 — without a detector the VLM judges part/wire steps alone
+            log.warning("sin detector (%s): los pasos se revisan solo con el VLM", e)
+    if os.environ.get("CV_VLM", "1") != "0":
+        from .vlm import VlmJudge
+
+        STATE.judge = VlmJudge()
+        STATE.warmup = asyncio.create_task(STATE.judge.warmup())
     if os.environ.get("CV_TTS", "1") != "0":
         try:
             from .tts import Tts
@@ -81,7 +97,14 @@ async def vllm_up() -> bool:
 
 @app.get("/health")
 async def health() -> dict:
-    return {"ok": True, "gpu": gpu_name(), "vllm": await vllm_up(), "voice": STATE.voice}
+    det = STATE.detector
+    return {
+        "ok": True,
+        "gpu": gpu_name(),
+        "vllm": await vllm_up(),
+        "voice": STATE.voice,
+        "detector": None if det is None else Path(det.weights).name,
+    }
 
 
 def make_config() -> Config:
@@ -94,7 +117,7 @@ def make_config() -> Config:
 
 
 def make_session(ws: WebSocket) -> Session:
-    return Session(ws, make_config())
+    return AssemblySession(ws, make_config(), STATE.detector, STATE.judge)
 
 
 @app.websocket("/ws/session")
