@@ -306,14 +306,16 @@ def hello(**extra):
 
 
 def test_reset_with_an_open_issue_sends_issue_clear():
-    with scripted_client(mistake="touch_faucet_bare").websocket_connect("/ws/session") as ws:
+    # Rinsing right after wetting is out of order. (A bare hand on the faucet this early isn't a mistake:
+    # the task only forbids it when closing the faucet is due.)
+    with scripted_client(mistake="rinse_hands").websocket_connect("/ws/session") as ws:
         ws.send_text(hello())
         ws.receive_json()  # ready
         # wet at 100 ms, the mistake at 200 ms; stop before the next step (300 ms) would clear it.
         messages = run_frames(ws, 0, 5)
         while not any(m["type"] == "say" and m["priority"] == "urgent" for m in messages):
             messages.append(ws.receive_json())  # the issue, then its spoken correction
-        assert next(m for m in messages if m["type"] == "issue")["mistake_id"] == "bare_faucet"
+        assert next(m for m in messages if m["type"] == "issue")["kind"] == "out_of_order"
         ws.send_text(json.dumps({"type": "reset"}))
         after = []
         while not after or after[-1]["type"] != "say":
@@ -322,7 +324,7 @@ def test_reset_with_an_open_issue_sends_issue_clear():
 
 
 def test_fixing_a_mistake_cancels_its_correction_if_still_playing():
-    with scripted_client(mistake="touch_faucet_bare").websocket_connect("/ws/session") as ws:
+    with scripted_client(mistake="rinse_hands").websocket_connect("/ws/session") as ws:
         ws.send_text(hello())
         ws.receive_json()  # ready
         # wet at 100 ms, the mistake at 200 ms, soap at 300 ms (clears the issue while the line plays)

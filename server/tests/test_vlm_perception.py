@@ -191,6 +191,13 @@ def test_pick_frames_newest_plus_one_about_span_older():
     assert [f.t_ms for f in pick_frames(fs, span_ms=0)] == [1500]
 
 
+def test_pick_frames_spreads_more_frames_over_the_span():
+    fs = frames(n=8, step_ms=170)  # ~6 fps: t = 0, 170, …, 1190 (the session's 8-frame window)
+    assert [f.t_ms for f in pick_frames(fs, span_ms=1100, count=3)] == [170, 680, 1190]
+    assert [f.t_ms for f in pick_frames(fs[-2:], span_ms=1100, count=3)] == [1020, 1190]  # fewer frames
+    assert [f.t_ms for f in pick_frames(fs, span_ms=1100, count=1)] == [1190]
+
+
 def test_downscale_keeps_small_frames_and_shrinks_big_ones():
     small = jpeg(320, 240)
     assert downscale_jpeg(small, 640) is small

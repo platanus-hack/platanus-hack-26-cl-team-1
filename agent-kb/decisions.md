@@ -112,6 +112,8 @@ with a pointer to their replacement; nothing is ever deleted from §3.
 ### D-012 — Perception: Qwen3-VL-8B FP8 on vLLM behind a keyed tunnel (2026-11-21)
 - **Update:** the model and the client stand; where it is served (the 3090 behind a keyed tunnel) is replaced by
   D-014 (the 5090 over an SSH port-forward). The 3090 setup stays as a fallback.
+- **Update (D-017):** the live call policy is now 3 frames over 1.1 s, a call every 0.75 s, and the prompt
+  describes the hands before deciding.
 - **Context:** the scripted fake must give way to a real video-language model behind `Perception`; the 3090 is
   on a private network and the server may run on a laptop.
 - **Decision:** `SUP_PERCEPTION=vlm` → `VlmPerception` (`server/app/perception/vlm.py`) calls Qwen3-VL-8B-Instruct-FP8
@@ -193,6 +195,26 @@ with a pointer to their replacement; nothing is ever deleted from §3.
 - **Consequences:** GitHub holds a key that can run commands as root on the GPU box. Every merge restarts the
   demo server for a few seconds, so pause CD during judging. A broken merge reaches the demo once CI passes;
   revert it, or redeploy a good commit by hand. vLLM is never touched.
+
+### D-017 — Perception tuning on real frames: keep the 8B, describe-then-decide prompt, controller infers one unseen step (2026-11-21)
+- **Context:** the first real webcam run (hand washing, 138 calls, labelled) showed perception right on 60% of
+  calls; it missed brief actions (taking soap) and confused similar ones (palms vs backs). With perfect
+  perception the rules controller was fine, but one missed step blocked the rest of the task.
+- **Decision:** keep Qwen3-VL-8B FP8. The 30B-A3B Instruct and Thinking (4-bit AWQ) were worse on the same
+  frames (52–56%), and the Thinking model is too slow (p95 12.8 s).
+  - The prompt has the model describe the hands first (`note` is the first key under guided decoding),
+    then compare similar actions.
+  - Task cues say what tells similar actions apart.
+  - Live defaults: 3 frames over 1.1 s, a call every 0.75 s.
+  - The rules controller ignores a forbidden action whose step isn't due yet.
+  - After 4 out-of-order sightings in a row, it takes the step's single missing prerequisite as done if
+    that prerequisite could be done now, and says so. 3 sightings skipped a real step on a run where the
+    model hallucinated early rinses.
+  - Numbers: `training/results/perception.md`.
+- **Consequences:** a deliberate out-of-order action that lasts more than about 3 s gets accepted after one
+  warning. A forbidden action more than one step before its step is ignored. 3 frames per call need vLLM
+  started with `VLM_MAX_IMAGES` ≥ 3 (`gpu/vllm-5090.sh` defaults to 4); an older vLLM rejects every call
+  loudly. Fine-tuning (`training/vlm`) is the next lever, and it needs more labelled runs.
 
 ## §2 Open (decide in block 1, see docs/VISION.md)
 

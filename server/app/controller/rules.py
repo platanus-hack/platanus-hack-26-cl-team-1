@@ -23,14 +23,22 @@ from contracts import (
 
 MIN_CONFIDENCE = 0.5
 REMIND_AFTER_MS = 20_000
+# A step seen out of order this many times in a row, whose one missing prerequisite could be done now, is
+# taken as proof that the prerequisite happened unseen (a brief action between two perception calls, like
+# taking soap). The out-of-order warning is still said on the first sighting.
+INFER_AFTER = 4  # 3 skipped a real step on a run where the model hallucinated 3 early rinses
 
 
 class RulesController:
     def __init__(
-        self, min_confidence: float = MIN_CONFIDENCE, remind_after_ms: int = REMIND_AFTER_MS
+        self,
+        min_confidence: float = MIN_CONFIDENCE,
+        remind_after_ms: int = REMIND_AFTER_MS,
+        infer_after: int = INFER_AFTER,
     ) -> None:
         self.min_confidence = min_confidence
         self.remind_after_ms = remind_after_ms
+        self.infer_after = infer_after
 
     # ── Controller interface ─────────────────────────────────────────────────
 
@@ -43,6 +51,7 @@ class RulesController:
         self.seq = 0
         self.last_progress_ms: int | None = None
         self.last_reminder_ms: int | None = None
+        self.streak: tuple[str, int] | None = None  # (action, consecutive out-of-order sightings)
         first = self.task.step(self.automaton.legal_next(self.done)[0])
         # The greeting is a reminder of the first step.
         greeting = SayRequest(text=f"Vamos con: {task.title_es}. {first.instruction_es}")
@@ -65,9 +74,21 @@ class RulesController:
                 transition.step, MistakeKind.INCOMPLETE, mistake.id if mistake else None, text
             )
 
+        out_of_order = transition.outcome is Outcome.MISTAKE and transition.kind is MistakeKind.OUT_OF_ORDER
+        count = self.streak[1] + 1 if out_of_order and self.streak and self.streak[0] == out.action else 1
+        self.streak = (out.action, count) if out_of_order else None
+
         if transition.outcome is Outcome.MISTAKE:
             if transition.kind is MistakeKind.REPEATED:
                 return self._decision(Event.NONE)  # perception often reports an ongoing action twice
+            legal = self.automaton.legal_next(self.done)
+            if transition.kind is MistakeKind.WRONG_ACTION and not self._near(transition.step, legal):
+                # A forbidden action for a step that is far from due (opening the faucet bare-handed at the
+                # start is fine; closing it bare-handed near the end isn't, even a step early).
+                return self._decision(Event.NONE)
+            inferred = self._infer(transition.step, observation.t_ms) if count >= self.infer_after else None
+            if out_of_order and inferred:
+                return inferred
             text = self._correction_text(transition)
             mistake_id = transition.mistake.id if transition.mistake else None
             return self._mistake(transition.step, transition.kind, mistake_id, text)
@@ -117,6 +138,38 @@ class RulesController:
         return self._decision(Event.STEP_DONE, step=step.id, say=SayRequest(text=nxt.instruction_es))
 
     # ── helpers ──────────────────────────────────────────────────────────────
+
+    def _near(self, step_id: str | None, legal: list[str]) -> bool:
+        """The step is due now, or each of its prerequisites is done or due now (one step away)."""
+        if step_id is None or step_id in legal:
+            return True
+        return all(r in self.done or r in legal for r in self.task.step(step_id).requires)
+
+    def _infer(self, step_id: str | None, t_ms: int) -> Decision | None:
+        """Mark `step_id` done together with its one missing prerequisite, if that prerequisite could be
+        done now. Returns None (keep warning) when more than one step is missing or it isn't due yet."""
+        if step_id is None:
+            return None
+        step = self.task.step(step_id)
+        missing = [r for r in step.requires if r not in self.done]
+        if len(missing) != 1 or missing[0] not in self.automaton.legal_next(self.done):
+            return None
+        skipped = self.task.step(missing[0])
+        done = self.automaton.apply(self.done, skipped.action).done
+        transition = self.automaton.apply(done, step.action)
+        self.done = transition.done
+        self.mistake_step = None
+        self.open_mistake = None
+        self.streak = None
+        self.last_progress_ms = t_ms
+        assumed = f"Bien, doy por hecho: {skipped.title_es.lower()}."
+        if transition.outcome is Outcome.TASK_DONE:
+            text = f"{assumed} ¡Listo! Terminaste la tarea."
+            return self._decision(Event.TASK_DONE, step=step.id, say=SayRequest(text=text))
+        nxt = self.task.step(self.automaton.legal_next(self.done)[0])
+        return self._decision(
+            Event.STEP_DONE, step=step.id, say=SayRequest(text=f"{assumed} {nxt.instruction_es}")
+        )
 
     def _correction_text(self, transition) -> str:
         if transition.mistake is not None:
