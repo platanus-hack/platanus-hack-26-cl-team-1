@@ -22,6 +22,9 @@ TASK = LIBRARY.get("hand_hygiene_basic")
 CORRECT = [s.action for s in TASK.steps]
 
 
+TASK_IDS = [t.id for t in LIBRARY.summaries()]
+
+
 def obs(action, seq, quality=None, confidence=0.9):
     quality = quality or (Quality.OK if action else Quality.UNKNOWN)
     out = VlmOutput(action=action, confidence=confidence, quality=quality)
@@ -55,6 +58,37 @@ def test_clean_correct_run_reaches_task_done_in_legal_states():
                 if step.id in done:
                     assert set(step.requires) <= done
     assert events.count(Event.STEP_DONE) == len(CORRECT) - 1
+    assert Event.TASK_DONE in events
+
+
+@pytest.mark.parametrize("task_id", TASK_IDS)
+def test_nothing_in_view_marks_no_step_done(task_id):
+    """Only null observations (empty scene): the GRU's time prior alone must not complete a step."""
+    controller = LearnedController(WEIGHTS)
+    controller.start(LIBRARY.get(task_id))
+    events = [controller.decide(obs(None, seq, confidence=0.0)).event for seq in range(1, 21)]
+    assert Event.STEP_DONE not in events and Event.TASK_DONE not in events
+
+
+def test_one_confident_report_marks_its_step_done():
+    task = LIBRARY.get("led_flashlight")
+    controller = LearnedController(WEIGHTS)
+    controller.start(task)
+    decision = controller.decide(obs("place_button", 1))
+    assert decision.event is Event.STEP_DONE
+    assert decision.step == "button"
+
+
+@pytest.mark.parametrize("task_id", TASK_IDS)
+def test_clean_correct_run_reaches_task_done_on_every_task(task_id):
+    task = LIBRARY.get(task_id)
+    controller = LearnedController(WEIGHTS)
+    controller.start(task)
+    events, seq = [], 0
+    for step in task.steps:
+        for _ in range(2):
+            seq += 1
+            events.append(controller.decide(obs(step.action, seq)).event)
     assert Event.TASK_DONE in events
 
 

@@ -10,8 +10,11 @@ predicts:
 - `p_mistake[k]`: a mistake of kind `k` (or none) is happening now.
 
 Outputs are restricted to the task: a step is marked done only when it is legal next, so the state is
-always a valid automaton state, and mistakes are attributed through the automaton. Texts, statuses,
-reminders and "ya lo hice" are the rule controller's, so both emit the same `Decision`s.
+always a valid automaton state, and mistakes are attributed through the automaton. A step is also marked
+done only after a confident perception report since the last advance (`armed`): otherwise the GRU's time
+prior alone (only null observations) drifts `p_done` past the threshold and completes the first step with
+nothing in view. Texts, statuses, reminders and "ya lo hice" are the rule controller's, so both emit the
+same `Decision`s.
 
 `features()` is the single definition of the input encoding: training imports it from here.
 """
@@ -136,6 +139,7 @@ class LearnedController(RulesController):
         self.h = np.zeros(self.weights.model.hidden)
         self.prev_t_ms: int | None = None
         self.prev_action: str | None = None
+        self.armed = False  # a confident report since the last advance; advancing needs one
         return super().start(task)
 
     def decide(self, observation: Observation) -> Decision:
@@ -147,11 +151,14 @@ class LearnedController(RulesController):
         self.h, p_done, p_mistake = self.weights.model.step(x, self.h)
         if self.automaton.is_complete(self.done):
             return self._decision(Event.NONE)
+        if out.action is not None and out.confidence >= self.min_confidence:
+            self.armed = True
 
-        # Mark done every legal step the model believes is done (in task order, re-checking legality).
+        # Mark done every legal step the model believes is done (in task order, re-checking legality),
+        # but only on the back of a confident report: never from the time prior alone.
         index = {s.id: j for j, s in enumerate(self.task.steps)}
         advanced: str | None = None
-        progress = True
+        progress = self.armed
         while progress:
             progress = False
             for step_id in self.automaton.legal_next(self.done):
@@ -160,6 +167,7 @@ class LearnedController(RulesController):
                     advanced, progress = step_id, True
                     break
         if advanced is not None:
+            self.armed = False
             self.mistake_step = None
             self.open_mistake = None
             self.last_progress_ms = observation.t_ms
