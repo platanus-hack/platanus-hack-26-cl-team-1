@@ -47,7 +47,6 @@ def main() -> None:
     a = ap.parse_args()
 
     from ultralytics import YOLO, YOLOWorld
-
     from vision.classes import CLASSES, PROMPTS
 
     cfg = yaml.safe_load(Path(a.data).read_text())
@@ -59,9 +58,13 @@ def main() -> None:
     rows = []
     world = YOLOWorld(a.world)
     world.set_classes([PROMPTS[c] for c in CLASSES])
-    rows.append(("YOLO-World v2-s, zero-shot (prompts)", evaluate(world, a.data, a.imgsz), speed_ms(world, images, a.imgsz)))
+    rows.append(
+        ("YOLO-World v2-s, zero-shot (prompts)", evaluate(world, a.data, a.imgsz), speed_ms(world, images, a.imgsz))
+    )
     ft = YOLO(a.finetuned)
-    rows.append((f"YOLO11s fine-tuned ({Path(a.finetuned).name})", evaluate(ft, a.data, a.imgsz), speed_ms(ft, images, a.imgsz)))
+    rows.append(
+        (f"YOLO11s fine-tuned ({Path(a.finetuned).name})", evaluate(ft, a.data, a.imgsz), speed_ms(ft, images, a.imgsz))
+    )
     base = YOLO(a.base)
     base_speed = speed_ms(base, images, a.imgsz)
 

@@ -40,3 +40,5 @@ CLASS_SPECS: tuple[YoloClass, ...] = (
 CLASSES: tuple[str, ...] = tuple(c.name for c in CLASS_SPECS)
 CLASS_ID: dict[str, int] = {n: i for i, n in enumerate(CLASSES)}
 NC = len(CLASSES)
+# Text prompts for zero-shot detectors (YOLO-World understands English best).
+PROMPTS: dict[str, str] = {c.name: c.prompt_en for c in CLASS_SPECS}

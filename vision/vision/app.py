@@ -22,6 +22,7 @@ from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 
 from .assembly import AssemblySession
+from .review import router as review_router
 from .session import Config, Session
 
 log = logging.getLogger("vision")
@@ -71,6 +72,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title="Circuito Vivo — visión", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.include_router(review_router)  # /review: YOLO label reviewer (F4)
 
 
 @lru_cache(maxsize=1)
