@@ -25,6 +25,7 @@ export class C172Cockpit implements Simulator {
   private acc = 0;
   private detachKeys: (() => void) | null = null;
   private onEvent: (event: SimEvent) => void = () => {};
+  private log: SimEvent[] = [];
 
   constructor() {
     this.canvas = document.createElement('canvas');
@@ -42,6 +43,11 @@ export class C172Cockpit implements Simulator {
     return this.sim;
   }
 
+  /** Every event since `start()`, on simulator time (read-only use: capture and dataset tooling). */
+  get eventLog(): readonly SimEvent[] {
+    return this.log;
+  }
+
   async load(): Promise<void> {
     this.images ??= await loadPanelImages();
     this.outside ??= new OutsideView(WIDTH, PANEL_TOP + 20);
@@ -50,7 +56,11 @@ export class C172Cockpit implements Simulator {
 
   start(onEvent: (event: SimEvent) => void): void {
     this.stop();
-    this.onEvent = onEvent;
+    this.log = [];
+    this.onEvent = (event) => {
+      this.log.push(event);
+      onEvent(event);
+    };
     this.sim = initialSim();
     for (const key of Object.keys(this.inputs) as (keyof Inputs)[]) this.inputs[key] = false;
     this.audio.start();
