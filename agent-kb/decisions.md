@@ -193,6 +193,23 @@ with a pointer to their replacement; nothing is ever deleted from §3.
 - **Consequences:** GitHub holds a key that can run commands as root on the GPU box. Every merge restarts the
   demo server for a few seconds, so pause CD during judging. A broken merge reaches the demo once CI passes;
   revert it, or redeploy a good commit by hand. vLLM is never touched.
+### D-017 — Perception: look before labelling, and an action needs its own object in view (2026-11-21)
+- **Context:** on the live demo, putting down an empty breadboard completed `led_flashlight`'s first step
+  (`place_button`) with no button anywhere. Guided decoding wrote `action` before `objects`, the prompt said the
+  person "should be doing" the next step, nothing compared the action with what the model saw, and the rules
+  controller completes a step from one observation.
+- **Decision:** the guided-decoding schema emits `objects`, `note`, then `action`, `quality`, `confidence` (the
+  `VlmOutput` contract is unchanged: same fields, validated by name). The prompt shows what each action acts on
+  (ontology `object`) and presents the next steps as context only. `VlmPerception` turns into `uncertain` (logged at WARNING) any action
+  whose ontology `object` is not among the answer's `objects`. Every VLM answer and controller decision is logged
+  at INFO on the demo box.
+- **Consequences:** an action's ontology `object` must be what the camera sees being handled.
+  `robot_assembly`'s `connect_motor_wires` now acts on `dc_motor` (its cue shows the motor's own leads), not on
+  `jumper_wire`; `aviation`'s `rotate` / `rotate_early` act on `attitude_indicator` with the `yoke` as target
+  (the simulator draws no yoke). An action with no object (`establish_climb`) is never rejected. The guard can cost recall when the object is hidden (a finger on a small button); measure it with
+  `app.perception.bench` and read the WARNING lines. Not done here: the learned controller can still complete a
+  step from timing alone, with no observation of it (follow-up), and the rules controller still accepts a single
+  observation.
 
 ## §2 Open (decide in block 1, see docs/VISION.md)
 
