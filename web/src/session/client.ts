@@ -2,6 +2,7 @@
 import type { Hello, WsClientMessage } from '../contracts/ws_client_message';
 import type { WsServerMessage } from '../contracts/ws_server_message';
 import { packFrame, unpackAudio } from './frames';
+import { sessionWsUrl } from './server';
 
 export type SessionHandlers = {
   onMessage: (message: WsServerMessage) => void;
@@ -9,19 +10,12 @@ export type SessionHandlers = {
   onClose: (reason: string) => void;
 };
 
-/** `?server=wss://host` overrides the server (e.g. the GPU box's tunnel); otherwise same origin. */
-export function sessionUrl(): string {
-  const override = new URLSearchParams(location.search).get('server');
-  const base = override ?? `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}`;
-  return `${base.replace(/\/$/, '')}/ws/session`;
-}
-
 export class SessionClient {
   private ws: WebSocket;
   private seq = 0;
   private readonly t0 = performance.now();
 
-  constructor(hello: Hello, handlers: SessionHandlers, url = sessionUrl()) {
+  constructor(hello: Hello, handlers: SessionHandlers, url = sessionWsUrl()) {
     this.ws = new WebSocket(url);
     this.ws.binaryType = 'arraybuffer';
     this.ws.onopen = () => this.send(hello);
