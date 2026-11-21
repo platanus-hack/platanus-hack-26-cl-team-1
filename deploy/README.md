@@ -94,6 +94,33 @@ rate limit). The ack time depends on which Cloudflare edge the quick tunnel land
 In the browser, open the link, pick a task, choose the webcam, and press the debug key (D) to see the
 observations.
 
+## Continuous deployment (D-016)
+
+`.github/workflows/cd-demo.yml` runs `deploy/up-demo.sh` on a GitHub runner **every time CI passes on a push to
+`main`**, for exactly the commit CI tested. Deploys queue in order, and the link stays the same because only the
+server restarts. The job summary shows the deployed commit and the link. Actions → *CD demo* → *Run workflow*
+deploys `main` by hand.
+
+- **Pause it** while judges use the demo: on the box, `touch ~/sup/cd-paused`. Runs then end green with a
+  "paused" notice. `rm ~/sup/cd-paused` resumes. A manual `deploy/up-demo.sh` ignores the switch.
+- Each deploy takes the page down for a few seconds. A merge during judging is visible, so pause first.
+- If a merge breaks the demo, revert the PR, or redeploy a good commit by hand.
+
+**One-time setup.** It needs repo secrets, which only a repo admin can add. Until then the job ends green with a
+"Demo deploy skipped" warning.
+
+| Secret | Value |
+|---|---|
+| `GPU5090` | `root@<host>` (the box address, as in the team chat) |
+| `GPU5090_PORT` | the SSH port |
+| `DEMO_SSH_KEY` | the private half of a key used **only** by CD |
+| `DEMO_SSH_KNOWN_HOSTS` | `ssh-keyscan -p <port> -t ed25519 <host>`, so the runner checks the box's identity |
+
+The CD key's public half is in the box's `~/.ssh/authorized_keys` with the `restrict` option: no port
+forwarding, agent or pty. It can still run commands as root, which is the same power as the team's own login.
+To revoke it, delete the line marked `sup-demo-cd` on the box. To rotate it: generate a new key, replace that
+line, and update `DEMO_SSH_KEY`.
+
 ## Why not Render (D-015)
 
 The old project put the static web app on Render and pointed it at the GPU tunnel with `?server=`. That doesn't

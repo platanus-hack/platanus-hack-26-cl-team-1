@@ -1,0 +1,99 @@
+name: CD demo
+
+# After CI passes on a push to main, redeploy the public demo on the 5090 box with deploy/up-demo.sh (D-015,
+# D-016): same command a human runs, same link (only the server restarts). Setup and the pause switch:
+# deploy/README.md § Continuous deployment.
+#
+# Safety: `workflow_run` runs this file from main and only for CI runs on pushes to main, so PR code never sees
+# the secrets. It checks out exactly the commit CI tested. Secrets: GPU5090 (user@host), GPU5090_PORT,
+# DEMO_SSH_KEY (a key used only for this, `restrict`ed on the box), DEMO_SSH_KNOWN_HOSTS (the box's host key).
+on:
+  workflow_run:  # zizmor: ignore[dangerous-triggers]
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Deploys queue up in order; a running deploy is never cancelled halfway.
+concurrency:
+  group: cd-demo
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy demo to the 5090
+    if: >-
+      github.event_name == 'workflow_dispatch'
+      || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GPU5090: ${{ secrets.GPU5090 }}
+      GPU5090_PORT: ${{ secrets.GPU5090_PORT }}
+      SSH_KEY: ${{ secrets.DEMO_SSH_KEY }}
+      KNOWN_HOSTS: ${{ secrets.DEMO_SSH_KNOWN_HOSTS }}
+      SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - name: Check configuration
+        id: config
+        run: |
+          missing=""
+          for name in GPU5090 GPU5090_PORT SSH_KEY KNOWN_HOSTS; do [ -n "${!name}" ] || missing="$missing $name"; done
+          if [ -n "$missing" ]; then
+            echo "::warning title=Demo deploy skipped::Missing secrets:$missing (see deploy/README.md § Continuous deployment)."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v5
+        if: steps.config.outputs.ready == 'true'
+        with:
+          ref: ${{ env.SHA }}
+          persist-credentials: false
+
+      - name: SSH key
+        if: steps.config.outputs.ready == 'true'
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf 'Host *\n  StrictHostKeyChecking yes\n  BatchMode yes\n  ConnectTimeout 15\n' > ~/.ssh/config
+
+      # `touch ~/sup/cd-paused` on the box stops automatic deploys (e.g. while judges use the demo);
+      # `rm ~/sup/cd-paused` resumes them. Manual deploys (deploy/up-demo.sh) ignore it.
+      - name: Pause switch
+        id: pause
+        if: steps.config.outputs.ready == 'true'
+        run: |
+          if ssh -p "$GPU5090_PORT" "$GPU5090" 'test -e ~/sup/cd-paused'; then
+            echo "::notice title=Demo deploy paused::~/sup/cd-paused exists on the box; not deploying ${SHA:0:7}."
+            echo "paused=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "paused=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: pnpm/action-setup@v4
+        if: steps.config.outputs.ready == 'true' && steps.pause.outputs.paused == 'false'
+        with:
+          package_json_file: web/package.json
+      - uses: actions/setup-node@v5
+        if: steps.config.outputs.ready == 'true' && steps.pause.outputs.paused == 'false'
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Deploy
+        if: steps.config.outputs.ready == 'true' && steps.pause.outputs.paused == 'false'
+        run: |
+          deploy/up-demo.sh | tee deploy.log
+          url=$(grep -o 'https://[^ ]*' deploy.log | tail -1)
+          {
+            echo "### Demo deployed: \`${SHA:0:7}\`"
+            echo
+            echo "$url"
+          } >> "$GITHUB_STEP_SUMMARY"

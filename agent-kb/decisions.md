@@ -164,6 +164,18 @@ with a pointer to their replacement; nothing is ever deleted from §3.
   with a Cloudflare account. If the box goes down, so does the demo (fallback: `make dev` on a laptop +
   `gpu/up-5090.sh`).
 
+### D-016 — Continuous deployment of the demo from GitHub Actions over SSH (2026-11-21)
+- **Context:** D-015's deploy was manual, so merged PRs (e.g. #31's new task) didn't reach the public link until
+  someone remembered to run `deploy/up-demo.sh`.
+- **Decision:** `.github/workflows/cd-demo.yml` runs `deploy/up-demo.sh` on a runner after CI passes on a push to
+  `main` (`workflow_run`, from main only, for the tested commit), queued, never cancelled halfway. It logs in
+  with a key used only by CD, `restrict`ed on the box, and checks the pinned host key. Secrets: `GPU5090`,
+  `GPU5090_PORT`, `DEMO_SSH_KEY`, `DEMO_SSH_KNOWN_HOSTS`. A file on the box (`~/sup/cd-paused`) pauses it
+  without needing repo admin.
+- **Consequences:** GitHub holds a key that can run commands as root on the GPU box. Every merge restarts the
+  demo server for a few seconds, so pause CD during judging. A broken merge reaches the demo once CI passes;
+  revert it, or redeploy a good commit by hand. vLLM is never touched.
+
 ## §2 Open (decide in block 1, see docs/VISION.md)
 
 - **D-?? Demo scenario.** Direction: physical assembly in robotics (a contact who assembles robots will give a
