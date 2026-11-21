@@ -23,14 +23,21 @@ correction. Trained with a simulator and fine-tuned per scenario.
 
 ## Commands
 
+Needs `uv` and Node 24 + `pnpm`.
+
 ```bash
-python3 -I -m unittest discover -s scripts/ci/tests -t .   # CI tooling tests
-cd contracts && uv sync && uv run pytest -q                # contracts tests
-cd contracts && uv run python -m contracts.export          # regenerate JSON Schemas after a model change
-cd contracts && uv run ruff check . && uv run ruff format .
+make install   # contracts, server, web
+make dev       # server :8000 (scripted perception, browser voice) + web :5173 → open http://localhost:5173
+make test      # every test suite
+make check     # what CI runs: lint, tests, schema + TS type freshness, web build
+make schemas   # after changing contracts/: regenerate JSON Schemas and web/src/contracts/*.ts
 ```
 
-_Add server/web commands here as soon as the skeleton exists._
+Server settings (env): `SUP_PERCEPTION=scripted`, `SUP_SCRIPTED_EVERY_MS=4000`, `SUP_VOICE=browser`,
+`SUP_TASKS_DIR=tasks`. The web app takes `?server=wss://…` to talk to a remote server (the GPU box's tunnel).
+
+Where code goes: `server/app/{library,session,voice}` (Alonso), `server/app/{perception,controller}` and
+`training/` (Cote), `sim/` and `web/` (Anaís), `tasks/<domain>/` (task library), `contracts/` (shared).
 
 ## Rules
 

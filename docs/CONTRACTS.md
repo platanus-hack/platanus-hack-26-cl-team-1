@@ -24,6 +24,7 @@ PR, `uv run python -m contracts.export` re-run. Additive optional fields are the
 | 4 | Controller decision | `decision.py` | Controller → voice, UI |
 | 5 | WebSocket protocol | `protocol.py` | Browser ↔ server |
 | 6 | Trajectories and clip records | `dataset.py` | Simulator → training and eval |
+| 7 | In-process interfaces: `Perception`, `Controller`, `Voice` (+ fakes) | `interfaces.py`, `fakes.py` | Session server ↔ each component |
 
 All ids are `snake_case` (`^[a-z][a-z0-9_]*$`). Every model forbids unknown fields. Spanish only in
 `*_es` fields and in text that is spoken; everything else English.
@@ -120,6 +121,31 @@ Helpers: `pack_frame/unpack_frame`, `pack_audio/unpack_audio`, `client_message_a
   `mistake_id`), `run_id`, `split`, `path` relative to the data root on the GPU server, and the generation
   `prompt`. Manifests are JSONL in git; the clips are not.
 - **Splits are per run / recording session**, never per clip or frame of the same run.
+
+## 7. Interfaces inside the server
+
+The session server (Alonso) drives three components through `typing.Protocol`s, so any implementation
+plugs in (fake, rules, learned model, API, local model):
+
+```python
+class Perception:   # Cote
+    async def observe(self, frames: Sequence[Frame], task: Task, next_steps: Sequence[str]) -> Observation | None
+class Controller:   # Cote; one instance per session
+    def start(self, task: Task) -> Decision          # reset + greeting
+    def decide(self, observation: Observation) -> Decision
+    def tick(self, now_ms: int) -> Decision | None    # ~1/s; reminders when stuck
+    def skip(self, now_ms: int) -> Decision           # "ya lo hice"
+class Voice:        # Alonso
+    async def synthesize(self, request: SayRequest) -> bytes | None   # mp3, or None = browser speaks
+```
+
+- The session owns timing and concurrency: ≤1 `observe` in flight, `tick` once per second of client time.
+- `observe` never raises for a bad model answer (return an uncertain observation or `None`); it raises only
+  for real failures, which the session reports as an `error` message.
+- Anti-spam (drop, cancel, prioritize) is the session's voice queue, not `Voice`.
+- **Fakes** (`contracts.fakes`): `ScriptedPerception.correct_run(task, every_ms, mistake=…)` replays a run on
+  the client clock with no model; `SilentVoice` returns `None`. The server uses them by default
+  (`SUP_PERCEPTION=scripted`, `SUP_VOICE=browser`), so the whole loop runs on a laptop.
 
 ## Example
 

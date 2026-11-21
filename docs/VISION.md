@@ -106,6 +106,15 @@ The task still has to be (a) demoable live with a webcam at the pitch, (b) gener
 content filters blocking it, (c) short (5–10 steps) with obvious, visible mistakes. Assembly fits all
 three better than the medical options did.
 
+**Pitch framing from the contact (2026-11-21):** they design systems made of many components; field
+technicians then assemble them, and today the designer has to be there (or on a live call) watching and
+correcting. With this product the designer "trains" the supervisor in simulation once, and afterwards a
+technician just points a camera at the work: the model already knows how it should be assembled and
+catches mistakes, without the designer present. **The expert's know-how becomes a model that many people
+can use.** Product implications: the task library is authored by the expert (Claude helps turn their
+design into a recipe), the simulator is how the expert teaches it, and the field mode needs no live
+connection to the expert.
+
 Candidates in that direction (pick one once the contact's input arrives):
 
 - **A small robot / mechanism assembly**: e.g. mount a servo on a bracket, attach a horn or wheel, wire it

@@ -7,6 +7,7 @@ from .automaton import Outcome, TaskAutomaton, Transition
 from .common import PROTOCOL_VERSION, MistakeKind, Source, StepStatus
 from .dataset import ClipRecord, ClipSource, Split, Trajectory, TrajectoryEvent
 from .decision import Decision, Event, Priority, SayRequest
+from .interfaces import Controller, Frame, Perception, Voice
 from .ontology import ActionDef, ObjectDef, Ontology
 from .perception import InvalidVlmOutput, Observation, Quality, VlmOutput, parse_vlm_output
 from .task import MistakeDef, Step, Task, TaskSummary
@@ -16,8 +17,10 @@ __all__ = [
     "ActionDef",
     "ClipRecord",
     "ClipSource",
+    "Controller",
     "Decision",
     "Event",
+    "Frame",
     "InvalidVlmOutput",
     "MistakeDef",
     "MistakeKind",
@@ -25,6 +28,7 @@ __all__ = [
     "Observation",
     "Ontology",
     "Outcome",
+    "Perception",
     "Priority",
     "Quality",
     "SayRequest",
@@ -39,5 +43,6 @@ __all__ = [
     "TrajectoryEvent",
     "Transition",
     "VlmOutput",
+    "Voice",
     "parse_vlm_output",
 ]
