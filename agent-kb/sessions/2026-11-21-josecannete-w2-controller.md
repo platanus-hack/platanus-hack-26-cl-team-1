@@ -14,7 +14,7 @@
 
 ## Findings
 - First version fed the controller's tracked state to the GRU (teacher-forced on the true state): it was
-  barely better than rules. Dropping the state inputs fixed it (exposure bias), see D-012.
+  barely better than rules. Dropping the state inputs fixed it (exposure bias), see D-013.
 - Under medium noise the learned controller ends ~92% of runs in the true state vs ~41–59% for rules, with
   4–6x fewer false alarms, but lower mistake recall. Numbers: `training/results/controller.md`.
 
