@@ -1,5 +1,4 @@
-// Frame source (owner: Anaís): the webcam or a simulated clip, both played in a <video>, are captured
-// the same way, so the server can't tell them apart. Frames keep the camera's aspect ratio (the iPhone
+// Frame source (owner: Anaís): a camera played in a <video>, captured to JPEG on a canvas. Frames keep the camera's aspect ratio (the iPhone
 // is 16:9), long side at most 640 px, never upscaled.
 
 const MAX_SIDE = 640;
@@ -48,19 +47,6 @@ export async function openWebcam(
     closed = true;
     stream.getTracks().forEach((t) => t.stop());
     video.srcObject = null;
-  };
-}
-
-export async function openClip(video: HTMLVideoElement, file: File): Promise<() => void> {
-  const url = URL.createObjectURL(file);
-  video.srcObject = null;
-  video.src = url;
-  video.loop = true;
-  video.muted = true;
-  await video.play();
-  return () => {
-    video.pause();
-    URL.revokeObjectURL(url);
   };
 }
 
