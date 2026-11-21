@@ -149,6 +149,21 @@ with a pointer to their replacement; nothing is ever deleted from §3.
   public demo URL would need a tunnel from that laptop, or the server running on the box. The 3090 scripts
   (`gpu/up.sh`) remain as a fallback. 32 GB fits the 8B (~18 GB) next to a second model or a small training job.
 
+### D-015 — Demo deploy: everything on the 5090 box, one origin behind a Cloudflare tunnel (2026-11-21)
+- **Context:** A3 needs a public link a judge can open with no laptop in the loop. The web app fetches `/api/*`
+  from its own origin. vLLM runs on the 5090 on `127.0.0.1` (D-014). Render (the old setup) needs a human with
+  the account, and a quick tunnel's URL changes on every restart anyway.
+- **Decision:** the session server runs on the 5090 next to vLLM and also serves the built web app
+  (`deploy/demo_app.py`: `create_app()` + the Vite build mounted at `/`). One Cloudflare tunnel (quick by
+  default, named if `SUP_TUNNEL_TOKEN` is set) exposes only that server; vLLM stays private. Processes run in
+  tmux restart loops (no systemd). `deploy/up-demo.sh` is the one command; secrets live in `~/sup/demo.env`
+  (mode 600) on the box.
+- **Consequences:** same origin, so no CORS, no `?server=` and no second host; Render is dropped for this
+  project. The quick-tunnel link survives redeploys (only the server restarts) but changes when cloudflared
+  restarts: `deploy/up-demo.sh --url` prints the current one. A stable link needs a named tunnel from someone
+  with a Cloudflare account. If the box goes down, so does the demo (fallback: `make dev` on a laptop +
+  `gpu/up-5090.sh`).
+
 ## §2 Open (decide in block 1, see docs/VISION.md)
 
 - **D-?? Demo scenario.** Direction: physical assembly in robotics (a contact who assembles robots will give a
@@ -157,7 +172,6 @@ with a pointer to their replacement; nothing is ever deleted from §3.
 - **D-?? M_VL labeller/fallback.** Main model decided (D-012); proposal: a Gemini Flash-class API as labeller/fallback.
 - **D-?? Visual simulator.** Proposal: Runway Gen-4.5 image-to-video (and Aleph for mistake variants) per step,
   starting from photos of our real setup; local Wan 2.2 as fallback. Budget to agree.
-- **D-?? Deploy.** Where the web app runs for the demo (Render again, or local + tunnel to the 3090).
 
 ## §3 Superseded
 

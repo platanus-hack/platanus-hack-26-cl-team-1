@@ -65,6 +65,9 @@ holds `SUP_VLM_API_KEY` and optionally `VLM_MODEL`, `VLM_SERVED`, `VLM_GPU_UTIL`
 
 ## RTX 5090 box (current GPU)
 
+The public demo (server + web app behind a Cloudflare tunnel) also runs on this box: see
+[deploy/README.md](../deploy/README.md).
+
 A second box with an **RTX 5090 (32 GB)**: a container where we're root, with no systemd and no rsync, and
 `nvcc` 12.9. Its address is in the team chat; keep it out of git (the repo is public and the login is root).
 vLLM listens on `127.0.0.1` only, and we reach it with an **SSH port-forward**, so it needs no public tunnel
