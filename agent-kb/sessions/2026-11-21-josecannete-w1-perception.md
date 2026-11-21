@@ -1,7 +1,7 @@
 # 2026-11-21 — w1-perception
 
 - **Who:** josecannete (+ agent, workspace W1)
-- **Branch / PRs:** `josecannete/gufg0` → PR (see backlog Done)
+- **Branch / PRs:** `josecannete/gufg0` → https://github.com/platanus-hack/platanus-hack-26-cl-team-1/pull/21
 - **Goal:** replace the scripted perception with Qwen3-VL-8B FP8 on vLLM (3090) behind `Perception`.
 
 ## Done
