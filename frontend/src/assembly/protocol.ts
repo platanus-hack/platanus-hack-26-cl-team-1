@@ -50,6 +50,8 @@ export interface Detection {
   box: [number, number, number, number]; // x1 y1 x2 y2, frame pixels
   /** Holes the legs of this detection map to (when calibrated). */
   holes?: string[];
+  /** wire_end only: jumper colour read in HSV ('red', 'black', …). */
+  color?: string;
 }
 
 export type ServerMsg =

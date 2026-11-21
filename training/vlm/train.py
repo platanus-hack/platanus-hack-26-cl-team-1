@@ -18,29 +18,42 @@ import json
 from pathlib import Path
 
 
-def load(path: Path, limit: int | None) -> list[dict]:
-    from PIL import Image
+def load(path: Path, limit: int | None):
+    """JSONL → datasets.Dataset of plain strings (TRL 1.x wants a Dataset; PIL images inside nested
+    chat messages do not survive Arrow, so images stay as paths and are opened by the collator)."""
+    from datasets import Dataset
 
     recs = [json.loads(x) for x in path.read_text().splitlines() if x.strip()]
     if limit:
         recs = recs[:limit]
-    out = []
-    for r in recs:
-        imgs = [Image.open(p).convert("RGB") for p in r["images"]]
-        out.append(
+    keep = ("system", "user", "target", "images")
+    return Dataset.from_list([{k: r[k] for k in keep} for r in recs])
+
+
+def to_messages(r: dict) -> dict:
+    from PIL import Image
+
+    imgs = [Image.open(p).convert("RGB") for p in r["images"]]
+    return {
+        "messages": [
+            {"role": "system", "content": [{"type": "text", "text": r["system"]}]},
             {
-                "messages": [
-                    {"role": "system", "content": [{"type": "text", "text": r["system"]}]},
-                    {
-                        "role": "user",
-                        "content": [{"type": "image", "image": imgs[0]}, {"type": "image", "image": imgs[1]}]
-                        + [{"type": "text", "text": r["user"]}],
-                    },
-                    {"role": "assistant", "content": [{"type": "text", "text": r["target"]}]},
-                ]
-            }
-        )
-    return out
+                "role": "user",
+                "content": [{"type": "image", "image": im} for im in imgs] + [{"type": "text", "text": r["user"]}],
+            },
+            {"role": "assistant", "content": [{"type": "text", "text": r["target"]}]},
+        ]
+    }
+
+
+class PathCollator:
+    """Opens the images of each row and hands chat messages to Unsloth's vision collator."""
+
+    def __init__(self, inner) -> None:
+        self.inner = inner
+
+    def __call__(self, rows: list[dict]):
+        return self.inner([to_messages(r) for r in rows])
 
 
 def main() -> None:
@@ -81,14 +94,16 @@ def main() -> None:
     out = Path(a.out)
     trainer = SFTTrainer(
         model=model,
-        tokenizer=tokenizer,
-        data_collator=UnslothVisionDataCollator(
-            model,
-            tokenizer,
-            resize="max",  # keep 640x480 frames and <=512 px crops: exactly what production sends
-            train_on_responses_only=True,  # loss only on the JSON answer (Qwen ChatML turns)
-            instruction_part="<|im_start|>user\n",
-            response_part="<|im_start|>assistant\n",
+        processing_class=tokenizer,  # TRL 1.x name
+        data_collator=PathCollator(
+            UnslothVisionDataCollator(
+                model,
+                tokenizer,
+                resize="max",  # keep 640x480 frames and <=512 px crops: exactly what production sends
+                train_on_responses_only=True,  # loss only on the JSON answer (Qwen ChatML turns)
+                instruction_part="<|im_start|>user\n",
+                response_part="<|im_start|>assistant\n",
+            )
         ),
         train_dataset=data,
         args=SFTConfig(
@@ -97,7 +112,7 @@ def main() -> None:
             num_train_epochs=a.epochs,
             max_steps=a.max_steps,
             learning_rate=a.lr,
-            warmup_ratio=0.05,
+            warmup_steps=0.05,  # float in [0, 1) = ratio of total steps (transformers 5)
             lr_scheduler_type="cosine",
             optim="adamw_8bit",
             weight_decay=0.01,
