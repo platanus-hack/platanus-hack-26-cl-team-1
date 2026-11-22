@@ -54,6 +54,13 @@ def target(task: Task, ontology: Ontology, label: str) -> str:
     return json.dumps(answer)
 
 
+def check_test_sessions(requested: list[str], found: set[str]) -> None:
+    """Every held-out session must exist: a typo would silently put a test run into training."""
+    unknown = sorted(set(requested) - found)
+    if unknown:
+        raise ValueError(f"--test-sessions not in the runs: {unknown}; sessions found: {sorted(found)}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -64,13 +71,18 @@ def main() -> None:
     parser.add_argument("--tasks-dir", type=Path, default=REPO_ROOT / "tasks")
     args = parser.parse_args()
     library = TaskLibrary.load(args.tasks_dir)
+    sessions = {run: load_sessions(run, library) for run in args.runs}
+    try:
+        check_test_sessions(args.test_sessions, {s.id for found in sessions.values() for s in found})
+    except ValueError as error:
+        raise SystemExit(str(error)) from error
     (args.out / "images").mkdir(parents=True, exist_ok=True)
     rows: dict[str, list[dict]] = {"train": [], "test": []}
     counts: dict[str, Counter] = {"train": Counter(), "test": Counter()}
     for run in args.runs:
         labels_path = run / "labels.json"
         labels = json.loads(labels_path.read_text()) if labels_path.exists() else {}
-        for session in load_sessions(run, library):
+        for session in sessions[run]:
             ontology = Ontology.model_validate_json(
                 (args.tasks_dir / session.task.domain / "ontology.json").read_text()
             )

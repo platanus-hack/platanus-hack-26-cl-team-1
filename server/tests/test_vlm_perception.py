@@ -300,6 +300,7 @@ def test_session_runs_on_the_vlm(monkeypatch):
     settings = Settings(
         tasks_dir=TASKS_DIR, perception=PerceptionMode.VLM, scripted_every_ms=0, scripted_mistake=None,
         voice=VoiceMode.BROWSER, cors_origins=(), vlm_base_url="http://vlm.invalid/v1", vlm_min_interval_ms=0,
+        vlm_max_in_flight=1,
     )  # fmt: skip
     client = TestClient(create_app(settings))
     with client.websocket_connect("/ws/session") as ws:
@@ -336,3 +337,80 @@ def test_dataset_labels_pass_the_object_guard():
         for action in task.actions:
             obs = observe(make(FakeModel(dataset.target(task, onto, action)), onto), task, next_steps=[])
             assert obs.output.action == action, (task.id, action, obs.output.note)
+
+
+def test_pipelined_calls_overlap_and_arrive_in_launch_order(task, ontology):
+    """Three calls in flight at once; the second finishes first but is only delivered after the first."""
+    gates = [asyncio.Event() for _ in range(3)]
+
+    class Gated(FakeModel):
+        async def __call__(self, messages, json_schema):
+            n = len(self.calls)
+            self.calls.append((messages, json_schema))
+            await gates[n].wait()
+            action, seen = [("wet_hands", ["hands"]), ("apply_soap", ["soap"]), ("rub_palms", ["hands"])][n]
+            return answer(action=action, confidence=0.9, quality="ok", objects=seen)
+
+    model = Gated(answer())
+    perception = make(model, ontology, min_interval_ms=0, max_in_flight=3)
+
+    async def run():
+        fs = frames()
+        assert [await perception.observe(fs, task, []) for _ in range(2)] == [None, None]
+        third = asyncio.create_task(perception.observe(fs, task, []))  # at capacity: waits for the 1st
+        await asyncio.sleep(0.01)
+        assert len(model.calls) == 3 and not third.done()
+        gates[1].set()
+        await asyncio.sleep(0.01)
+        assert not third.done()  # the 2nd is in, but the 1st comes first
+        gates[0].set()
+        first = await third
+        gates[2].set()
+        rest = [await perception.observe([], task, []) for _ in range(2)]
+        return [o.output.action for o in (first, *rest)]
+
+    assert asyncio.run(run()) == ["wet_hands", "apply_soap", "rub_palms"]
+
+
+def test_pipelined_call_failure_is_raised(task, ontology):
+    model = FakeModel(openai.APIConnectionError(request=None))  # type: ignore[arg-type]
+    perception = make(model, ontology, min_interval_ms=0, max_in_flight=2)
+
+    async def run():
+        assert await perception.observe(frames(), task, []) is None
+        await asyncio.sleep(0.01)
+        await perception.observe(frames(), task, [])
+
+    with pytest.raises(openai.APIConnectionError):
+        asyncio.run(run())
+
+
+def test_session_runs_on_pipelined_vlm_calls(monkeypatch):
+    """The live defaults (3 calls in flight): a stream of frames reaches the controller in order."""
+    model = FakeModel(answer(action="wet_hands", confidence=0.9, quality="ok", objects=["hands"]))
+    monkeypatch.setattr(factory, "_completer", lambda *a: model)
+    settings = Settings(
+        tasks_dir=TASKS_DIR, perception=PerceptionMode.VLM, scripted_every_ms=0, scripted_mistake=None,
+        voice=VoiceMode.BROWSER, cors_origins=(), vlm_base_url="http://vlm.invalid/v1", vlm_min_interval_ms=0,
+    )  # fmt: skip
+    assert settings.vlm_max_in_flight > 1
+    client = TestClient(create_app(settings))
+    with client.websocket_connect("/ws/session") as ws:
+        hello = {"type": "hello", "protocol": 1, "task_id": "hand_hygiene_basic", "source": "webcam"}
+        ws.send_text(json.dumps(hello | {"debug": True}))
+        assert ws.receive_json()["type"] == "ready"
+        seen, seq = [], 0
+        while not any(m["type"] == "state" and m["statuses"]["wet"] == "done" for m in seen):
+            ws.send_bytes(pack_frame(seq, seq * 170, jpeg()))
+            seq += 1
+            message = ws.receive_json()
+            while (
+                message["type"] != "debug"
+                or message.get("observation") is not None
+                or message["seq"] != seq - 1
+            ):
+                seen.append(message)
+                message = ws.receive_json()
+            assert seq < 50, "the pipelined answers never reached the controller"
+        seqs = [m["observation"]["seq"] for m in seen if m["type"] == "debug" and m.get("observation")]
+        assert seqs == sorted(seqs)

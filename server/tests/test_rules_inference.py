@@ -96,3 +96,19 @@ def test_a_step_without_a_defined_out_of_order_mistake_is_still_inferred():
         plane, ["turn_master_on", "set_fuel_both", "set_mixture_rich", *["set_flaps_takeoff"] * 4]
     )
     assert decisions[-1].event is Event.STEP_DONE and {"engine_start", "flaps_10"} <= controller.done
+
+
+def test_fast_sightings_need_the_minimum_span_before_inferring(task):
+    """Four sightings within a second (pipelined perception) aren't enough: the span must reach 2 s."""
+    controller = RulesController()
+    controller.start(task)
+
+    def at(action, t_ms):
+        output = VlmOutput(action=action, confidence=0.9, quality=Quality.OK)
+        o = Observation(seq=t_ms, t_ms=t_ms, source=Source.WEBCAM, model="t", latency_ms=0, output=output)
+        return controller.decide(o)
+
+    at("wet_hands", 0)
+    fast = [at("rub_palms", t) for t in (1000, 1250, 1500, 1750, 2000, 2250)]
+    assert all(d.event is not Event.STEP_DONE for d in fast)
+    assert at("rub_palms", 3000).event is Event.STEP_DONE

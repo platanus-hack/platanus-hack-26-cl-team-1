@@ -41,7 +41,8 @@ class Settings:
     vlm_base_url: str | None = None  # OpenAI-compatible base URL, e.g. https://<tunnel>/v1
     vlm_model: str = "qwen3-vl-8b-fp8"  # served model name in vLLM; also recorded in every Observation
     vlm_api_key: str | None = None  # vLLM --api-key; never commit it (gpu/README.md)
-    vlm_min_interval_ms: int = 750  # minimum time between two VLM calls, so we don't hammer the GPU
+    vlm_max_in_flight: int = 3  # pipelined calls per session; vLLM batches them (D-018)
+    vlm_min_interval_ms: int = 250  # minimum time between two VLM calls, so we don't hammer the GPU
     vlm_timeout_s: float = 10.0  # a slower answer is a real failure (raises)
     vlm_max_side_px: int = 640  # frames are downscaled so their longest side is at most this
     vlm_record_dir: Path | None = None  # if set, every VLM call's frames + answer are saved here
@@ -50,8 +51,16 @@ class Settings:
     vlm_frames: int = 3  # frames per call, spread over vlm_span_ms (vLLM's --limit-mm-per-prompt caps it)
 
     def __post_init__(self) -> None:
-        if self.vlm_frames < 1 or self.vlm_min_interval_ms < 0 or self.vlm_span_ms < 0:
-            raise ValueError("SUP_VLM_FRAMES must be ≥ 1, SUP_VLM_MIN_INTERVAL_MS and SUP_VLM_SPAN_MS ≥ 0")
+        if (
+            self.vlm_frames < 1
+            or self.vlm_max_in_flight < 1
+            or self.vlm_min_interval_ms < 0
+            or self.vlm_span_ms < 0
+        ):
+            raise ValueError(
+                "SUP_VLM_FRAMES and SUP_VLM_MAX_IN_FLIGHT must be ≥ 1, "
+                "SUP_VLM_MIN_INTERVAL_MS and SUP_VLM_SPAN_MS ≥ 0"
+            )
         if self.perception is PerceptionMode.VLM and not self.vlm_base_url:
             raise ValueError("SUP_PERCEPTION=vlm needs SUP_VLM_BASE_URL (e.g. https://<tunnel>/v1)")
 
@@ -65,6 +74,7 @@ class Settings:
             vlm_base_url=os.environ.get("SUP_VLM_BASE_URL") or None,
             vlm_model=os.environ.get("SUP_VLM_MODEL", cls.vlm_model),
             vlm_api_key=os.environ.get("SUP_VLM_API_KEY") or None,
+            vlm_max_in_flight=int(os.environ.get("SUP_VLM_MAX_IN_FLIGHT", cls.vlm_max_in_flight)),
             vlm_min_interval_ms=int(os.environ.get("SUP_VLM_MIN_INTERVAL_MS", cls.vlm_min_interval_ms)),
             vlm_timeout_s=float(os.environ.get("SUP_VLM_TIMEOUT_S", cls.vlm_timeout_s)),
             vlm_max_side_px=int(os.environ.get("SUP_VLM_MAX_SIDE_PX", cls.vlm_max_side_px)),

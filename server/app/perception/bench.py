@@ -3,8 +3,11 @@
     cd server && SUP_VLM_BASE_URL=https://<tunnel>/v1 SUP_VLM_API_KEY=… \\
         uv run python -m app.perception.bench --task hand_hygiene_basic --repeat 3 img1.jpg img2.jpg …
 
-Each image is sent as a single frame (next steps = the task's first legal steps) through `VlmPerception`,
-exactly as the session would. Prints one observation per call, then p50/p95 latency.
+`--stream SECONDS` instead feeds the images as a camera at `--fps` with the live settings and reports
+observations per second (the throughput of pipelined calls, D-018).
+
+Otherwise each image is sent as a single frame (next steps = the task's first legal steps) through
+`VlmPerception`, exactly as the session would. Prints one observation per call, then p50/p95 latency.
 """
 
 from __future__ import annotations
@@ -29,7 +32,10 @@ def percentile(values: list[int], q: float) -> int:
 
 
 async def run(task_id: str, images: list[Path], repeat: int) -> None:
-    settings = replace(Settings.from_env(), perception=PerceptionMode.VLM, vlm_min_interval_ms=0)
+    # One call at a time: this mode measures a single call's latency and answer.
+    settings = replace(
+        Settings.from_env(), perception=PerceptionMode.VLM, vlm_min_interval_ms=0, vlm_max_in_flight=1
+    )
     task = TaskLibrary.load(settings.tasks_dir).get(task_id)
     if task is None:
         sys.exit(f"unknown task {task_id!r}")
@@ -52,15 +58,61 @@ async def run(task_id: str, images: list[Path], repeat: int) -> None:
     )
 
 
+async def stream(task_id: str, images: list[Path], seconds: float, fps: float) -> None:
+    """Feed a camera-like stream (the images in a loop at `fps`) through `VlmPerception` with the live
+    settings (`SUP_VLM_MAX_IN_FLIGHT`, `SUP_VLM_MIN_INTERVAL_MS`, …), one `observe` at a time as the session
+    does, and report observations per second and their latency."""
+    settings = replace(Settings.from_env(), perception=PerceptionMode.VLM)
+    task = TaskLibrary.load(settings.tasks_dir).get(task_id)
+    if task is None:
+        sys.exit(f"unknown task {task_id!r}")
+    perception = make_perception(settings, task)
+    next_steps = TaskAutomaton(task).legal_next(frozenset())
+    jpegs = [p.read_bytes() for p in images]
+    window: list[Frame] = []
+    latencies: list[int] = []
+    loop = asyncio.get_running_loop()
+    t0 = loop.time()
+    observing: asyncio.Task | None = None
+    seq = 0
+    while loop.time() - t0 < seconds:
+        frame = Frame(
+            seq=seq, t_ms=round((loop.time() - t0) * 1000), jpeg=jpegs[seq % len(jpegs)], source=Source.WEBCAM
+        )
+        window = [*window[-7:], frame]  # the session's 8-frame window
+        if observing is None or observing.done():
+            if observing is not None and (obs := observing.result()) is not None:
+                latencies.append(obs.latency_ms)
+            observing = asyncio.create_task(perception.observe(list(window), task, next_steps))
+        seq += 1
+        await asyncio.sleep(max(0.0, t0 + seq / fps - loop.time()))
+    elapsed = loop.time() - t0
+    if not latencies:
+        sys.exit("no observations")
+    print(
+        f"{len(latencies)} observations in {elapsed:.1f} s = {len(latencies) / elapsed:.2f}/s "
+        f"(max_in_flight={settings.vlm_max_in_flight}, min_interval={settings.vlm_min_interval_ms} ms, "
+        f"{settings.vlm_frames} frames/call, camera {fps:g} fps); "
+        f"latency p50 {percentile(latencies, 0.5)} ms, p95 {percentile(latencies, 0.95)} ms"
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument("--task", default="hand_hygiene_basic")
     parser.add_argument("--repeat", type=int, default=1)
+    parser.add_argument("--stream", type=float, metavar="SECONDS", help="camera-like stream: observations/s")
+    parser.add_argument(
+        "--fps", type=float, default=6.0, help="camera fps for --stream (the web app sends 6)"
+    )
     parser.add_argument("images", nargs="+", type=Path)
     args = parser.parse_args()
-    asyncio.run(run(args.task, args.images, args.repeat))
+    if args.stream:
+        asyncio.run(stream(args.task, args.images, args.stream, args.fps))
+    else:
+        asyncio.run(run(args.task, args.images, args.repeat))
 
 
 if __name__ == "__main__":

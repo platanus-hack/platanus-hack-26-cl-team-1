@@ -35,6 +35,7 @@ Measure latency and look at real answers (single JPEGs, through `VlmPerception` 
 
 ```bash
 cd server && SUP_VLM_BASE_URL=… SUP_VLM_API_KEY=… uv run python -m app.perception.bench --repeat 3 a.jpg b.jpg
+cd server && SUP_VLM_BASE_URL=… uv run python -m app.perception.bench --stream 45 frames/*.jpg   # observations/s
 ```
 
 ## What runs
@@ -58,7 +59,8 @@ holds `SUP_VLM_API_KEY` and optionally `VLM_MODEL`, `VLM_SERVED`, `VLM_GPU_UTIL`
 | `SUP_VLM_BASE_URL` | — (required for `vlm`) | `https://<tunnel>/v1` |
 | `SUP_VLM_API_KEY` | — | the key from `~/sup/env` |
 | `SUP_VLM_MODEL` | `qwen3-vl-8b-fp8` | vLLM served name; recorded in every `Observation.model` |
-| `SUP_VLM_MIN_INTERVAL_MS` | `750` | minimum time between calls (one call in flight anyway) |
+| `SUP_VLM_MIN_INTERVAL_MS` | `250` | minimum time between call starts |
+| `SUP_VLM_MAX_IN_FLIGHT` | `3` | pipelined calls per session; vLLM batches them at about the latency of one (D-018) |
 | `SUP_VLM_TIMEOUT_S` | `10` | slower = failure (raises; the session reports an `error`) |
 | `SUP_VLM_MAX_SIDE_PX` | `640` | frames are downscaled to this longest side |
 | `SUP_VLM_SPAN_MS` | `1100` | the frames shown to the model cover about this much time |
