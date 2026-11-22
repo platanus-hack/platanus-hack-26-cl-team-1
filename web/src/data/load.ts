@@ -9,13 +9,17 @@ import type {
   IgnitionPreset,
   NationalPopulation,
   NationalPopulationMeta,
+  NationalStation,
+  NationalStationsFile,
+  NationalVehicle,
   Reinforcement,
   RoadsFile,
   RouteCut,
   TimelineId,
+  VehicleKind,
   WeatherFile,
 } from '../engine/types'
-import { FUEL, ROAD, UNIT_COUNT } from '../engine/types'
+import { COMPANY_SPECIALTY, FUEL, ROAD, SETTLEMENT, STATION_KIND, UNIT_COUNT, VEHICLE_KIND, VEHICLE_KIND_UNIT } from '../engine/types'
 import type { EventDef } from './events'
 import { lonLatToColRow } from './grid'
 import { wallClockMin } from './time'
@@ -446,6 +450,140 @@ export function parseBrigades(j: unknown, g: GridMeta): BrigadesFile {
   return { stations, dispatch, reinforcements, cuts }
 }
 
+/** Chile's mainland + Rapa Nui + Juan Fernández, generous (lon -110..-66, lat -56..-17). */
+const CHILE_BOX = { lonMin: -110, lonMax: -66, latMin: -56.5, latMax: -17 }
+const VEHICLE_KINDS = new Set<string>(Object.values(VEHICLE_KIND))
+
+function oneOf<T extends string>(file: string, o: Obj, k: string, allowed: readonly T[], what: string): T {
+  const v = o[k]
+  if (typeof v !== 'string' || !(allowed as readonly string[]).includes(v)) throw new DataError(file, `${what}: "${k}" = ${JSON.stringify(v)} no es uno de ${allowed.join(', ')}`)
+  return v as T
+}
+function nullableInt(file: string, o: Obj, k: string, what: string): number | null {
+  const v = o[k]
+  if (v === null) return null
+  if (!Number.isInteger(v)) throw new DataError(file, `${what}: "${k}" debe ser un entero o null`)
+  return v as number
+}
+
+/** national/bomberos_cl.json: every fire company of Chile with its trucks (pipeline/steps/bomberos.py). Checks
+ *  the closed sets, positions inside Chile, unique ids, that units agree with the vehicles and the totals with
+ *  the stations. */
+export function parseNationalStations(j: unknown): NationalStationsFile {
+  const f = 'national/bomberos_cl.json'
+  if (!isObj(j)) throw new DataError(f, 'no es un objeto JSON')
+  if (j.version !== 1) throw new DataError(f, `versión ${String(j.version)} desconocida (se espera 1)`)
+  const totals = j.totals
+  if (!isObj(totals)) throw new DataError(f, 'falta "totals"')
+  const ids = new Set<string>()
+  const stations: NationalStation[] = list(f, j, 'stations').map((s) => {
+    const id = str(f, s, 'id')
+    if (ids.has(id)) throw new DataError(f, `id duplicado "${id}"`)
+    ids.add(id)
+    const what = `estación ${id}`
+    const vehicles: NationalVehicle[] = list(f, s, 'vehicles').map((v) => {
+      if (typeof v.kind !== 'string' || !VEHICLE_KINDS.has(v.kind)) throw new DataError(f, `${what}: tipo de carro ${JSON.stringify(v.kind)} desconocido`)
+      return {
+        code: nullableStr(f, v, 'code'),
+        kind: v.kind as VehicleKind,
+        make: nullableStr(f, v, 'make'),
+        model: nullableStr(f, v, 'model'),
+        year: nullableInt(f, v, 'year', what),
+        source: nullableStr(f, v, 'source'),
+      }
+    })
+    if (typeof s.cuerpoInferred !== 'boolean') throw new DataError(f, `${what}: "cuerpoInferred" debe ser true o false`)
+    const x: NationalStation = {
+      id,
+      cuerpo: str(f, s, 'cuerpo'),
+      cuerpoInferred: s.cuerpoInferred,
+      number: nullableInt(f, s, 'number', what),
+      company: str(f, s, 'company'),
+      kind: oneOf(f, s, 'kind', STATION_KIND, what),
+      specialty: oneOf(f, s, 'specialty', COMPANY_SPECIALTY, what),
+      region: str(f, s, 'region'),
+      comuna: str(f, s, 'comuna'),
+      lon: num(f, s, 'lon'),
+      lat: num(f, s, 'lat'),
+      settlement: oneOf(f, s, 'settlement', SETTLEMENT, what),
+      peopleNearby: num(f, s, 'peopleNearby'),
+      locationSource: str(f, s, 'locationSource'),
+      vehicles,
+      units: units(f, s, what),
+      fleetSource: nullableStr(f, s, 'fleetSource'),
+      fleetComplete: (() => {
+        if (typeof s.fleetComplete !== 'boolean') throw new DataError(f, `${what}: "fleetComplete" debe ser true o false`)
+        return s.fleetComplete
+      })(),
+    }
+    if (!(x.lon >= CHILE_BOX.lonMin && x.lon <= CHILE_BOX.lonMax && x.lat >= CHILE_BOX.latMin && x.lat <= CHILE_BOX.latMax))
+      throw new DataError(f, `${what} (${x.lon}, ${x.lat}) queda fuera de Chile`)
+    const want = unitsOfVehicles(vehicles)
+    if (want.some((n, i) => n !== x.units[i])) throw new DataError(f, `${what}: "units" ${JSON.stringify(x.units)} no coincide con sus carros ${JSON.stringify(want)}`)
+    if (x.fleetComplete && (x.fleetSource === null || vehicles.some((v) => v.source === null))) throw new DataError(f, `${what}: flota completa con carros sin fuente`)
+    if (x.fleetSource === null && vehicles.some((v) => v.source !== null)) throw new DataError(f, `${what}: carros con fuente pero sin "fleetSource"`)
+    if (vehicles.length === 0) throw new DataError(f, `${what}: no tiene carros`)
+    return x
+  })
+  if (stations.length === 0) throw new DataError(f, 'no tiene estaciones')
+  const sumUnits = new Array<number>(UNIT_COUNT).fill(0)
+  for (const s of stations) s.units.forEach((n, i) => (sumUnits[i] += n))
+  const out: NationalStationsFile = {
+    version: 1,
+    baked: str(f, j, 'baked'),
+    totals: {
+      stations: num(f, totals, 'stations'),
+      documentedFleets: num(f, totals, 'documentedFleets'),
+      vehicles: num(f, totals, 'vehicles'),
+      units: numArray(f, totals, 'units', UNIT_COUNT),
+    },
+    reference: list(f, j, 'reference').map((r) => ({ label: str(f, r, 'label'), value: num(f, r, 'value'), source: str(f, r, 'source') })),
+    estimateMethod: str(f, j, 'estimateMethod'),
+    sources: (() => {
+      const v = j.sources
+      if (!Array.isArray(v) || v.length === 0 || !v.every((x) => typeof x === 'string' && x.length > 0)) throw new DataError(f, '"sources" debe ser una lista de textos')
+      return v as string[]
+    })(),
+    stations,
+  }
+  const t = out.totals
+  if (t.stations !== stations.length) throw new DataError(f, `totals.stations (${t.stations}) no coincide con ${stations.length} estaciones`)
+  if (t.documentedFleets !== stations.filter((s) => s.fleetSource !== null).length) throw new DataError(f, 'totals.documentedFleets no coincide con las estaciones')
+  if (t.vehicles !== stations.reduce((a, s) => a + s.vehicles.length, 0)) throw new DataError(f, 'totals.vehicles no coincide con los carros')
+  if (t.units.some((n, i) => n !== sumUnits[i])) throw new DataError(f, `totals.units ${JSON.stringify(t.units)} no coincide con la suma ${JSON.stringify(sumUnits)}`)
+  return out
+}
+
+/** Count per engine UnitType of a list of vehicles (VEHICLE_KIND_UNIT). */
+export function unitsOfVehicles(vehicles: { kind: VehicleKind }[]): number[] {
+  const u = new Array<number>(UNIT_COUNT).fill(0)
+  for (const v of vehicles) {
+    const t = VEHICLE_KIND_UNIT[v.kind]
+    if (t !== null) u[t] += 1
+  }
+  return u
+}
+
+/** The national stations inside a lon/lat box, as brigade-engine stations (BrigadeStation). For a scenario
+ *  built from scratch: pass the scenario grid's bounds. The cuerpo of each station still needs a dispatch time
+ *  in BrigadesFile.dispatch. unitsSource is the fleet's source only when the whole fleet is documented; a fleet
+ *  with any estimated truck is "supuesto" (null), as the UI shows it. */
+export function stationsInBox(file: NationalStationsFile, box: { lonMin: number; lonMax: number; latMin: number; latMax: number }): BrigadeStation[] {
+  if (!(box.lonMin < box.lonMax && box.latMin < box.latMax)) throw new DataError('national/bomberos_cl.json', `caja inválida ${JSON.stringify(box)}`)
+  return file.stations
+    .filter((s) => s.lon >= box.lonMin && s.lon <= box.lonMax && s.lat >= box.latMin && s.lat <= box.latMax)
+    .map((s) => ({
+      id: s.id,
+      cuerpo: s.cuerpo,
+      company: s.company,
+      lon: s.lon,
+      lat: s.lat,
+      units: [...s.units],
+      unitsSource: s.fleetComplete ? s.fleetSource : null,
+      locationSource: s.locationSource,
+    }))
+}
+
 /** Loads one baked event's files (its own timeline). Returns null when its data has not been baked yet (no
  *  grid.json); throws DataError otherwise. Optional layers are fetched only when the event ships them. */
 export async function loadRealDataset(event: EventDef): Promise<Dataset | null> {
@@ -507,4 +645,10 @@ export async function loadRealDataset(event: EventDef): Promise<Dataset | null> 
 export async function loadNationalPopulation(): Promise<NationalPopulation> {
   const [meta, bin] = await Promise.all([fetchJson('national/population_cl.json'), fetchBin('national/population_cl.bin')])
   return parseNationalPopulation(meta, bin)
+}
+
+/** Every fire company of Chile with its trucks (~1 MB), for scenarios built outside the baked grid. Not loaded by
+ *  the explorer today. */
+export async function loadNationalStations(): Promise<NationalStationsFile> {
+  return parseNationalStations(await fetchJson('national/bomberos_cl.json'))
 }

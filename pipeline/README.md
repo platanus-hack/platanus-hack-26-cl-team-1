@@ -11,6 +11,7 @@ uv run python bake.py --event eaton-2025  # Eaton 2025 -> web/public/data/eaton-
 uv run python bake.py --refresh  # wipe the event's download cache first and re-download everything
 uv run python bake_population.py # national population product + the grid's two layers (~25 s warm, ~80 MB cold)
 uv run python population_report.py  # totals and day/night checks quoted in the population MODEL.md
+uv run python bake_bomberos.py   # every fire company of Chile with its trucks (national/bomberos_cl.json, ~1 s warm)
 uv run pytest                    # unit tests for the non-trivial logic (no network)
 ```
 
@@ -78,6 +79,7 @@ Every grid stays under Viña's 245,456 cells (`grid.MAX_CELLS`).
 | `population_home.bin` | Float32 residents per cell | WorldPop 2024 (constrained, 100 m) |
 | `population_work.bin` | Float32 people per cell if every resident is at work or school | WorldPop 2024 + GHSL GHS-BUILT-V NRES 2025, gravity model |
 | `national/population_cl.{json,bin}` | Both layers for all of Chile, 30" (~0.9 km), sparse (`NationalPopulationMeta`) | same |
+| `national/bomberos_cl.json` | `NationalStationsFile`: the 1,256 compañías de bomberos of Chile with their trucks (kind, make, model), documented or estimated | JNB Catastro de Cuarteles 2025 + bomberos.cl list + OSM; JNB Registro de Material Mayor 2025; `bomberos/fleets.json` |
 | `eaton-2025/perimeter.bin` | Uint8 per cell: 1 inside the official final perimeter, 0 outside (**validation only**, not loaded by the app) | NIFC / WFIGS Interagency Fire Perimeters |
 | `eaton-2025/dins.json` | `[lon, lat, damage]` per inspected structure, damage in `none / affected / minor / major / destroyed / inaccessible` (**validation only**) | CAL FIRE Damage Inspection (DINS) |
 
@@ -201,6 +203,44 @@ validated against the grid on load (`parseBrigades`). Positions are the OpenStre
 nodes/ways of the four cuerpos inside the grid; every count, time and cut carries its source, or `null`, which
 the app shows as "supuesto". Sources and assumptions: `web/src/engine/brigade/MODEL.md`.
 
+**national/bomberos_cl.json (`steps/bomberos.py`, `bake_bomberos.py`).** Every fire company of Chile, for
+scenarios built anywhere (`stationsInBox` in `web/src/data/load.ts` turns it into `BrigadeStation[]`).
+- Companies and positions: the Junta Nacional de Bomberos (JNB) *Catastro Nacional de Cuarteles de Bomberos 2025*
+  (Geoportal de Chile; 1,271 cuarteles, `N_COMPA` lists the compañías each one houses) joined with the bomberos.cl
+  compañía list of 2024-10-08 (Itrend, *Datos para Resiliencia*, CC BY 4.0, public ArcGIS copy; 1,165 compañías) on
+  (cuerpo, number); `merge_companies` documents the rules and the bake prints how often each one applied. 1,256
+  compañías result (JNB Memoria 2025: 1,262) in 314 cuerpos (314). The two layers agree within 300 m for 861
+  compañías. Where they disagree (234), an OSM station with the same company number sits at the catastro point in
+  108 cases and at the 2024 point in 8; an uncoded catastro cuartel (the building without its code) sides with the
+  2024 point in 8; 106 have no OSM evidence and keep the catastro point. Catastro-only compañías at a "No operativa"
+  cuartel are dropped (1), and 2024-only compañías that sit within 300 m of another cuerpo's catastro compañía are
+  the same cuartel under an old cuerpo name and are dropped (6, listed by the bake). Codes like `CB-4 1` are a
+  second cuartel of the 4ª. Cuarteles generales without a compañía are left out. Per region the count is within
+  ±3 of the JNB's except Valparaíso (−5) and Aysén (+7: 12 catastro codes in no other source, likely brigadas); the
+  Metropolitana has one cuerpo more than the JNB (Calera de Tango, only in the 2024 list) and Ñuble one fewer (San
+  Fabián de Alico, new, no coordinates).
+- Region and comuna: point in polygon on geoBoundaries gbOpen CHL ADM1 / ADM3 (nearest polygon for points just off
+  the simplified coast). geoBoundaries names Pozo Almonte's polygon "Tocopilla"; the bake renames it (`ADM3_RENAME`)
+  and stops if any comuna name repeats. `settlement` urbano = more than 15,000 residents within 2.5 km (national
+  population).
+- Trucks: no open dataset lists them per compañía. `bomberos/fleets.json` is curated (396 entries from 293 sources):
+  330 compañías with 615 documented vehicles (code, kind, make, model, year, source URL; 150 of them the whole fleet
+  from the cuerpo's own pages or Wikipedia), compiled 2026-11-22 from cuerpo websites, Wikipedia, JNB / regional
+  reports and press; six entries per zone (48) were re-checked against their sources by a separate agent: 46 confirmed, the
+  2 refuted were dropped. The rest is
+  estimated against the JNB *Registro Nacional de Material Mayor* 2025 (`bomberos/registro_material_mayor_2025.json`,
+  Memoria 2025 p. 34: 4,476 vehicles in active service by region and type): per region and type, the register minus
+  the documented vehicles is shared among the compañías without a complete documented fleet, so the region totals
+  per type equal the register. Where the documented vehicles alone exceed it the bake prints it and keeps them
+  (today 15 ladders in the Metropolitana, 2 ladders and 3 hazmat units in Biobío: 4,496 vehicles in all; the
+  register's national ladder count fell from 131 to 84 between 2024 and 2025). Each estimated vehicle has
+  `source: null` ("supuesto") and a make/model drawn from the documented models of its type, by frequency, and the
+  JNB bulk purchases (Magirus 2017, the 2024 deliveries), each weighing its share of the national register of that
+  type; "otros", first-response units and ambulances get no model. Rule details: `ESTIMATE_NOTE` in
+  `steps/bomberos.py`, also written into the file. Known gaps: Puerto Montt 10ª and 11ª (2026) are in no location
+  source yet. In Arica y Parinacota the register has fewer water units than compañías: the bake lists the 3 left
+  without one.
+
 **Population (`steps/population.py`, `bake_population.py`).** Where people are by time of day, for all of
 Chile; the time-of-day part runs in the browser (`web/src/engine/population/MODEL.md`).
 - Residents: WorldPop 2024, constrained, 3" (`chl_pop_2024_CN_100m_R2025A_v1.tif`, 62 MB).
@@ -276,7 +316,12 @@ reading the 198 GOES files).
 - GHSL GHS-BUILT-V R2023A (European Commission, Joint Research Centre): CC BY 4.0.
   https://human-settlement.emergency.copernicus.eu/
 - geoBoundaries gbOpen ADM0 (Argentina, Bolivia, Peru): used only as a mask while baking, not redistributed.
-  https://www.geoboundaries.org/
+  https://www.geoboundaries.org/ ADM1 / ADM3 of Chile: region and comuna names in `national/bomberos_cl.json`, CC BY 4.0.
+- Junta Nacional de Cuerpos de Bomberos de Chile: Catastro Nacional de Cuarteles de Bomberos 2025 (Geoportal de
+  Chile, IDE Chile; public download, credit to the JNB as the providing institution) and Memoria Anual 2025
+  (https://www.bomberos.cl/).
+- Compañías de Bomberos de Chile (bomberos.cl, 2024), Itrend Datos para Resiliencia, doi:10.71578/DGVCQZ, CC BY 4.0.
+- Documented fleets: the cuerpo, company, Wikipedia and press pages cited per compañía in `bomberos/fleets.json`.
 
 ## Known limitations
 
@@ -293,6 +338,9 @@ reading the 198 GOES files).
   published start time and point.
 - Eaton: the reanalysis point is ~7 km west of Altadena and smooths the downslope wind storm of that night;
   treat its winds and gusts as a baseline, not as what stations in the foothills recorded.
+- Fire company trucks are mostly estimated: only the compañías in `bomberos/fleets.json` are documented; the rest
+  match the JNB register per region and type but not per compañía. Use them for resource scenarios, not as an
+  inventory.
 - Population is a model: WorldPop is itself an estimate (19.7 M, against 18.5 M counted by Censo 2024), and
   building volume is a proxy for jobs that under-weights old mixed-use centres (Santiago, Concepción). See
   `web/src/engine/population/MODEL.md`.

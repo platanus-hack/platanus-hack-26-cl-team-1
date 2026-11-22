@@ -352,6 +352,120 @@ export interface BrigadesFile {
 }
 
 // ---------------------------------------------------------------------------------------------------------
+// Fire companies of all of Chile: national/bomberos_cl.json (pipeline/steps/bomberos.py, read by
+// src/data/load.ts). The input for building a scenario anywhere in Chile: stationsInBox() turns it into
+// BrigadeStation[] for the brigade engine.
+// ---------------------------------------------------------------------------------------------------------
+
+/** Vehicle class of the Chilean "material mayor", closed set (pipeline/steps/bomberos.py VEHICLE_KIND_UNIT). The
+ *  JNB register (Memoria 2025, p. 34) counts bomba (+ bomba_rescate), forestal, aljibe, escala, rescate, hazmat,
+ *  primera intervención, ambulancia and "otros" (mando, transporte, otro). Codes vary by cuerpo. */
+export const VEHICLE_KIND = {
+  BOMBA: 'bomba', // B / BX: pump with tank (multipropósito semiurbano / pesado)
+  BOMBA_RESCATE: 'bomba_rescate', // BR / RB: pump with rescue equipment
+  FORESTAL: 'forestal', // F / BF: 4x4 pump for wildland fronts
+  PRIMERA_INTERVENCION: 'primera_intervencion', // light first-response unit with a small tank
+  ALJIBE: 'aljibe', // Z / BT: water tender
+  ESCALA: 'escala', // Q (porta escalas) / M, MX (aerial ladder or platform)
+  RESCATE: 'rescate', // R / RX / UR: rescue, no water
+  HAZMAT: 'hazmat', // H / HX: hazardous materials
+  AMBULANCIA: 'ambulancia', // S
+  MANDO: 'mando', // X / K: command
+  TRANSPORTE: 'transporte', // T / J / L: crew or logistics
+  OTRO: 'otro', // utility units and estimated "otros" of the register
+} as const
+export type VehicleKind = (typeof VEHICLE_KIND)[keyof typeof VEHICLE_KIND]
+/** Which engine unit type a vehicle counts as; null = not modelled by the brigade engine. A first-response unit
+ *  carries a small tank like a forestal (JNB C-1: 250-750 gal), so it counts as Forestal; ladders and rescue as
+ *  Escala / rescate. */
+export const VEHICLE_KIND_UNIT: Record<VehicleKind, UnitType | null> = {
+  bomba: UNIT.BOMBA,
+  bomba_rescate: UNIT.BOMBA,
+  forestal: UNIT.FORESTAL,
+  primera_intervencion: UNIT.FORESTAL,
+  aljibe: UNIT.ALJIBE,
+  escala: UNIT.RESCATE,
+  rescate: UNIT.RESCATE,
+  hazmat: null,
+  ambulancia: null,
+  mando: null,
+  transporte: null,
+  otro: null,
+}
+
+/** Company specialty, closed set. 'desconocida' when no source states it. */
+export const COMPANY_SPECIALTY = ['agua', 'escala', 'rescate', 'hazmat', 'forestal', 'mixta', 'desconocida'] as const
+export type CompanySpecialty = (typeof COMPANY_SPECIALTY)[number]
+/** Station kind: a numbered compañía, a cuerpo's cuartel general, or a station whose name says neither. */
+export const STATION_KIND = ['compania', 'cuartel_general', 'otro'] as const
+export type StationKind = (typeof STATION_KIND)[number]
+/** urbano = more than 15,000 residents within 2.5 km of the station (national population product). */
+export const SETTLEMENT = ['urbano', 'rural'] as const
+export type Settlement = (typeof SETTLEMENT)[number]
+
+/** One truck. source null = "supuesto" (estimated vehicle; make/model drawn from the documented ones). */
+export interface NationalVehicle {
+  /** As the cuerpo writes it, e.g. "B-12", "M-1"; null when estimated or not given. */
+  code: string | null
+  kind: VehicleKind
+  make: string | null
+  model: string | null
+  year: number | null
+  source: string | null
+}
+
+export interface NationalStation {
+  id: string
+  /** e.g. "Viña del Mar" (Cuerpo de Bomberos de Viña del Mar). */
+  cuerpo: string
+  /** true when the name did not say the cuerpo and it was taken from the comuna (or a researched comuna → cuerpo
+   *  list). */
+  cuerpoInferred: boolean
+  /** Company number (1 = Primera Compañía); null for a cuartel general or an unnumbered station. */
+  number: number | null
+  /** Display label, e.g. "8ª Compañía" or the OSM name. */
+  company: string
+  kind: StationKind
+  specialty: CompanySpecialty
+  region: string
+  comuna: string
+  lon: number
+  lat: number
+  settlement: Settlement
+  /** Residents within 2.5 km of the station (national population product, WorldPop 2024). */
+  peopleNearby: number
+  locationSource: string
+  vehicles: NationalVehicle[]
+  /** Count per UnitType (UNIT_COUNT), derived from vehicles through VEHICLE_KIND_UNIT. */
+  units: number[]
+  /** Where the documented vehicles come from; null = no vehicle documented, the whole fleet is "supuesto"
+   *  (estimated, see NationalStationsFile.estimateMethod). */
+  fleetSource: string | null
+  /** true when the source lists the company's whole fleet; false when only some vehicles are documented (e.g. a
+   *  delivery note) and the rest are estimated (vehicles with source null). */
+  fleetComplete: boolean
+}
+
+export interface NationalStationsFile {
+  version: 1
+  /** Local date of the bake (YYYY-MM-DD). */
+  baked: string
+  totals: {
+    stations: number
+    /** Stations with at least one documented vehicle (fleetSource not null). */
+    documentedFleets: number
+    vehicles: number
+    /** Sum of units per UnitType over all stations. */
+    units: number[]
+  }
+  /** National reference figures (Junta Nacional de Bomberos etc.) with their sources, for context. */
+  reference: { label: string; value: number; source: string }[]
+  estimateMethod: string
+  sources: string[]
+  stations: NationalStation[]
+}
+
+// ---------------------------------------------------------------------------------------------------------
 // Population: where people are by time of day (pipeline/steps/population.py, src/engine/population/)
 // ---------------------------------------------------------------------------------------------------------
 

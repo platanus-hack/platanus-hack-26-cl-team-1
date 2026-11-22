@@ -1,0 +1,291 @@
+{
+ "note": "Registro Nacional de Material Mayor 2025, solo material mayor en servicio activo, por región y tipo de carro (Junta Nacional de Cuerpos de Bomberos de Chile, Memoria Anual 2025, p. 34), y compañías y cuerpos por región (p. 33). Transcrito a mano; cada fila suma su total y las columnas suman los totales nacionales del PDF.",
+ "source": "Bomberos de Chile, Memoria Anual 2025, pp. 33-34, https://www.bomberos.cl/images/documentos/pdf/Memoria_2025.pdf",
+ "categories": [
+  "bomba",
+  "forestal",
+  "aljibe",
+  "escala",
+  "rescate",
+  "hazmat",
+  "primera_intervencion",
+  "ambulancia",
+  "gersa",
+  "otros"
+ ],
+ "regions": {
+  "Antofagasta": {
+   "cuerpos": 8,
+   "companias": 29,
+   "vehicles": {
+    "bomba": 43,
+    "forestal": 2,
+    "aljibe": 10,
+    "escala": 4,
+    "rescate": 26,
+    "hazmat": 2,
+    "primera_intervencion": 5,
+    "ambulancia": 6,
+    "gersa": 0,
+    "otros": 24
+   },
+   "total": 122
+  },
+  "Arica y Parinacota": {
+   "cuerpos": 1,
+   "companias": 8,
+   "vehicles": {
+    "bomba": 4,
+    "forestal": 0,
+    "aljibe": 4,
+    "escala": 1,
+    "rescate": 10,
+    "hazmat": 1,
+    "primera_intervencion": 1,
+    "ambulancia": 0,
+    "gersa": 0,
+    "otros": 10
+   },
+   "total": 31
+  },
+  "Atacama": {
+   "cuerpos": 9,
+   "companias": 27,
+   "vehicles": {
+    "bomba": 35,
+    "forestal": 7,
+    "aljibe": 12,
+    "escala": 1,
+    "rescate": 13,
+    "hazmat": 0,
+    "primera_intervencion": 9,
+    "ambulancia": 0,
+    "gersa": 1,
+    "otros": 29
+   },
+   "total": 107
+  },
+  "Aysén": {
+   "cuerpos": 6,
+   "companias": 29,
+   "vehicles": {
+    "bomba": 38,
+    "forestal": 15,
+    "aljibe": 6,
+    "escala": 0,
+    "rescate": 6,
+    "hazmat": 1,
+    "primera_intervencion": 10,
+    "ambulancia": 1,
+    "gersa": 0,
+    "otros": 22
+   },
+   "total": 99
+  },
+  "Biobío": {
+   "cuerpos": 32,
+   "companias": 142,
+   "vehicles": {
+    "bomba": 167,
+    "forestal": 59,
+    "aljibe": 33,
+    "escala": 5,
+    "rescate": 40,
+    "hazmat": 5,
+    "primera_intervencion": 19,
+    "ambulancia": 4,
+    "gersa": 4,
+    "otros": 115
+   },
+   "total": 451
+  },
+  "Coquimbo": {
+   "cuerpos": 15,
+   "companias": 73,
+   "vehicles": {
+    "bomba": 91,
+    "forestal": 11,
+    "aljibe": 21,
+    "escala": 3,
+    "rescate": 31,
+    "hazmat": 2,
+    "primera_intervencion": 12,
+    "ambulancia": 7,
+    "gersa": 0,
+    "otros": 54
+   },
+   "total": 232
+  },
+  "La Araucanía": {
+   "cuerpos": 36,
+   "companias": 134,
+   "vehicles": {
+    "bomba": 176,
+    "forestal": 31,
+    "aljibe": 44,
+    "escala": 4,
+    "rescate": 40,
+    "hazmat": 7,
+    "primera_intervencion": 20,
+    "ambulancia": 11,
+    "gersa": 5,
+    "otros": 145
+   },
+   "total": 483
+  },
+  "Los Lagos": {
+   "cuerpos": 35,
+   "companias": 140,
+   "vehicles": {
+    "bomba": 212,
+    "forestal": 36,
+    "aljibe": 44,
+    "escala": 8,
+    "rescate": 35,
+    "hazmat": 3,
+    "primera_intervencion": 17,
+    "ambulancia": 4,
+    "gersa": 0,
+    "otros": 99
+   },
+   "total": 458
+  },
+  "Los Ríos": {
+   "cuerpos": 20,
+   "companias": 85,
+   "vehicles": {
+    "bomba": 97,
+    "forestal": 24,
+    "aljibe": 23,
+    "escala": 2,
+    "rescate": 17,
+    "hazmat": 3,
+    "primera_intervencion": 8,
+    "ambulancia": 5,
+    "gersa": 1,
+    "otros": 59
+   },
+   "total": 239
+  },
+  "Magallanes": {
+   "cuerpos": 4,
+   "companias": 14,
+   "vehicles": {
+    "bomba": 24,
+    "forestal": 3,
+    "aljibe": 4,
+    "escala": 1,
+    "rescate": 8,
+    "hazmat": 2,
+    "primera_intervencion": 3,
+    "ambulancia": 3,
+    "gersa": 0,
+    "otros": 12
+   },
+   "total": 60
+  },
+  "Maule": {
+   "cuerpos": 30,
+   "companias": 120,
+   "vehicles": {
+    "bomba": 148,
+    "forestal": 35,
+    "aljibe": 43,
+    "escala": 5,
+    "rescate": 27,
+    "hazmat": 1,
+    "primera_intervencion": 14,
+    "ambulancia": 9,
+    "gersa": 1,
+    "otros": 107
+   },
+   "total": 390
+  },
+  "Metropolitana": {
+   "cuerpos": 24,
+   "companias": 161,
+   "vehicles": {
+    "bomba": 218,
+    "forestal": 26,
+    "aljibe": 45,
+    "escala": 29,
+    "rescate": 92,
+    "hazmat": 14,
+    "primera_intervencion": 20,
+    "ambulancia": 15,
+    "gersa": 0,
+    "otros": 133
+   },
+   "total": 592
+  },
+  "O'Higgins": {
+   "cuerpos": 33,
+   "companias": 96,
+   "vehicles": {
+    "bomba": 156,
+    "forestal": 34,
+    "aljibe": 43,
+    "escala": 3,
+    "rescate": 45,
+    "hazmat": 2,
+    "primera_intervencion": 8,
+    "ambulancia": 7,
+    "gersa": 0,
+    "otros": 134
+   },
+   "total": 432
+  },
+  "Tarapacá": {
+   "cuerpos": 7,
+   "companias": 26,
+   "vehicles": {
+    "bomba": 27,
+    "forestal": 2,
+    "aljibe": 11,
+    "escala": 5,
+    "rescate": 13,
+    "hazmat": 0,
+    "primera_intervencion": 2,
+    "ambulancia": 4,
+    "gersa": 0,
+    "otros": 6
+   },
+   "total": 70
+  },
+  "Valparaíso": {
+   "cuerpos": 34,
+   "companias": 125,
+   "vehicles": {
+    "bomba": 146,
+    "forestal": 73,
+    "aljibe": 64,
+    "escala": 12,
+    "rescate": 52,
+    "hazmat": 5,
+    "primera_intervencion": 10,
+    "ambulancia": 3,
+    "gersa": 0,
+    "otros": 134
+   },
+   "total": 499
+  },
+  "Ñuble": {
+   "cuerpos": 20,
+   "companias": 53,
+   "vehicles": {
+    "bomba": 62,
+    "forestal": 33,
+    "aljibe": 24,
+    "escala": 1,
+    "rescate": 11,
+    "hazmat": 0,
+    "primera_intervencion": 11,
+    "ambulancia": 1,
+    "gersa": 2,
+    "otros": 66
+   },
+   "total": 211
+  }
+ },
+ "nationalTotal": 4476
+}
