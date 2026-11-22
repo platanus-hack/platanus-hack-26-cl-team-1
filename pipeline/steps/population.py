@@ -22,6 +22,13 @@ national cell's home is split over its WorldPop pixels as WorldPop has it; its w
 proportion to non-residential volume (or over its WorldPop pixels for the stay-at-home cells). The 3" pixels
 are then split into SUPERSAMPLE x SUPERSAMPLE sub-pixels, each binned into the 60 m cell holding its centre:
 mass-conserving, so the domain totals equal the sum of the parts of the national cells inside it.
+
+Regional variant (events outside Chile, Event.population_regional): the same gravity model and refinement, on a
+30" grid over the simulation grid plus 2 x COMMUTE_MAX_M, built in memory at bake time instead of a committed
+national product. Origins within COMMUTE_MAX_M of the grid are everyone who can commute into it; the second
+COMMUTE_MAX_M holds every destination those origins are normalised over. Residents come from GHSL GHS-POP 2025
+(3", same tile as the non-residential volume): WorldPop's per-country files are only served whole (the USA one
+is 1.5 GB and data.worldpop.org ignores HTTP range requests, so no windowed read).
 """
 
 from __future__ import annotations
@@ -56,6 +63,18 @@ GHSL_TILE_URL = (
 # GHSL 4326 tiles are 10 x 10 degrees (bounds verified by reading them): R11..R15 = lat -10.9..-60.9,
 # C11 = lon -80..-70, C12 = lon -70..-60. Plus R12_C8 (Rapa Nui) and R12_C10 (San Felix / San Ambrosio).
 GHSL_TILES = [f"R{r}_C{c}" for r in range(11, 16) for c in (11, 12)] + ["R12_C8", "R12_C10"]
+# Tile (R, C) spans lon C1_WEST + 10 (C - 1) .. +10, lat R1_NORTH - 10 (R - 1) .. -10 (read from the tiles: R6_C7
+# spans lon -120.0079..-110.0079, lat 29.0996..39.0996; R11_C11 lon -80.0079..-70.0079, lat -20.9004..-10.9004).
+GHSL_TILE_DEG = 10.0
+GHSL_C1_WEST = -180.0079162
+GHSL_R1_NORTH = 89.0995834
+# Residents outside Chile (regional bake): GHSL GHS-POP 2025, 3", same tiles and pixel grid as GHSL_PRODUCT.
+GHS_POP_COLLECTION = "GHS_POP_GLOBE_R2023A"
+GHS_POP_PRODUCT = "GHS_POP_E2025_GLOBE_R2023A_4326_3ss"
+GHS_POP_TILE_URL = (
+    f"https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/GHSL/{GHS_POP_COLLECTION}/{GHS_POP_PRODUCT}/V1-0/tiles/"
+    f"{GHS_POP_PRODUCT}_V1_0_{{t}}.zip"
+)
 # Neighbouring countries (geoBoundaries gbOpen ADM0, simplified): their non-residential buildings must not attract
 # Chilean residents near the border (e.g. Tacna from Arica). Masking the neighbours, not Chile itself, because a
 # coarse coastline would drop coastal cities (a 1:10M Chile outline misses ~144k residents of Punta Arenas and
@@ -75,6 +94,13 @@ SOURCE = (
     "CC BY 4.0) con un modelo de gravedad (escala 10 km, máximo 30 km); se excluye la de Argentina, Bolivia y Perú "
     "(límites de geoBoundaries). Cuántos están fuera de casa según día y hora: supuestos documentados "
     "(ENE del INE oct-dic 2024; Censo 2024; matrícula Mineduc). Es una estimación, no un conteo."
+)
+REGIONAL_SOURCE = (
+    "Residentes: GHSL GHS-POP 2025, población residente a 3 segundos de arco (~90 m) (Comisión Europea, JRC; "
+    "https://human-settlement.emergency.copernicus.eu/, CC BY 4.0). Lugar de trabajo o estudio: volumen construido "
+    "no residencial GHSL GHS-BUILT-V NRES 2025 (misma fuente) con un modelo de gravedad (escala 10 km, máximo 30 km) "
+    "calculado sobre la zona del simulador más 60 km alrededor. Es una estimación, no un conteo. Cuántos están fuera "
+    "de casa según día y hora: supuestos del modelo de presencia (ver Fuentes)."
 )
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -120,16 +146,21 @@ def worldpop_path() -> Path:
     return _download(WORLDPOP_URL, CACHE / WORLDPOP_URL.rsplit("/", 1)[1])
 
 
-def ghsl_paths() -> list[Path]:
-    out = []
-    for t in GHSL_TILES:
-        z = _download(GHSL_TILE_URL.format(t=t), CACHE / f"{GHSL_PRODUCT}_{t}.zip")
-        tif = CACHE / f"{GHSL_PRODUCT}_V1_0_{t}.tif"
-        if not tif.exists():
-            with zipfile.ZipFile(z) as zf:
-                zf.extract(tif.name, CACHE)
-        out.append(tif)
-    return out
+def _ghsl_tile_path(url: str, product: str, t: str) -> Path:
+    z = _download(url.format(t=t), CACHE / f"{product}_{t}.zip")
+    tif = CACHE / f"{product}_V1_0_{t}.tif"
+    if not tif.exists():
+        with zipfile.ZipFile(z) as zf:
+            zf.extract(tif.name, CACHE)
+    return tif
+
+
+def ghsl_paths(tiles: list[str] = GHSL_TILES) -> list[Path]:
+    return [_ghsl_tile_path(GHSL_TILE_URL, GHSL_PRODUCT, t) for t in tiles]
+
+
+def ghs_pop_path(tile: str) -> Path:
+    return _ghsl_tile_path(GHS_POP_TILE_URL, GHS_POP_PRODUCT, tile)
 
 
 def neighbour_paths() -> list[Path]:
@@ -209,6 +240,26 @@ def gravity(
         src[b0 - w0 : b1 - w0] = ratio
         work[w0:w1, c0:c1] += att * _conv(src, k)
     return work + stay, stay
+
+
+def ghsl_tile(west: float, south: float, east: float, north: float) -> str:
+    """The GHSL 4326 tile holding the whole bbox. Raises if the bbox spans more than one tile (the regional bake
+    reads residents from one raster: mosaicking tiles is not implemented)."""
+    cols = {math.floor((x - GHSL_C1_WEST) / GHSL_TILE_DEG) + 1 for x in (west, east)}
+    rows = {math.floor((GHSL_R1_NORTH - y) / GHSL_TILE_DEG) + 1 for y in (north, south)}
+    if len(cols) != 1 or len(rows) != 1:
+        raise RuntimeError(f"bbox {west, south, east, north} spans GHSL tiles R{sorted(rows)} x C{sorted(cols)}")
+    return f"R{rows.pop()}_C{cols.pop()}"
+
+
+def expand_bbox(
+    west: float, south: float, east: float, north: float, margin_m: float
+) -> tuple[float, float, float, float]:
+    """The bbox grown by at least margin_m on every side (east-west at the extent's most poleward latitude)."""
+    dlat = margin_m / M_PER_DEG
+    s, n = south - dlat, north + dlat
+    dlon = margin_m / (M_PER_DEG * math.cos(math.radians(max(abs(s), abs(n)))))
+    return west - dlon, s, east + dlon, n
 
 
 def supersample_bin(values: np.ndarray, lon_w: float, lat_n: float, px_deg: float, s: int, cell_index) -> np.ndarray:
@@ -297,13 +348,19 @@ def _ghsl_national(ng: NationalGrid) -> np.ndarray:
         with rasterio.open(p) as d:
             a = d.read(1)
             t = d.transform
-        r, c = np.nonzero(a)
-        lon = t.c + (c + 0.5) * t.a
-        lat = t.f + (r + 0.5) * t.e
-        idx = ng.index(lon, lat)
-        keep = idx >= 0
-        nres += np.bincount(idx[keep], weights=a[r[keep], c[keep]].astype(np.float64), minlength=nres.size)
+        nres += _bin_by_centre(ng, a, t.c, t.f, t.a, t.e)
     return nres.reshape(ng.rows, ng.cols)
+
+
+def _bin_by_centre(ng: NationalGrid, a: np.ndarray, lon_w: float, lat_n: float, dx: float, dy: float) -> np.ndarray:
+    """Sum of the pixels of `a` (origin lon_w, lat_n; pixel size dx, dy with dy < 0) per cell holding their centre,
+    flat (rows * cols,). Pixels outside the grid are dropped."""
+    r, c = np.nonzero(a)
+    lon = lon_w + (c + 0.5) * dx
+    lat = lat_n + (r + 0.5) * dy
+    idx = ng.index(lon, lat)
+    keep = idx >= 0
+    return np.bincount(idx[keep], weights=a[r[keep], c[keep]].astype(np.float64), minlength=ng.rows * ng.cols)
 
 
 def bake_national() -> dict:
@@ -387,13 +444,23 @@ def load_national() -> tuple[NationalGrid, dict, dict[str, np.ndarray]]:
 # ---------------------------------------------------------------------------------------------------------------
 
 
-def _read_window(path: Path, west: float, south: float, east: float, north: float) -> tuple[np.ndarray, float, float]:
-    """Pixels of a 4326 raster covering the bbox (+1 pixel margin), nodata -> 0. Returns (array, lon_w, lat_n)."""
+def _read_window(
+    path: Path, west: float, south: float, east: float, north: float, strict: bool = False
+) -> tuple[np.ndarray, float, float]:
+    """Pixels of a 4326 raster covering the bbox (+1 pixel margin), nodata -> 0. Returns (array, lon_w, lat_n).
+    strict: the raster must cover the whole bbox at 3 arc-seconds (raises otherwise) and hold no negative or
+    non-finite values."""
     import rasterio
     from rasterio.windows import Window
 
     with rasterio.open(path) as d:
         t = d.transform
+        if strict:
+            if abs(t.a - PX_DEG) > 1e-9 or abs(t.e + PX_DEG) > 1e-9:
+                raise RuntimeError(f"{path.name}: pixel is not 3 arc-seconds: {t}")
+            b = d.bounds
+            if west < b.left or east > b.right or south < b.bottom or north > b.top:
+                raise RuntimeError(f"{path.name} ({b}) does not cover {west, south, east, north}")
         c0 = max(0, int(math.floor((west - t.c) / t.a)) - 1)
         c1 = min(d.width, int(math.ceil((east - t.c) / t.a)) + 1)
         r0 = max(0, int(math.floor((t.f - north) / -t.e)) - 1)
@@ -403,18 +470,62 @@ def _read_window(path: Path, west: float, south: float, east: float, north: floa
         a = d.read(1, window=Window(c0, r0, c1 - c0, r1 - r0)).astype(np.float64)
         if d.nodata is not None:
             a[a == d.nodata] = 0.0
+        if strict and ((a < 0).any() or not np.isfinite(a).all()):
+            raise RuntimeError(f"{path.name}: negative or non-finite values in {west, south, east, north}")
         return a, t.c + c0 * t.a, t.f + r0 * t.e
 
 
+def bake_regional() -> tuple[NationalGrid, dict[str, np.ndarray], list[Path], dict]:
+    """The gravity model on a 30" grid over the simulation grid + 2 x COMMUTE_MAX_M (see the module docstring).
+    Returns (grid, flat home / work / nres per cell, [residents raster, non-residential raster], summary)."""
+    # One more 30" cell of margin: the regional grid starts on a residents pixel, not on the bbox edge.
+    w, s, e, n = expand_bbox(*grid.bbox(), 2 * COMMUTE_MAX_M + NAT_DEG * M_PER_DEG)
+    tile = ghsl_tile(w, s, e, n)
+    paths = [ghs_pop_path(tile), *ghsl_paths([tile])]
+    px, pw, pn = _read_window(paths[0], w, s, e, n, strict=True)
+    ng = NationalGrid(pw, pn, *px.shape)
+    home = block_sum(px, BLOCK)
+    a, aw, an = _read_window(paths[1], w, s, e, n, strict=True)
+    if abs(aw - pw) > 1e-9 or abs(an - pn) > 1e-9:
+        raise RuntimeError(f"GHS-POP and GHS-BUILT-V windows are not aligned: {(pw, pn)} vs {(aw, an)}")
+    nres = _bin_by_centre(ng, a, aw, an, PX_DEG, -PX_DEG).reshape(ng.rows, ng.cols)
+    work, stay = gravity(home, nres, ng.lat_of_row(), NAT_DEG)
+    if abs(work.sum() - home.sum()) > 1e-6 * home.sum():
+        raise RuntimeError(f"gravity lost people: home {home.sum():.0f} vs work {work.sum():.0f}")
+    if (work < 0).any():
+        raise RuntimeError("gravity produced negative workers")
+    summary = {
+        "tile": tile,
+        "extent": [
+            round(v, 4) for v in (ng.lon_w, ng.lat_n - ng.rows * NAT_DEG, ng.lon_w + ng.cols * NAT_DEG, ng.lat_n)
+        ],
+        "grid": f"{ng.rows} x {ng.cols} cells of 30 arc-seconds",
+        "home": round(float(home.sum())),
+        "stayHome": round(float(stay.sum())),
+        "nonResidentialMillionM3": round(float(nres.sum()) / 1e6, 1),
+    }
+    lookup = {"home": home.ravel(), "work": work.ravel(), "nres": nres.ravel()}
+    return ng, lookup, paths, summary
+
+
 def bake_domain() -> dict:
+    """population_{home,work}.bin of the selected event: from Chile's committed national product, or from a
+    regional gravity model (Event.population_regional)."""
+    if grid.EVENT.population_regional:
+        ng, lookup, (pop_path, *nres_paths), summary = bake_regional()
+        return {"regional": summary, **_refine(ng, lookup, pop_path, nres_paths)}
     ng, meta, nat = load_national()
-    w, s, e, n = grid.bbox()
     # National cells overlapping the domain (whole cells: refinement is per national cell).
     lookup = {k: np.zeros(ng.rows * ng.cols, dtype=np.float64) for k in ("home", "work", "nres")}
     for k in lookup:
         lookup[k][nat["cell"]] = nat[k]
+    return _refine(ng, lookup, worldpop_path(), ghsl_paths())
 
-    pop, pw, pn = _read_window(worldpop_path(), w, s, e, n)
+
+def _refine(ng: NationalGrid, lookup: dict[str, np.ndarray], pop_path: Path, nres_paths: list[Path]) -> dict:
+    """Splits the 30" cells' home and work onto the 60 m grid (mass-conserving, see the module docstring)."""
+    w, s, e, n = grid.bbox()
+    pop, pw, pn = _read_window(pop_path, w, s, e, n)
     pr, pc = np.indices(pop.shape)
     parent_pop = ng.index(pw + (pc + 0.5) * PX_DEG, pn - (pr + 0.5) * PX_DEG)
     if (parent_pop < 0).any():
@@ -430,7 +541,7 @@ def bake_domain() -> dict:
     work_from_home = pop * stay_frac
 
     nres_px = []
-    for p in ghsl_paths():
+    for p in nres_paths:
         a, aw, an = _read_window(p, w, s, e, n)
         if a.size:
             nres_px.append((a, aw, an))

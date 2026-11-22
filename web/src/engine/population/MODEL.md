@@ -55,6 +55,22 @@ The explorer can replace the real date: "Fecha real", "Hábil con clases", "Háb
 The real date of the scenario, 2 Feb 2024, was a Friday in the summer holidays, so workers are out and students
 are not.
 
+**Per event** (`EventDef.presence` in `src/data/events.ts`). Viña, the today timeline and Talca use the table
+above. The Eaton fire (Los Angeles County) uses the layers of a regional bake (`pipeline/README.md`: residents
+from GHSL GHS-POP 2025, because WorldPop USA cannot be read by window; same NRES volume and gravity model, on the
+grid + 60 km) and these shares:
+
+| Parameter | Value | Source / status |
+|---|---|---|
+| `workerShare` | 0.396 | US Census ACS 2020-2024 5-year, LA County: workers 16+ 4,687,090 (B08301) minus 801,832 who worked from home = 3,885,258 commuters; / 9,808,667 (B01003). Those who work from home count as home |
+| `studentShare` | 0.243 | same release: enrolled in school 2,382,781 (B14001, age 3+); / 9,808,667 |
+| `workSchedule`, `schoolSchedule` | as above | the Chilean assumptions, kept |
+| school term | 15 Aug to 15 Jun, without 23 Dec - 3 Jan | Pasadena Unified 2024-25 calendar for the winter break (Altadena and Pasadena are in PUSD); the term's start and end are approximate |
+
+A school year that crosses New Year is a range whose start is after its end (`inSchoolTerm`). The real date,
+Tuesday 7 Jan 2025, was a school day; the fire started at 18:18, when the schedules already send most people home
+(everyone by 20:00), so these shares only change the first two hours.
+
 ## Checks (pipeline/population_report.py)
 
 Ratio of the work layer to the home layer, i.e. the most a place can grow or empty out when everyone is at

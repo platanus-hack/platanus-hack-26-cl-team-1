@@ -11,6 +11,7 @@ uv run python bake.py --event eaton-2025  # Eaton 2025 -> web/public/data/eaton-
 uv run python bake.py --event talca  # Talca, hypothetical -> web/public/data/talca/ (~7 s warm, ~2 min cold)
 uv run python bake.py --refresh  # wipe the event's download cache first and re-download everything
 uv run python bake_population.py # national population product + the grid's two layers (~25 s warm, ~80 MB cold)
+uv run python bake_population.py --event eaton-2025  # one event's two layers only (Eaton: regional model, ~2 s warm, ~47 MB cold)
 uv run python population_report.py  # totals and day/night checks quoted in the population MODEL.md
 uv run python bake_bomberos.py   # every fire company of Chile with its trucks (national/bomberos_cl.json, ~1 s warm)
 uv run pytest                    # unit tests for the non-trivial logic (no network)
@@ -40,7 +41,7 @@ default, `vina-2024`, so `bake_population.py`, `population_report.py` and the te
 | Event | Output | Download cache | Outputs |
 |---|---|---|---|
 | `vina-2024` (default) | `web/public/data/` | `pipeline/.cache/` | everything below except the `eaton-2025/` validation files |
-| `eaton-2025` | `web/public/data/eaton-2025/` | `pipeline/.cache/eaton-2025/` | the ten base files + `perimeter.bin` + `dins.json`; no population, no brigades (later) |
+| `eaton-2025` | `web/public/data/eaton-2025/` | `pipeline/.cache/eaton-2025/` | the ten base files + `perimeter.bin` + `dins.json` + population (regional model); no brigades (later) |
 | `talca` (hypothetical) | `web/public/data/talca/` | `pipeline/.cache/talca/` | the base files except `goes.json` (`scar.bin` all 255, `firms.json` `[]`) + population; no brigades |
 
 An event either has an **observed fire** (every field of `events.FIRE_FIELDS` set: post-fire Sentinel-2 scene,
@@ -84,8 +85,8 @@ Every grid stays under Viña's 245,456 cells (`grid.MAX_CELLS`).
 | `goes.json` | `FirmsPoint[]`, GOES-16 fire pixels every 10 min, 2 Feb 12:00 - 3 Feb 04:00 local (scoring only, not loaded by the app) | NOAA GOES-16 ABI L2 FDC |
 | `ignitions.json` | `IgnitionPreset[]` | FIRMS first detections + press reports |
 | `brigades.json` | `BrigadesFile`: fire companies, trucks, dispatch, reinforcements, road cuts | **Curated by hand** (not baked): OpenStreetMap fire stations + press; see `web/src/engine/brigade/MODEL.md` |
-| `population_home.bin` | Float32 residents per cell | WorldPop 2024 (constrained, 100 m) |
-| `population_work.bin` | Float32 people per cell if every resident is at work or school | WorldPop 2024 + GHSL GHS-BUILT-V NRES 2025, gravity model |
+| `population_home.bin` | Float32 residents per cell | WorldPop 2024 (constrained, 100 m); Eaton: GHSL GHS-POP 2025 (3") |
+| `population_work.bin` | Float32 people per cell if every resident is at work or school | the residents + GHSL GHS-BUILT-V NRES 2025, gravity model |
 | `national/population_cl.{json,bin}` | Both layers for all of Chile, 30" (~0.9 km), sparse (`NationalPopulationMeta`) | same |
 | `national/bomberos_cl.json` | `NationalStationsFile`: the 1,256 compañías de bomberos of Chile with their trucks (kind, make, model), documented or estimated | JNB Catastro de Cuarteles 2025 + bomberos.cl list + OSM; JNB Registro de Material Mayor 2025; `bomberos/fleets.json` |
 | `eaton-2025/perimeter.bin` | Uint8 per cell: 1 inside the official final perimeter, 0 outside (**validation only**, not loaded by the app) | NIFC / WFIGS Interagency Fire Perimeters |
@@ -262,6 +263,17 @@ Chile; the time-of-day part runs in the browser (`web/src/engine/population/MODE
   which conserves the totals.
 - `bake_population.py` re-bakes both. It also rewrites `grid.json`, which is deterministic from constants, to
   carry the new source.
+- Outside Chile (`Event.population_regional`, today Eaton) there is no national product: `bake_domain` runs the
+  same gravity model (same kernel and constants) on a regional 30" grid built in memory, then the same
+  refinement. The regional extent is the grid plus 60 km on every side (`expand_bbox`, east-west at the extent's
+  most poleward latitude, plus one 30" cell): every origin that can reach the grid (within 30 km) has all of its
+  destinations (within 30 km of it) inside. Residents come from GHSL GHS-POP 2025 (3", same tile and pixel grid
+  as the non-residential volume), not WorldPop: WorldPop's per-country files are only served whole (the USA one,
+  `usa_pop_2024_CN_100m_R2025A_v1.tif`, is 1.5 GB) and data.worldpop.org ignores HTTP range requests, so GDAL
+  cannot read a window of it. The tile comes from the extent (`ghsl_tile`, bounds read from the tiles: tile
+  R, C spans lon -180.0079 + 10 (C - 1) and lat 89.0996 - 10 (R - 1)); an extent across two tiles stops the bake.
+  No neighbour-country mask (Mexico is ~200 km away). `bake_population.py --event <id>` re-bakes one event's two
+  layers and its `grid.json`; `bake.py --event <id>` does it as part of the full bake.
 
 ## Eaton 2025 (`--event eaton-2025`)
 
@@ -303,6 +315,13 @@ reading the 198 GOES files).
 - **dins.json** (`steps/dins.py`, validation only): CAL FIRE DINS public view of the Eaton fire, 18,428 inspected
   structures, all inside the grid: 9,419 destroyed, 70 major, 148 minor, 858 affected, 7,893 no damage,
   40 inaccessible (the service's closed `DAMAGE` domain; any other value stops the bake).
+- **population_{home,work}.bin**: regional model (see "Population"). GHSL tile `R6_C7` for both GHS-POP 2025 and
+  GHS-BUILT-V NRES 2025 (42 + 5 MB zipped); regional grid 152 x 187 cells of 30" over lon -118.868..-117.310,
+  lat 33.552..34.819 (the grid + 60 km: most of the Los Angeles basin, 15.7 M residents, nobody without a
+  destination within 30 km). In the grid: 449,921 residents, 281,455 at work or school hours (0.63: the grid
+  sends more commuters to Los Angeles than it receives). Inside the official perimeter: 24,145 residents, 3,496
+  at work hours. Within 1 km of Pasadena City Hall there are 2.3 times as many people at work hours as at night;
+  within 1 km of central Altadena 0.27.
 
 ## Talca, hypothetical (`--event talca`)
 
@@ -344,7 +363,7 @@ Same steps and methods; the fire-only steps are skipped (see "Events"). Measured
   https://data-nifc.opendata.arcgis.com/ ; CAL FIRE Damage Inspection (DINS) public view; CAL FIRE incident page
   (start time and point), https://www.fire.ca.gov/incidents/2025/1/7/eaton-fire
 - WorldPop 2024 (R2025A v1): CC BY 4.0. https://www.worldpop.org/
-- GHSL GHS-BUILT-V R2023A (European Commission, Joint Research Centre): CC BY 4.0.
+- GHSL GHS-BUILT-V R2023A and GHS-POP R2023A (European Commission, Joint Research Centre): CC BY 4.0.
   https://human-settlement.emergency.copernicus.eu/
 - geoBoundaries gbOpen ADM0 (Argentina, Bolivia, Peru): used only as a mask while baking, not redistributed.
   https://www.geoboundaries.org/ ADM1 / ADM3 of Chile: region and comuna names in `national/bomberos_cl.json`, CC BY 4.0.
@@ -374,4 +393,5 @@ Same steps and methods; the fire-only steps are skipped (see "Events"). Measured
   inventory.
 - Population is a model: WorldPop is itself an estimate (19.7 M, against 18.5 M counted by Censo 2024), and
   building volume is a proxy for jobs that under-weights old mixed-use centres (Santiago, Concepción). See
-  `web/src/engine/population/MODEL.md`.
+  `web/src/engine/population/MODEL.md`. Eaton uses GHS-POP, not WorldPop (see "Population"), and the Chilean
+  commuting kernel (10 km, cut at 30 km), shorter than many Los Angeles commutes.

@@ -55,6 +55,18 @@ describe('calendar and schedules', () => {
     expect(inSchoolTerm(12, 16, P)).toBe(false)
   })
 
+  it('handles a school year and a winter break that cross New Year (August to June)', () => {
+    const us = { ...P, schoolTerm: { start: [8, 15] as [number, number], end: [6, 15] as [number, number], winterBreak: [[12, 23], [1, 3]] as [[number, number], [number, number]] } }
+    expect(inSchoolTerm(8, 14, us)).toBe(false)
+    expect(inSchoolTerm(8, 15, us)).toBe(true)
+    expect(inSchoolTerm(12, 22, us)).toBe(true)
+    expect(inSchoolTerm(12, 31, us)).toBe(false)
+    expect(inSchoolTerm(1, 3, us)).toBe(false)
+    expect(inSchoolTerm(1, 7, us)).toBe(true) // the Eaton fire's Tuesday
+    expect(inSchoolTerm(6, 15, us)).toBe(true)
+    expect(inSchoolTerm(7, 1, us)).toBe(false)
+  })
+
   it('interpolates schedules linearly', () => {
     expect(scheduleAt(P.workSchedule, 0)).toBe(0)
     expect(scheduleAt(P.workSchedule, 8)).toBeCloseTo(0.5, 12)

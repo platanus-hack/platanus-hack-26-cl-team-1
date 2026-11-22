@@ -86,7 +86,10 @@ class Event:
     weather_summary: tuple[str, str]  # local window (inclusive) summarised in the bake log
     sources: dict[str, str]  # grid.json "sources" (the "Fuentes" panel), in display order
     ignitions: tuple[dict, ...] | None  # fixed presets; None = derived from the first VIIRS pass (Viña)
-    population: bool  # bake population_{home,work}.bin (Chile only: the national product)
+    population: bool  # bake population_{home,work}.bin
+    # How: False = refined from Chile's committed national product; True = a regional gravity model on GHSL tiles
+    # around the grid (outside Chile), see steps/population.py.
+    population_regional: bool = field(default=False)
     perimeter: dict | None = field(default=None)  # official final perimeter (validation only), see perimeter.py
     dins: dict | None = field(default=None)  # CAL FIRE damage inspection points (validation only), see dins.py
 
@@ -96,6 +99,8 @@ class Event:
             raise ValueError(f"event {self.id}: set all of {FIRE_FIELDS} (a real fire) or none (hypothetical)")
         if not self.observed_fire and not self.ignitions:
             raise ValueError(f"event {self.id}: a hypothetical scenario needs fixed ignition presets")
+        if self.population_regional and not self.population:
+            raise ValueError(f"event {self.id}: population_regional needs population=True")
 
     @property
     def observed_fire(self) -> bool:
@@ -107,7 +112,7 @@ class Event:
         out = BASE_OUTPUTS if self.observed_fire else tuple(f for f in BASE_OUTPUTS if f != "goes.json")
         if self.population:
             out += ("population_home.bin", "population_work.bin")
-        if self.population and not self.out_subdir:
+        if self.population and not self.population_regional and not self.out_subdir:
             # The national product lives in web/public/data/national/: listed once, under the root event.
             out += (
                 "national/population_cl.json",
@@ -298,7 +303,8 @@ EATON_2025 = Event(
             f"coordenadas 34.203483, -118.069155 ({EATON_CALFIRE_URL}).",
         },
     ),
-    population=False,
+    population=True,
+    population_regional=True,  # USA: GHS-POP residents + GHSL NRES, gravity model over the grid + 60 km
     perimeter={
         "url": EATON_PERIMETER_URL,
         "unique_fire_id": "2025-CALAC-009087",
