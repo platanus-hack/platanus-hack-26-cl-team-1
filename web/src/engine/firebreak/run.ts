@@ -256,6 +256,8 @@ const IGNITION_ZONE_M = 1000
 function designOf(name: string, members: number[], zoneM: number): Design {
   const arrival = new Float32Array(N).fill(Infinity)
   const fireStart = new Float32Array(N).fill(Infinity)
+  /** Earliest arrival of a single ignition's own fire, over the members: its ignition time is fireStart. */
+  const firstAlone = new Float32Array(N).fill(Infinity)
   const value = new Float32Array(N)
   let nj = 0
   for (const k of members) nj += base[k].jumps.length
@@ -268,17 +270,17 @@ function designOf(name: string, members: number[], zoneM: number): Design {
     }
     jumps.set(base[k].jumps, o)
     o += base[k].jumps.length
-    // Which fire reaches each cell first: one run per ignition (the combined fire is their minimum).
-    const first = new Float32Array(N).fill(Infinity)
+    // Which fire reaches each cell first: one run per ignition.
     for (const g of memberIgnitions[k]) {
       const alone = memberIgnitions[k].length === 1 ? base[k].arrival : runFire(k, { ignitions: [g] })
       for (let i = 0; i < N; i++)
-        if (alone[i] < first[i]) {
-          first[i] = alone[i]
-          if (alone[i] <= arrival[i]) fireStart[i] = g.tMin
+        if (alone[i] < firstAlone[i]) {
+          firstAlone[i] = alone[i]
+          fireStart[i] = g.tMin
         }
     }
   }
+  for (let i = 0; i < N; i++) if (arrival[i] !== Infinity && fireStart[i] === Infinity) throw new Error(`lines: cell ${i} burns but no single ignition's fire reaches it`)
   const sources = new Set(members.flatMap((k) => memberIgnitions[k].map((g) => g.cell)))
   if (zoneM > 0) {
     const rad = Math.ceil(zoneM / cellM)
@@ -409,6 +411,7 @@ function proposals(d: Design, mode: Mode): Proposal[] {
   let flows = 0
   let graph = ''
   let repaired = 0
+  const curve: string[] = []
   for (const untilMin of mode.untilMin) {
     const cut = new LineCut({ rows, cols, arrivalMin: d.arrival, jumps: d.jumps, ignitionCells: d.sourceCells, eligible, value: d.value, untilMin })
     if (untilMin === horizonMin) graph = `${cut.cellCount} cells, ${(cut.jumpCount / 1e6).toFixed(2)} M ember jumps, ${cut.totalValue.toFixed(0)} households at stake`
@@ -426,6 +429,7 @@ function proposals(d: Design, mode: Mode): Proposal[] {
       let r = cut.solve(lambda)
       flows++
       keep(r)
+      if (untilMin === horizonMin) curve.push(`    cut to the end (${hhmm(horizonMin)}) at ${String(lambda).padStart(5)} cells per household: ${km(r.cells.length).toFixed(1).padStart(6)} km keeps the fire from ${r.protectedValue.toFixed(0).padStart(5)} of ${cut.totalValue.toFixed(0)} households (by the graph, before scheduling crews)`)
       for (let pass = 0; pass < mode.repairs && r.cells.length > 0; pass++) {
         const ready = mode.ready(d, r.cells)
         let late = 0
@@ -443,8 +447,7 @@ function proposals(d: Design, mode: Mode): Proposal[] {
     }
   }
   console.log(`  proposals: ${nEligible} cells may hold a line; spread graph ${graph}; ${flows} minimum cuts (${repaired} repairs) in ${secs(t)} s -> ${out.length} distinct lines`)
-  for (const p of out.filter((q) => q.untilMin === horizonMin))
-    console.log(`    cut to the end (${hhmm(horizonMin)}), ${String(p.lambda).padStart(5)} cells per household: ${km(p.cells.length).toFixed(1).padStart(6)} km keeps the fire from ${p.protectedValue.toFixed(0)} households (by the graph)`)
+  for (const line of curve) console.log(line)
   return out
 }
 
