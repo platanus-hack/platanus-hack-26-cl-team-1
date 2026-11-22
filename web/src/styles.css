@@ -874,9 +874,11 @@ input[type='range']:focus-visible {
 .map-notes {
   position: absolute;
   top: 12px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(560px, calc(100% - 320px));
+  /* between the layers card (12 + 248 px) and the zoom buttons, centred there: never over the open card */
+  left: 272px;
+  right: 56px;
+  max-width: 560px;
+  margin-inline: auto;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -888,8 +890,9 @@ input[type='range']:focus-visible {
 }
 .tool-hint {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: 8px 12px;
   justify-content: space-between;
   padding: 9px 12px;
   border-radius: var(--radius);
@@ -899,10 +902,15 @@ input[type='range']:focus-visible {
   color: var(--text);
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
 }
+.tool-hint > span:first-child {
+  flex: 1 1 220px;
+}
+/* the buttons drop under the text when the hint is narrow */
 .tool-hint-actions {
   display: flex;
   gap: 8px;
   flex: none;
+  margin-left: auto;
 }
 .map-note {
   padding: 8px 12px;
@@ -1426,12 +1434,6 @@ input[type='range']:focus-visible {
     width: auto;
     transform: none;
   }
-  .tool-hint {
-    flex-wrap: wrap;
-  }
-  .tool-hint-actions {
-    margin-left: auto;
-  }
   .main.narrow .maplibregl-ctrl-bottom-left,
   .main.narrow .maplibregl-ctrl-bottom-right {
     bottom: var(--sheet-h, 0px);
@@ -1452,6 +1454,17 @@ input[type='range']:focus-visible {
   .sources div {
     grid-template-columns: 1fr;
     gap: 0;
+  }
+}
+
+/* Landscape phones and portrait tablets: the time bar fits in one row, which leaves more of the map visible. */
+@media (min-width: 600px) and (max-width: 899px) {
+  .timebar.docked {
+    grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+    grid-template-areas: 'play clock scrub speed d3';
+    column-gap: 14px;
+    /* room above the scrubber for the alert label */
+    padding-top: 16px;
   }
 }
 
