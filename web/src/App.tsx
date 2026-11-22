@@ -8,7 +8,7 @@ import { localToMin, minToHHMM } from './data/time'
 import { SimClient } from './worker/client'
 import type { EvacOut, FireOut } from './worker/protocol'
 import type { FirebreakWidth, Scenario, WeatherSettings } from './worker/scenario'
-import { buildWeatherSeries, countAtOrBefore, HORIZON_MIN, sampleAt, sortedArrivals } from './worker/scenario'
+import { buildWeatherSeries, countAtOrBefore, defaultBrigades, HORIZON_MIN, sampleAt, sortedArrivals } from './worker/scenario'
 import { MapView } from './ui/MapView'
 import type { LayerToggles, Tool } from './ui/MapView'
 import { Panel } from './ui/Panel'
@@ -54,6 +54,7 @@ function defaultScenario(data: Dataset): Scenario {
     footShare: DEFAULT_EVAC_PARAMS.footShare,
     closedEdges: [],
     addedLinks: [],
+    brigades: defaultBrigades(data.brigades, data.grid.t0),
   }
 }
 
