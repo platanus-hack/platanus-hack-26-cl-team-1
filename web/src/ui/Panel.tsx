@@ -10,6 +10,7 @@ import { minToDateLabel, minToEndLabel, minToHHMM, localToMin, wallClockMin } fr
 import type { BrigadesOut, EvacOut, FireOut } from '../worker/protocol'
 import { BrigadesSection } from './BrigadesSection'
 import { PlanSection } from './PlanSection'
+import { FirebreakEmberRange, type EmberRangeState } from './FirebreakEmberRange'
 import type { FirebreakWidth, Scenario, WeatherSettings } from '../worker/scenario'
 import { FIREBREAK_WIDTHS, sampleAt } from '../worker/scenario'
 import { Compass, compassLabel, fmtInt, fmtSigned, Section, Segmented, Slider, Toggle } from './controls'
@@ -51,6 +52,8 @@ interface Props {
   summary: Summary | null
   baseline: Summary | null
   setBaseline: (s: Summary | null) => void
+  /** Drawn firebreaks under several ember distances (worker/emberRange.ts). */
+  emberRange: EmberRangeState | null
   timings: Timings | null
   busy: boolean
   simError: string | null
@@ -445,9 +448,12 @@ function CortafuegosSection(p: Props) {
         </ul>
       )}
       {s.firebreaks.length > 0 && (
-        <button type="button" className="btn small ghost" onClick={() => p.update({ firebreaks: [] })}>
-          Borrar todos
-        </button>
+        <>
+          <button type="button" className="btn small ghost" onClick={() => p.update({ firebreaks: [] })}>
+            Borrar todos
+          </button>
+          <FirebreakEmberRange range={p.emberRange} cellM={p.data.grid.cellM} own={s.spotting ? s.spotMetresPerKmh : null} />
+        </>
       )}
     </Section>
   )

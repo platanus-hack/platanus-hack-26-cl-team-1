@@ -133,6 +133,25 @@ Spotting runs only when `params.spotting` is on. It starts from settled cells wh
   (cell, `spotJitterSeed`), for ensembles. The median of an ensemble overburns (the fastest path wins), so it
   stays at 0.
 
+**Drawn firebreaks in the app (D-034).** Because a 30-120 m firebreak is crossed whenever D_max is longer, whether
+a drawn line holds depends mostly on `spotMetresPerKmh`, which was calibrated only on Viña 2024. When the user has
+drawn firebreaks, the worker (`src/worker/emberRange.ts`) also runs the scenario, without firefighters, at the
+scenario's own ember setting (so one row always matches the main result without firefighters, embers off included)
+and at each distance the calibration tried (12, 15 and 25 m per km/h, section 6), without and with the lines, and the
+Cortafuegos panel shows the range. Fires are cached per setting, so a change that only affects the evacuation
+reruns the evacuations only. `pnpm exec tsx scripts/firebreak-embers.ts` measures the same for one line; on
+Talca (D-032), an 8 km x 120 m line 1 km ahead of the fire, measured on 2026-11-22:
+
+| Embers | Households cut off, without -> with the line | Burned by midnight |
+|---|---|---|
+| 12 m per km/h | 4,625 -> 2,983 (-35.5 %) | 7,027 -> 6,330 ha |
+| 15 m per km/h | 7,022 -> 5,663 (-19.4 %) | 8,114 -> 7,474 ha |
+| 25 m per km/h (shipped) | 10,582 -> 10,001 (-5.5 %) | 14,098 -> 13,288 ha |
+| Off (reference) | 2,534 -> 107 (-95.8 %) | 6,072 -> 591 ha |
+
+A line drawn by hand a few tens of metres away gave -25 %, -12 % and -4.9 %: at the shorter distances the result
+also depends on exactly where the line crosses the shrub and forest that throw embers.
+
 ## 6. Calibration (`calibrate.ts`)
 
 Run `pnpm exec tsx src/engine/fire/calibrate.ts`, or add `--scan` for a grid search. It uses the baked

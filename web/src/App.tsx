@@ -20,6 +20,7 @@ import { MapView } from './ui/MapView'
 import type { LayerToggles, Tool } from './ui/MapView'
 import { Panel } from './ui/Panel'
 import type { Summary, Timings } from './ui/Panel'
+import type { EmberRangeState } from './ui/FirebreakEmberRange'
 import { Timebar } from './ui/Timebar'
 import { LayersCard } from './ui/LayersCard'
 import { SourcesModal } from './ui/SourcesModal'
@@ -345,6 +346,8 @@ function Explorer({
   const [simError, setSimError] = useState<string | null>(null)
   const [timings, setTimings] = useState<Timings | null>(null)
   const [baseline, setBaseline] = useState<Summary | null>(null)
+  /** Drawn firebreaks under several ember distances (worker/emberRange.ts); null until the worker sends one. */
+  const [emberRange, setEmberRange] = useState<EmberRangeState | null>(null)
   /** Which day the population model assumes (who is home, who is at work or school). UI-only: the worker's
    *  fire and evacuation do not depend on it. */
   const [populationDay, setPopulationDay] = useState<PopulationDay>(POPULATION_DAY.REAL)
@@ -392,8 +395,13 @@ function Explorer({
         setSimError(null)
         setTimings((prev) => ({ fireMs: r.fire ? r.fire.elapsedMs : (prev?.fireMs ?? null), fireRerun: !!r.fire, evacMs: r.evac.elapsedMs, roundTripMs }))
       },
-      onError: (m) => setSimError(m),
+      onError: (m) => {
+        setSimError(m)
+        // The range below the firebreaks belonged to the last good run: say so instead of showing it or "Calculando…".
+        setEmberRange({ rows: null, error: 'el escenario actual no se pudo simular' })
+      },
       onBusy: setBusy,
+      onEmberRange: (m) => setEmberRange({ rows: m.rows, error: m.error }),
     })
     c.init(data.synthetic, choice)
     // A new worker starts with the current scenario (the debounced effect below only fires on changes).
@@ -589,6 +597,7 @@ function Explorer({
     summary,
     baseline,
     setBaseline,
+    emberRange,
     timings,
     busy,
     simError,
