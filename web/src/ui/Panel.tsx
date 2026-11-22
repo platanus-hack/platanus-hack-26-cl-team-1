@@ -6,6 +6,7 @@ import type { PopulationDay, PresenceParams, WeatherSeries } from '../engine/typ
 import { POPULATION_DAY, TIMELINE } from '../engine/types'
 import { dayKind, type BurnedAreaPeople } from '../engine/population'
 import { LAG_CAP_MIN } from '../engine/fire/pacing'
+import { isTodayTimeline } from '../data/timeline'
 import { minToDateLabel, minToEndLabel, minToHHMM, localToMin, wallClockMin } from '../data/time'
 import type { BrigadesOut, EvacOut, FireOut } from '../worker/protocol'
 import type { EdgeContact } from '../engine/fire/edge'
@@ -245,7 +246,7 @@ function ClimaSection(p: Props) {
   const w = p.scenario.weather
   const t0 = p.data.grid.t0
   const real = w.mode === 'real'
-  const today = p.data.timeline === TIMELINE.TODAY
+  const today = isTodayTimeline(p.data.timeline)
   const raw = sampleAt(p.rawSeries, p.clock)
   const used = sampleAt(p.appliedSeries, p.clock)
   const hhmm = minToHHMM(t0, p.clock)
@@ -391,7 +392,18 @@ function FuegoSection(p: Props) {
           </li>
         ))}
       </ul>
-      <ToolButton tool="ignition" current={p.tool} setTool={p.setTool} label={`Agregar ignición (${minToHHMM(t0, p.clock)})`} />
+      {p.data.ignitions.length === 0 && s.userIgnitions.length === 0 && (
+        <p className="muted small">Sin focos: ajusta el reloj y agrega uno en el mapa.</p>
+      )}
+      <div className="row">
+        <ToolButton tool="ignition" current={p.tool} setTool={p.setTool} label={`Agregar ignición (${minToHHMM(t0, p.clock)})`} />
+        {s.userIgnitions.length > 1 && (
+          <button type="button" className="btn small ghost" onClick={() => p.update({ userIgnitions: [] })}>
+            Quitar todas
+          </button>
+        )}
+      </div>
+      <p className="muted small">Toca un foco en el mapa para quitarlo.</p>
       <div className="sep" />
       <Toggle label="Pavesas (focos secundarios)" checked={s.spotting} onChange={(v) => p.update({ spotting: v })} sub="Brasas que el viento lleva por delante del frente" />
       <Slider
@@ -696,6 +708,15 @@ function TalcaNote() {
 /** What the today timeline assumes, above everything else it changes. */
 function TodayNote(p: Props) {
   const t0 = p.data.grid.t0
+  if (p.data.timeline === TIMELINE.TODAY_TALCA)
+    return (
+      <div className="alert info timeline-note">
+        <b>Escenario hipotético de hoy en Talca</b> (región del Maule), {minToDateLabel(t0, 0)}, las 24 horas: el pronóstico del tiempo de hoy para
+        este punto y <b>ningún foco</b>: ajusta el reloj y agrega los focos en el mapa («Agregar ignición»); toca un foco para quitarlo. Usa el mismo
+        modelo calibrado solo con el incendio de Viña del Mar 2024, sin validación local, y el combustible de ESA WorldCover 2021. Aún sin bomberos.
+        Sirve para explorar y planificar, no para predecir.
+      </div>
+    )
   return (
     <div className="alert info timeline-note">
       <b>Escenario hipotético de hoy</b>, {minToDateLabel(t0, 0)}, las 24 horas: el pronóstico del tiempo de hoy para este punto (sin la corrección
@@ -706,7 +727,7 @@ function TodayNote(p: Props) {
 }
 
 export function Panel(p: Props) {
-  const today = p.data.timeline === TIMELINE.TODAY
+  const today = isTodayTimeline(p.data.timeline)
   return (
     <>
       <Results {...p} />

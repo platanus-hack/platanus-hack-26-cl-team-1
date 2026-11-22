@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { TIMELINE } from '../engine/types'
 import { ERA5_WIND_DIR_CORRECTION_DEG } from '../engine/fire/model'
-import { addDays, forecastUrl, offsetLabel, parseForecast, santiagoDate, type Forecast } from './forecast'
+import { addDays, forecastUrl, offsetLabel, parseForecast, santiagoDate, TALCA_FORECAST_POINT, VINA_FORECAST_POINT, type Forecast } from './forecast'
 import { makeMockDataset } from './mock'
-import { isTimelineId, timelineDataset, todayDataset } from './timeline'
+import { isTimelineId, isTodayTimeline, timelineDataset, todayDataset } from './timeline'
 import { localToMin, minToDateLabel, minToHHMM } from './time'
 import { awayShare, dayKind } from '../engine/population'
 
@@ -59,7 +59,7 @@ describe('forecast', () => {
   })
 
   it('asks for the same point and variables as the baked weather.json, today and tomorrow', () => {
-    const u = new URL(forecastUrl('2026-11-22'))
+    const u = new URL(forecastUrl('2026-11-22', VINA_FORECAST_POINT))
     expect(u.host).toBe('api.open-meteo.com')
     expect(u.searchParams.get('latitude')).toBe('-33.10')
     expect(u.searchParams.get('longitude')).toBe('-71.49')
@@ -75,8 +75,14 @@ describe('forecast', () => {
     ])
   })
 
+  it('asks for Talca at the point of its baked weather.json', () => {
+    const u = new URL(forecastUrl('2026-11-22', TALCA_FORECAST_POINT))
+    expect(u.searchParams.get('latitude')).toBe('-35.43')
+    expect(u.searchParams.get('longitude')).toBe('-71.66')
+  })
+
   it('parses a response into a WeatherFile', () => {
-    const f = parseForecast(openMeteo('2026-11-22'), '2026-11-22', '22 nov 2026, 02:30')
+    const f = parseForecast(openMeteo('2026-11-22'), '2026-11-22', '22 nov 2026, 02:30', VINA_FORECAST_POINT)
     expect(f.utcOffset).toBe('-03:00')
     expect(f.weather.times).toHaveLength(48)
     expect(f.weather.times[12]).toBe('2026-11-22T12:00')
@@ -89,20 +95,20 @@ describe('forecast', () => {
   it('refuses other units, missing hours, short series and service errors', () => {
     const date = '2026-11-22'
     const r = openMeteo(date)
-    expect(() => parseForecast({ ...r, hourly_units: { ...r.hourly_units, wind_speed_10m: 'm/s' } }, date, 'x')).toThrow(/unidad/)
+    expect(() => parseForecast({ ...r, hourly_units: { ...r.hourly_units, wind_speed_10m: 'm/s' } }, date, 'x', VINA_FORECAST_POINT)).toThrow(/unidad/)
     const gap = { ...r.hourly, wind_speed_10m: r.hourly.wind_speed_10m.map((v, i) => (i === 15 ? null : v)) }
-    expect(() => parseForecast({ ...r, hourly: gap }, date, 'x')).toThrow(/2026-11-22T15:00/)
+    expect(() => parseForecast({ ...r, hourly: gap }, date, 'x', VINA_FORECAST_POINT)).toThrow(/2026-11-22T15:00/)
     const short = Object.fromEntries(Object.entries(r.hourly).map(([k, v]) => [k, v.slice(0, 30)]))
-    expect(() => parseForecast({ ...r, hourly: short }, date, 'x')).toThrow(/cubre/)
-    expect(() => parseForecast(r, '2026-11-21', 'x')).toThrow(/cubre/)
-    expect(() => parseForecast({ error: true, reason: 'Parameter x is invalid' }, date, 'x')).toThrow(/Parameter x/)
-    expect(() => parseForecast({ ...r, utc_offset_seconds: undefined }, date, 'x')).toThrow(/utc_offset/)
+    expect(() => parseForecast({ ...r, hourly: short }, date, 'x', VINA_FORECAST_POINT)).toThrow(/cubre/)
+    expect(() => parseForecast(r, '2026-11-21', 'x', VINA_FORECAST_POINT)).toThrow(/cubre/)
+    expect(() => parseForecast({ error: true, reason: 'Parameter x is invalid' }, date, 'x', VINA_FORECAST_POINT)).toThrow(/Parameter x/)
+    expect(() => parseForecast({ ...r, utc_offset_seconds: undefined }, date, 'x', VINA_FORECAST_POINT)).toThrow(/utc_offset/)
   })
 })
 
 describe('timelines', () => {
   const base = makeMockDataset()
-  const forecast: Forecast = parseForecast(openMeteo('2026-11-22'), '2026-11-22', 'x')
+  const forecast: Forecast = parseForecast(openMeteo('2026-11-22'), '2026-11-22', 'x', VINA_FORECAST_POINT)
 
   it('the baked files are the 2024 timeline, with the ERA5 correction and its validated 12:00-24:00 window', () => {
     expect(base.timeline).toBe(TIMELINE.VINA_2024)
@@ -110,6 +116,22 @@ describe('timelines', () => {
     expect(base.horizonMin).toBe(12 * 60)
     expect(minToHHMM(base.grid.t0, base.defaultAlertMin)).toBe('18:00')
     expect(timelineDataset(base, { id: TIMELINE.VINA_2024 })).toBe(base)
+  })
+
+  it("today in Talca shows Talca's territory with the forecast and no ignitions", () => {
+    const talca = { ...base, timeline: TIMELINE.TALCA }
+    expect(() => timelineDataset(base, { id: TIMELINE.TODAY_TALCA, forecast })).toThrow(/talca/)
+    const d = timelineDataset(talca, { id: TIMELINE.TODAY_TALCA, forecast })
+    expect(d.timeline).toBe(TIMELINE.TODAY_TALCA)
+    expect(isTodayTimeline(d.timeline)).toBe(true)
+    expect(d.grid.t0).toBe('2026-11-22T00:00:00-03:00')
+    expect(d.horizonMin).toBe(24 * 60)
+    expect(d.weather).toBe(forecast.weather)
+    expect(d.windDirCorrectionDeg).toBe(0)
+    expect(d.ignitions).toEqual([])
+    expect(d.firms).toEqual([])
+    expect(d.fuel).toBe(base.fuel)
+    expect(isTimelineId('hoy-talca')).toBe(true)
   })
 
   it('today covers 00:00-24:00, with the forecast and the 2024 ignition points at the same time of day', () => {

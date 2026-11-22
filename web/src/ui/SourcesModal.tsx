@@ -4,6 +4,7 @@ import type { Dataset } from '../data/load'
 import { DEFAULT_EVAC_PARAMS } from '../engine/evac'
 import { TIMELINE } from '../engine/types'
 import { minToHHMM } from '../data/time'
+import { isTodayTimeline } from '../data/timeline'
 
 const sourceOf = (src: string | null) => (src === null ? 'supuesto' : `fuente: ${src}`)
 const fmtDec = (x: number) => x.toLocaleString('es-CL', { maximumFractionDigits: 2 })
@@ -57,7 +58,7 @@ export function SourcesModal({ data, onClose }: { data: Dataset; onClose: () => 
           ))}
           {!weatherListed && (
             <div>
-              <dt>{data.timeline === TIMELINE.TODAY ? 'Pronóstico (escenario desde hoy)' : 'Clima'}</dt>
+              <dt>{isTodayTimeline(data.timeline) ? 'Pronóstico (escenario desde hoy)' : 'Clima'}</dt>
               <dd>{linkify(data.weather.source)}</dd>
             </div>
           )}
@@ -107,6 +108,12 @@ export function SourcesModal({ data, onClose }: { data: Dataset; onClose: () => 
             El clima es una serie horaria en un solo punto (reanálisis ERA5 para el 2 feb 2024 y para el día de referencia de Talca; pronóstico de
             Open-Meteo para el escenario desde hoy), no el viento local en cada quebrada.
           </li>
+          {data.timeline === TIMELINE.TODAY_TALCA && (
+            <li>
+              El escenario de hoy en Talca es hipotético: parte sin focos (los agrega quien lo usa), el modelo de fuego se calibró solo con el incendio de
+              Viña del Mar 2024 y no tiene validación local. El combustible es el de ESA WorldCover 2021.
+            </li>
+          )}
           {data.timeline === TIMELINE.TALCA && (
             <li>
               El escenario de Talca es hipotético: el punto de inicio fue elegido para la demostración, el modelo de fuego se calibró solo con el incendio

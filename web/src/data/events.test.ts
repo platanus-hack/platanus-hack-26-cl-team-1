@@ -19,6 +19,7 @@ describe('event registry', () => {
   })
   it('shows the today timeline on Viña and each historical timeline on its own event', () => {
     expect(eventOfTimeline(TIMELINE.TODAY)).toBe(TIMELINE.VINA_2024)
+    expect(eventOfTimeline(TIMELINE.TODAY_TALCA)).toBe(TIMELINE.TALCA)
     expect(eventOfTimeline(TIMELINE.VINA_2024)).toBe(TIMELINE.VINA_2024)
     expect(eventOfTimeline(TIMELINE.EATON_2025)).toBe(TIMELINE.EATON_2025)
     expect(eventOfTimeline(TIMELINE.TALCA)).toBe(TIMELINE.TALCA)

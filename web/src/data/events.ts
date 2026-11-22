@@ -1,7 +1,7 @@
 // The historical events whose data is baked (pipeline/bake.py --event <id>), one territory and grid each, and
 // what differs between them: data folder, horizon, wind correction, which optional layers ship, evacuation
 // defaults with their sources. Each timeline (TIMELINE in types.ts) is shown on one of them: the "today"
-// timeline reuses Viña's territory (src/data/timeline.ts).
+// timelines reuse Viña's and Talca's territories (src/data/timeline.ts).
 import { DEFAULT_EVAC_PARAMS } from '../engine/evac'
 import { DEFAULT_FIRE_PARAMS } from '../engine/fire'
 import { ERA5_WIND_DIR_CORRECTION_DEG } from '../engine/fire/model'
@@ -131,7 +131,9 @@ export const EVENTS: Record<EventId, EventDef> = {
 
 /** The baked event a timeline is shown on. */
 export function eventOfTimeline(t: TimelineId): EventId {
-  return t === TIMELINE.TODAY ? TIMELINE.VINA_2024 : t
+  if (t === TIMELINE.TODAY) return TIMELINE.VINA_2024
+  if (t === TIMELINE.TODAY_TALCA) return TIMELINE.TALCA
+  return t
 }
 
 /** Every number of the registry must be finite and in range: a bad value stops here, not deep in an engine. */

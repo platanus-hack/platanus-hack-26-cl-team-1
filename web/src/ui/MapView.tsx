@@ -4,7 +4,7 @@ import type { CanvasSource, GeoJSONSource, Map as MlMap, MapMouseEvent, StyleSpe
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { Dataset } from '../data/load'
 import { gridBounds, gridCorners } from '../data/grid'
-import { localToMin } from '../data/time'
+import { localToMin, minToHHMM } from '../data/time'
 import type { BrigadesOut, EvacOut, FireOut } from '../worker/protocol'
 import type { Scenario } from '../worker/scenario'
 import { HOUSEHOLD } from '../engine/types'
@@ -70,6 +70,10 @@ interface Props {
   scenario: Scenario
   tool: Tool
   onAddIgnition: (lon: number, lat: number) => void
+  /** Removes an added fire start (Scenario.userIgnitions id). */
+  onRemoveIgnition: (id: string) => void
+  /** Turns a preset fire start (ignitions.json id) on or off. */
+  onTogglePresetIgnition: (id: string, on: boolean) => void
   onFirebreak: (points: [number, number][]) => void
   onToggleEdge: (edge: number) => void
   onAddLink: (u: number, v: number) => void
@@ -253,10 +257,10 @@ export function MapView(props: Props) {
     const feats: Feature[] = data.ignitions.map((g) => ({
       type: 'Feature',
       geometry: { type: 'Point', coordinates: [g.lon, g.lat] },
-      properties: { on: on.has(g.id) ? 1 : 0, t: localToMin(data.grid.t0, g.timeLocal) },
+      properties: { id: g.id, on: on.has(g.id) ? 1 : 0, user: 0, t: localToMin(data.grid.t0, g.timeLocal) },
     }))
     for (const u of scenario.userIgnitions)
-      feats.push({ type: 'Feature', geometry: { type: 'Point', coordinates: [u.lon, u.lat] }, properties: { on: 1, user: 1, t: u.tMin } })
+      feats.push({ type: 'Feature', geometry: { type: 'Point', coordinates: [u.lon, u.lat] }, properties: { id: u.id, on: 1, user: 1, t: u.tMin } })
     src('ignitions')?.setData(fc(feats))
   }
 
@@ -708,6 +712,13 @@ export function MapView(props: Props) {
     })
 
     map.on('click', (e: MapMouseEvent) => onClick(map, e))
+    // A fire start can be clicked (to remove it) when no tool is on.
+    map.on('mouseenter', 'ignitions', () => {
+      if (p.current.tool === 'none') map.getCanvas().style.cursor = 'pointer'
+    })
+    map.on('mouseleave', 'ignitions', () => {
+      if (p.current.tool === 'none') map.getCanvas().style.cursor = ''
+    })
     map.on('dblclick', (e: MapMouseEvent) => {
       if (p.current.tool === 'firebreak') {
         e.preventDefault()
@@ -760,12 +771,65 @@ export function MapView(props: Props) {
     if (pts.length >= 2) p.current.onFirebreak(pts)
   }
 
+  /** With no tool on, a click on a fire start opens a popup that removes it (an added one) or turns it off or on (a
+   *  preset). Returns whether the click hit one. */
+  function ignitionPopup(map: MlMap, e: MapMouseEvent, tol: number): boolean {
+    if (!map.getLayer('ignitions')) return false
+    const r = 9 * tol
+    const hits = map.queryRenderedFeatures(
+      [
+        [e.point.x - r, e.point.y - r],
+        [e.point.x + r, e.point.y + r],
+      ],
+      { layers: ['ignitions'] },
+    )
+    let best: (typeof hits)[number] | null = null
+    let bd = Infinity
+    for (const f of hits) {
+      if (f.geometry.type !== 'Point') continue
+      const q = map.project(f.geometry.coordinates as [number, number])
+      const d = Math.hypot(q.x - e.point.x, q.y - e.point.y)
+      if (d < bd) {
+        bd = d
+        best = f
+      }
+    }
+    if (!best || best.geometry.type !== 'Point') return false
+    const { id, on, user, t } = best.properties as { id: string; on: number; user: number; t: number }
+    const { data } = p.current
+    const preset = user ? null : data.ignitions.find((g) => g.id === id)
+    const el = document.createElement('div')
+    const title = document.createElement('div')
+    title.className = 'pp-title'
+    title.textContent = user ? 'Foco agregado' : (preset?.label ?? 'Foco predefinido')
+    const row = document.createElement('div')
+    row.className = 'pp-row'
+    row.textContent = `Empieza a las ${minToHHMM(data.grid.t0, t)}${!user && !on ? ' · desactivado' : ''}`
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.className = 'btn small pp-action'
+    btn.textContent = user ? 'Quitar foco' : on ? 'Desactivar foco' : 'Activar foco'
+    btn.addEventListener('click', () => {
+      popup.current?.remove()
+      if (user) p.current.onRemoveIgnition(id)
+      else p.current.onTogglePresetIgnition(id, !on)
+    })
+    el.append(title, row, btn)
+    popup.current?.remove()
+    popup.current = new maplibregl.Popup({ closeButton: true, className: 'household-popup', maxWidth: '260px' })
+      .setLngLat(best.geometry.coordinates as [number, number])
+      .setDOMContent(el)
+      .addTo(map)
+    return true
+  }
+
   function onClick(map: MlMap, e: MapMouseEvent) {
     const { tool } = p.current
     // A fingertip lands 7-12 px from where it aims, and houses and streets are 1-2 px wide at the fitted zoom.
     const tol = window.matchMedia(COARSE_QUERY).matches ? 2.5 : 1
     const { lng, lat } = e.lngLat
     if (tool === 'none') {
+      if (ignitionPopup(map, e, tol)) return
       // Household detail
       if (!map.getLayer('bld-status')) return
       const r = 5 * tol

@@ -4,9 +4,16 @@
 import type { WeatherFile } from '../engine/types'
 import { DataError, parseWeather } from './load'
 
-/** Same point as pipeline/steps/weather.py (Open-Meteo snaps it to its model grid). */
-export const FORECAST_LAT = -33.1
-export const FORECAST_LON = -71.49
+/** Where a forecast is asked for: the same point the territory's weather.json was requested at (weather_lat /
+ *  weather_lon of its event in pipeline/steps/events.py; Open-Meteo snaps it to its model grid). */
+export interface ForecastPoint {
+  lat: number
+  lon: number
+}
+/** Viña del Mar, Quilpué and Villa Alemana (VINA_2024 in pipeline/steps/events.py). */
+export const VINA_FORECAST_POINT: ForecastPoint = { lat: -33.1, lon: -71.49 }
+/** Talca (TALCA in pipeline/steps/events.py). */
+export const TALCA_FORECAST_POINT: ForecastPoint = { lat: -35.43, lon: -71.66 }
 export const FORECAST_TZ = 'America/Santiago'
 const FILE = 'pronóstico de Open-Meteo'
 /** A forecast that has not answered by then is reported as an error (with "Reintentar"), not left loading. */
@@ -59,10 +66,10 @@ export function offsetLabel(seconds: number): string {
   return `${sign}${String(Math.floor(a / 60)).padStart(2, '0')}:${String(a % 60).padStart(2, '0')}`
 }
 
-export function forecastUrl(date: string): string {
+export function forecastUrl(date: string, point: ForecastPoint): string {
   const q = new URLSearchParams({
-    latitude: FORECAST_LAT.toFixed(2),
-    longitude: FORECAST_LON.toFixed(2),
+    latitude: point.lat.toFixed(2),
+    longitude: point.lon.toFixed(2),
     hourly: Object.values(FIELDS).join(','),
     timezone: FORECAST_TZ,
     start_date: date,
@@ -77,7 +84,7 @@ const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !
 /** Turns an Open-Meteo forecast response into a WeatherFile (checked by parseWeather) and the date's UTC
  *  offset. Refuses other units, missing hours (null values) and a series that does not cover `date` 00:00 to
  *  the next day 23:00. `fetchedAt` goes into the source line. */
-export function parseForecast(j: unknown, date: string, fetchedAt: string): Forecast {
+export function parseForecast(j: unknown, date: string, fetchedAt: string, point: ForecastPoint): Forecast {
   if (!isObj(j)) throw new DataError(FILE, 'no es un objeto JSON')
   if (typeof j.error === 'boolean' && j.error) throw new DataError(FILE, `el servicio respondió con un error: ${String(j.reason)}`)
   const { hourly, hourly_units: units, utc_offset_seconds: offset, latitude, longitude } = j
@@ -89,8 +96,8 @@ export function parseForecast(j: unknown, date: string, fetchedAt: string): Fore
   if (!Array.isArray(times)) throw new DataError(FILE, 'falta "hourly.time"')
   const out: Obj = {
     source:
-      `Open-Meteo Forecast API (pronóstico, combinación de modelos "best match"), punto ${FORECAST_LAT.toFixed(2)}, ` +
-      `${FORECAST_LON.toFixed(2)}, horario local ${FORECAST_TZ}, consultado ${fetchedAt}. https://open-meteo.com/ (CC BY 4.0)`,
+      `Open-Meteo Forecast API (pronóstico, combinación de modelos "best match"), punto ${point.lat.toFixed(2)}, ` +
+      `${point.lon.toFixed(2)}, horario local ${FORECAST_TZ}, consultado ${fetchedAt}. https://open-meteo.com/ (CC BY 4.0)`,
     lat: latitude,
     lon: longitude,
     times,
@@ -110,12 +117,12 @@ export function parseForecast(j: unknown, date: string, fetchedAt: string): Fore
   return { date, utcOffset: offsetLabel(offset), weather }
 }
 
-/** Fetches today's forecast (America/Santiago date at `now`). Throws DataError on any failure. */
-export async function fetchForecast(now: Date = new Date()): Promise<Forecast> {
+/** Fetches today's forecast (America/Santiago date at `now`) at `point`. Throws DataError on any failure. */
+export async function fetchForecast(point: ForecastPoint, now: Date = new Date()): Promise<Forecast> {
   const date = santiagoDate(now)
   let res: Response
   try {
-    res = await fetch(forecastUrl(date), { signal: AbortSignal.timeout(FORECAST_TIMEOUT_MS) })
+    res = await fetch(forecastUrl(date, point), { signal: AbortSignal.timeout(FORECAST_TIMEOUT_MS) })
   } catch (e) {
     const why = (e as Error).name === 'TimeoutError' ? `no respondió en ${FORECAST_TIMEOUT_MS / 1000} s` : (e as Error).message
     throw new DataError(FILE, `no se pudo descargar (${why}); el escenario desde hoy necesita conexión a internet`)
@@ -128,5 +135,5 @@ export async function fetchForecast(now: Date = new Date()): Promise<Forecast> {
     throw new DataError(FILE, `JSON inválido (${(e as Error).message})`)
   }
   const hhmm = new Intl.DateTimeFormat('en-GB', { timeZone: FORECAST_TZ, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(now)
-  return parseForecast(j, date, `el ${date} a las ${hhmm}`)
+  return parseForecast(j, date, `el ${date} a las ${hhmm}`, point)
 }

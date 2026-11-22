@@ -1,6 +1,5 @@
 import type { TimelineId } from '../engine/types'
-import { TIMELINE } from '../engine/types'
-import { TIMELINE_OPTIONS } from '../data/timeline'
+import { isTodayTimeline, TIMELINE_OPTIONS } from '../data/timeline'
 
 /** Top bar: name, what is being simulated, the scenario picker and (once the data is ready) the sources. */
 export function Topbar({
@@ -26,7 +25,7 @@ export function Topbar({
       <div className="topbar-end">
         <div className="timeline-pick seg" role="group" aria-label="Escenario">
           {TIMELINE_OPTIONS.map((o) => {
-            const off = offline && o.value === TIMELINE.TODAY
+            const off = offline && isTodayTimeline(o.value)
             return (
               <button
                 key={o.value}
@@ -51,7 +50,7 @@ export function Topbar({
           onChange={(e) => onTimeline(e.target.value as TimelineId)}
         >
           {TIMELINE_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value} disabled={offline && o.value === TIMELINE.TODAY}>
+            <option key={o.value} value={o.value} disabled={offline && isTodayTimeline(o.value)}>
               {o.label}
             </option>
           ))}
