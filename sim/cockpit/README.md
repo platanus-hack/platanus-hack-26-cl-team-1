@@ -42,3 +42,31 @@ changing the drawing, recapture.
 2. `make dev`, open `http://localhost:5173/simulador/?task=c172_takeoff` and keep the tab in front.
 3. Paste `capture_c172.js` into the devtools console. It flies the run and the mistakes by itself
    (~2 min, waiting on the sim's real state through the dev-only `window.__c172`) and writes `cases.json` last.
+
+## Dataset: auto-labelled runs for VLM fine-tuning
+
+The simulator knows exactly which action happened and when, so its runs need no hand labelling
+(`training/vlm/README.md` otherwise asks for labelled webcam runs).
+
+1. `python3 -I sim/cockpit/receiver.py .context/sim-raw` (gitignored; one subdirectory per run).
+2. `make dev`, open `http://localhost:5173/simulador/?task=c172_takeoff`, click **Empezar práctica** once, keep the
+   tab in front, paste `fly_c172.js` into the devtools console, then `await flyC172({ runs: 12, seed: 1 })`.
+   Each run is a full takeoff, seeded: the order of steps that can go in any order, pauses, rotation speed and
+   pitch are random. Scenarios cycle through `correct` ×2, `start_not_ready`, `flaps_full`, `power_with_brake`,
+   `rotate_early` (each mistake made, held, then fixed, and the takeoff completed). ~45–60 s per run.
+3. Turn them into recorded VLM calls + labels, with the server's own frame picking, downscaling and rate:
+   ```bash
+   cd server && uv run python -m app.perception.simruns ../.context/sim-raw --out ../.context/sim-runs/v1
+   ```
+4. Build the fine-tuning dataset with the usual tool, holding out whole runs:
+   ```bash
+   cd server && uv run python -m app.perception.dataset ../.context/sim-runs/v1 --out ../.context/vlm-data/sim-v1 \
+     --test-sessions sim007_correct sim009_start_not_ready sim010_flaps_full sim011_power_with_brake sim012_rotate_early
+   ```
+   Run ids follow the seed (`sim<N>_<scenario>`, see `fly_c172.js`), so with seeds 1–12 that holds out the
+   second cycle's correct run and one of each mistake. An id that isn't in the runs is an error.
+
+Label policy (`--hold-ms`, default 2500): a call is labelled with the latest ground-truth action while its
+newest frame is within 2.5 s of it, else `none`; "expected next" counts only the actions before the call's
+oldest frame, as a live controller would. Hold out at least one run per mistake scenario for the test split,
+and evaluate on real webcam/cockpit runs as well: simulator frames are perfectly clean.

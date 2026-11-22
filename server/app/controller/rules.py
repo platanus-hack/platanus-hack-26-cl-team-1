@@ -27,6 +27,7 @@ REMIND_AFTER_MS = 20_000
 # taken as proof that the prerequisite happened unseen (a brief action between two perception calls, like
 # taking soap). The out-of-order warning is still said on the first sighting.
 INFER_AFTER = 4  # 3 skipped a real step on a run where the model hallucinated 3 early rinses
+INFER_MIN_MS = 2000  # …spanning at least this long, so faster perception doesn't infer sooner (D-018)
 
 
 class RulesController:
@@ -35,10 +36,12 @@ class RulesController:
         min_confidence: float = MIN_CONFIDENCE,
         remind_after_ms: int = REMIND_AFTER_MS,
         infer_after: int = INFER_AFTER,
+        infer_min_ms: int = INFER_MIN_MS,
     ) -> None:
         self.min_confidence = min_confidence
         self.remind_after_ms = remind_after_ms
         self.infer_after = infer_after
+        self.infer_min_ms = infer_min_ms
 
     # ── Controller interface ─────────────────────────────────────────────────
 
@@ -51,7 +54,9 @@ class RulesController:
         self.seq = 0
         self.last_progress_ms: int | None = None
         self.last_reminder_ms: int | None = None
-        self.streak: tuple[str, int] | None = None  # (action, consecutive out-of-order sightings)
+        self.streak: tuple[str, int, int] | None = (
+            None  # (action, consecutive out-of-order sightings, first t)
+        )
         first = self.task.step(self.automaton.legal_next(self.done)[0])
         # The greeting is a reminder of the first step.
         greeting = SayRequest(text=f"Vamos con: {task.title_es}. {first.instruction_es}")
@@ -75,8 +80,10 @@ class RulesController:
             )
 
         out_of_order = transition.outcome is Outcome.MISTAKE and transition.kind is MistakeKind.OUT_OF_ORDER
-        count = self.streak[1] + 1 if out_of_order and self.streak and self.streak[0] == out.action else 1
-        self.streak = (out.action, count) if out_of_order else None
+        same = out_of_order and self.streak is not None and self.streak[0] == out.action
+        count, since = (self.streak[1] + 1, self.streak[2]) if same and self.streak else (1, observation.t_ms)
+        self.streak = (out.action, count, since) if out_of_order else None
+        long_enough = count >= self.infer_after and observation.t_ms - since >= self.infer_min_ms
 
         if transition.outcome is Outcome.MISTAKE:
             if transition.kind is MistakeKind.REPEATED:
@@ -86,7 +93,7 @@ class RulesController:
                 # A forbidden action for a step that is far from due (opening the faucet bare-handed at the
                 # start is fine; closing it bare-handed near the end isn't, even a step early).
                 return self._decision(Event.NONE)
-            inferred = self._infer(transition.step, observation.t_ms) if count >= self.infer_after else None
+            inferred = self._infer(transition.step, observation.t_ms) if long_enough else None
             if out_of_order and inferred:
                 return inferred
             text = self._correction_text(transition)
