@@ -12,6 +12,8 @@ import type {
   NationalStation,
   NationalStationsFile,
   NationalVehicle,
+  PlanFile,
+  PlanValidation,
   Reinforcement,
   RoadsFile,
   RouteCut,
@@ -19,8 +21,9 @@ import type {
   VehicleKind,
   WeatherFile,
 } from '../engine/types'
-import { COMPANY_SPECIALTY, FUEL, ROAD, SETTLEMENT, STATION_KIND, UNIT_COUNT, VEHICLE_KIND, VEHICLE_KIND_UNIT } from '../engine/types'
+import { COMPANY_SPECIALTY, FUEL, PLAN_MEASURE, ROAD, SETTLEMENT, STATION_KIND, UNIT_COUNT, VEHICLE_KIND, VEHICLE_KIND_UNIT } from '../engine/types'
 import type { EventDef } from './events'
+import { PLAN_BELT_WIDTH_M, PLAN_PROGRAMME, PLAN_TILE_CELLS } from '../engine/plan'
 import { lonLatToColRow } from './grid'
 import { wallClockMin } from './time'
 
@@ -38,6 +41,9 @@ export interface Dataset {
   event: EventDef
   /** null when the event does not ship brigades.json (EventDef.layers); the UI says so. */
   brigades: BrigadesFile | null
+  /** Preparation plan (plan.json, src/engine/plan/bake.ts); null when the event does not ship one
+   *  (EventDef.layers); the UI says so. */
+  plan: PlanFile | null
   /** Residents per cell (population_home.bin) and people per cell when everyone is at work or school
    *  (population_work.bin); src/engine/population combines them by time of day. null when the event does not
    *  ship them (EventDef.layers); the UI says so. */
@@ -604,7 +610,7 @@ export async function loadRealDataset(event: EventDef): Promise<Dataset | null> 
   }
   const grid = parseGrid(gridJson)
   const cells = grid.rows * grid.cols
-  const [elev, fuel, scar, bld, roads, weather, ignitions, firms, population, brigades] = await Promise.all([
+  const [elev, fuel, scar, bld, roads, weather, ignitions, firms, population, brigades, plan] = await Promise.all([
     fetchBin('elevation.bin', dir),
     fetchBin('fuel.bin', dir),
     fetchBin('scar.bin', dir),
@@ -615,6 +621,7 @@ export async function loadRealDataset(event: EventDef): Promise<Dataset | null> 
     fetchJson('firms.json', dir),
     event.layers.population ? Promise.all([fetchBin('population_home.bin', dir), fetchBin('population_work.bin', dir)]) : null,
     event.layers.brigades ? fetchJson('brigades.json', dir) : null,
+    event.layers.plan ? fetchJson('plan.json', dir) : null,
   ])
   return {
     grid,
@@ -632,6 +639,7 @@ export async function loadRealDataset(event: EventDef): Promise<Dataset | null> 
       population === null
         ? null
         : { home: parsePopulationLayer('population_home.bin', population[0], cells), work: parsePopulationLayer('population_work.bin', population[1], cells) },
+    plan: plan === null ? null : parsePlan(plan, grid),
     synthetic: false,
     timeline: event.id,
     windDirCorrectionDeg: event.windDirCorrectionDeg,
@@ -651,4 +659,67 @@ export async function loadNationalPopulation(): Promise<NationalPopulation> {
  *  the explorer today. */
 export async function loadNationalStations(): Promise<NationalStationsFile> {
   return parseNationalStations(await fetchJson('national/bomberos_cl.json'))
+}
+
+/** plan.json: the preparation plan (PlanFile in types.ts). Checked against the grid and against the constants
+ *  the worker applies (tile size, belt width, programme), so a stale bake stops with a visible error. */
+export function parsePlan(j: unknown, g: GridMeta): PlanFile {
+  const f = 'plan.json'
+  if (!isObj(j)) throw new DataError(f, 'no es un objeto JSON')
+  const tileCells = num(f, j, 'tileCells')
+  const beltWidthM = num(f, j, 'beltWidthM')
+  if (tileCells !== PLAN_TILE_CELLS) throw new DataError(f, `tileCells = ${tileCells}, el simulador usa ${PLAN_TILE_CELLS}: vuelve a generar el plan (pnpm plan)`)
+  if (beltWidthM !== PLAN_BELT_WIDTH_M) throw new DataError(f, `beltWidthM = ${beltWidthM}, el simulador usa ${PLAN_BELT_WIDTH_M}: vuelve a generar el plan (pnpm plan)`)
+  if (!isObj(j.programme)) throw new DataError(f, '"programme" debe ser un objeto')
+  const programme = { prepMedianMin: num(f, j.programme, 'prepMedianMin'), cueShare: num(f, j.programme, 'cueShare') }
+  if (programme.prepMedianMin !== PLAN_PROGRAMME.prepMedianMin || programme.cueShare !== PLAN_PROGRAMME.cueShare)
+    throw new DataError(f, 'el programa del plan no coincide con PLAN_PROGRAMME: vuelve a generar el plan (pnpm plan)')
+  if (!isObj(j.ensemble)) throw new DataError(f, '"ensemble" debe ser un objeto')
+  const e = j.ensemble
+  const band = numArray(f, e, 'ignitionBandM', 2)
+  const ensemble = {
+    fires: num(f, e, 'fires'),
+    trainFires: num(f, e, 'trainFires'),
+    testFires: num(f, e, 'testFires'),
+    alertLagMin: num(f, e, 'alertLagMin'),
+    ignitionBandM: [band[0], band[1]] as [number, number],
+    excludeNearRealM: num(f, e, 'excludeNearRealM'),
+  }
+  const nTiles = Math.ceil(g.rows / tileCells) * Math.ceil(g.cols / tileCells)
+  const tileId = (o: Obj, k: string) => {
+    const t = num(f, o, k)
+    if (!Number.isInteger(t) || t < 0 || t >= nTiles) throw new DataError(f, `"${k}" = ${t} fuera de las ${nTiles} celdas del plan`)
+    return t
+  }
+  const seenT = new Set<number>()
+  const tiles = list(f, j, 'tiles').map((o) => {
+    const t = { tile: tileId(o, 'tile'), ha: num(f, o, 'ha'), savedPerFire: num(f, o, 'savedPerFire') }
+    if (seenT.has(t.tile)) throw new DataError(f, `celda ${t.tile} repetida en "tiles"`)
+    if (!(t.ha > 0)) throw new DataError(f, `celda ${t.tile}: "ha" debe ser > 0`)
+    seenT.add(t.tile)
+    return t
+  })
+  const seenS = new Set<number>()
+  const sectors = list(f, j, 'sectors').map((o) => {
+    const x = { sector: tileId(o, 'sector'), households: num(f, o, 'households'), savedPerFire: num(f, o, 'savedPerFire') }
+    if (seenS.has(x.sector)) throw new DataError(f, `sector ${x.sector} repetido en "sectors"`)
+    if (!(x.households > 0)) throw new DataError(f, `sector ${x.sector}: "households" debe ser > 0`)
+    seenS.add(x.sector)
+    return x
+  })
+  const measures = new Set<string>(Object.values(PLAN_MEASURE))
+  const validation: PlanValidation[] = list(f, j, 'validation').map((o) => {
+    const m = str(f, o, 'measure')
+    if (!measures.has(m)) throw new DataError(f, `medida desconocida "${m}" en "validation"`)
+    const r = numArray(f, o, 'randomUnseenPct', 3)
+    return {
+      measure: m as PlanValidation['measure'],
+      budget: num(f, o, 'budget'),
+      unseenPct: num(f, o, 'unseenPct'),
+      randomUnseenPct: [r[0], r[1], r[2]],
+      feb2Pct: num(f, o, 'feb2Pct'),
+      feb2MeanPct: num(f, o, 'feb2MeanPct'),
+    }
+  })
+  return { method: str(f, j, 'method'), tileCells, beltWidthM, programme, ensemble, tiles, sectors, validation }
 }

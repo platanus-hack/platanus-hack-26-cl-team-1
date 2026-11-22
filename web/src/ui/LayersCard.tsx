@@ -15,6 +15,7 @@ const ITEMS: { key: keyof LayerToggles; label: string; swatch: string }[] = [
   { key: 'combustible', label: 'Combustible', swatch: 'fuel' },
   { key: 'bomberos', label: 'Bomberos (rutas, sitios, cortes)', swatch: 'brig' },
   { key: 'poblacion', label: 'Personas a esta hora', swatch: 'pop' },
+  { key: 'plan', label: 'Plan de preparación', swatch: 'plan' },
 ]
 
 export function LayersCard({
@@ -70,6 +71,12 @@ export function LayersCard({
                     <span className="lg line routes" /> Ruta de evacuación (grosor: hogares)
                   </>
                 )}
+              </div>
+            )}
+            {layers.plan && !hide.includes('plan') && (
+              <div className="legend-row wrap">
+                <span className="lg plan-belt" /> Celdas de 1 km donde se trata la franja
+                <span className="lg plan-sector" /> Sectores con programa de preparación
               </div>
             )}
             {layers.poblacion && (

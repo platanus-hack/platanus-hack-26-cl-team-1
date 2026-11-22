@@ -26,8 +26,8 @@ export interface EventDef {
   /** Correction added to the historical ERA5 wind direction (deg). Fitted on Viña's scar only; 0 elsewhere
    *  (a site fit, not part of the model: engine/fire/MODEL.md section 6b). */
   windDirCorrectionDeg: number
-  /** Optional layers this event ships: brigades.json, population_{home,work}.bin. */
-  layers: { brigades: boolean; population: boolean }
+  /** Optional layers this event ships: brigades.json, population_{home,work}.bin, plan.json. */
+  layers: { brigades: boolean; population: boolean; plan: boolean }
   /** A real fire was observed here: the scar, FIRMS and the Validación section mean something. False for a
    *  hypothetical scenario (Talca), whose scar.bin is all "no data" and firms.json empty. */
   observedFire: boolean
@@ -70,7 +70,7 @@ export const EVENTS: Record<EventId, EventDef> = {
     dir: '',
     horizonMin: DEFAULT_FIRE_PARAMS.horizonMin, // 12:00 to midnight: the model has no suppression, so later hours overburn
     windDirCorrectionDeg: ERA5_WIND_DIR_CORRECTION_DEG,
-    layers: { brigades: true, population: true },
+    layers: { brigades: true, population: true, plan: true },
     observedFire: true,
     evac: {
       alertMin: { value: DEFAULT_EVAC_PARAMS.alertMin, source: null },
@@ -85,7 +85,7 @@ export const EVENTS: Record<EventId, EventDef> = {
     dir: 'eaton-2025/',
     horizonMin: 18 * 60, // 18:00 on 7 Jan to 12:00 on 8 Jan (Pacific time): the first night and morning
     windDirCorrectionDeg: 0,
-    layers: { brigades: true, population: true },
+    layers: { brigades: true, population: true, plan: false },
     observedFire: true,
     evac: {
       // 19:25: the first evacuation orders (east of Lake Avenue). West of Lake the first order came at 03:25.
@@ -116,7 +116,7 @@ export const EVENTS: Record<EventId, EventDef> = {
     dir: 'talca/',
     horizonMin: 12 * 60, // 12:00 to midnight, the same window as Viña's validated replay
     windDirCorrectionDeg: 0, // the -10 deg correction was fitted on Viña's scar only
-    layers: { brigades: false, population: true },
+    layers: { brigades: false, population: true, plan: false },
     observedFire: false,
     evac: {
       // 17:00: three hours after the hypothetical 14:00 ignition. A labelled assumption, like Viña's 18:00.

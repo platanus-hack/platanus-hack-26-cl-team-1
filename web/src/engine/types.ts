@@ -244,11 +244,23 @@ export interface EvacPrepared {
   [k: string]: unknown
 }
 
+/** Households in a community preparation programme (drills, go-bags, an agreed way out): they use their own
+ *  preparation median and cue share; everything else (fire, routes, alert, cue radius) is shared. */
+export interface EvacProgramme {
+  /** 1 per building in the programme, 0 otherwise (length = building count). */
+  member: Uint8Array
+  prepMedianMin: number
+  /** Share 0..1 of the programme's households that leave on environmental cues. */
+  cueShare: number
+}
+
 export interface EvacInput {
   prepared: EvacPrepared
   arrivalMin: Float32Array
   params: EvacParams
   edits: EvacEdits
+  /** Optional: households in a preparation programme (Plan de preparación). */
+  programme?: EvacProgramme
 }
 
 /** Per-building status, closed set. */
@@ -540,3 +552,61 @@ export type PopulationDay = (typeof POPULATION_DAY)[keyof typeof POPULATION_DAY]
 // export function awayShare(localIso: string, params: PresenceParams, day?: PopulationDay): number
 // export function peopleInBurnedArea(...)  (src/engine/population/index.ts)
 // export const DEFAULT_PRESENCE_PARAMS: PresenceParams
+
+// ---------------------------------------------------------------------------------------------------------
+// Preparation plan (plan.json, written by src/engine/plan/bake.ts; helpers in src/engine/plan/index.ts)
+// ---------------------------------------------------------------------------------------------------------
+
+/** A measure the preparation plan ranks. Closed set. */
+export const PLAN_MEASURE = {
+  /** Clear wildland within beltWidthM of inhabited land, by tile (cost: hectares). */
+  BELT: 'franja',
+  /** Community preparation programme, by sector (cost: households). */
+  PROGRAMME: 'programa',
+} as const
+export type PlanMeasure = (typeof PLAN_MEASURE)[keyof typeof PLAN_MEASURE]
+
+/** One budget of the plan, scored on fires the ranking never saw and on 2 Feb 2024. Percentages are of the
+ *  summed expected households cut off (EvacResult.expectedTrappedHouseholds) without the plan. */
+export interface PlanValidation {
+  measure: PlanMeasure
+  /** Hectares (BELT) or households (PROGRAMME). */
+  budget: number
+  /** Held-out fires of the ensemble (same weather as 2 Feb, ignitions the ranking never saw). */
+  unseenPct: number
+  /** The same budget filled at random (several draws): min, median, max on the held-out fires. */
+  randomUnseenPct: [number, number, number]
+  /** 2 Feb 2024 (real ignitions, alert 18:00), real ERA5 weather. */
+  feb2Pct: number
+  /** Same, mean over the weather members (wind +-20 %, direction +-10 degrees). */
+  feb2MeanPct: number
+}
+
+/** plan.json: a preparation plan ranked over an ensemble of plausible fires, never knowing where or when the
+ *  next one starts. Tiles and sectors are cells of a coarse grid of tileCells x tileCells grid cells:
+ *  tile = floor(row / tileCells) * ceil(cols / tileCells) + floor(col / tileCells). */
+export interface PlanFile {
+  /** Plain description of how the plan was built (Spanish, shown in the panel). */
+  method: string
+  tileCells: number
+  beltWidthM: number
+  programme: { prepMedianMin: number; cueShare: number }
+  ensemble: {
+    fires: number
+    trainFires: number
+    testFires: number
+    /** The alert reaches everyone this long after the ignition (minutes). */
+    alertLagMin: number
+    /** Ignitions in wildland this far from inhabited land (metres). */
+    ignitionBandM: [number, number]
+    /** No ignition within this distance (m) of the 2 Feb 2024 ignitions (so 2 Feb is a fair test). */
+    excludeNearRealM: number
+  }
+  /** Belt tiles, best first by savedPerFire / ha. savedPerFire: expected households saved by the tile alone,
+   *  per training fire. */
+  tiles: { tile: number; ha: number; savedPerFire: number }[]
+  /** Programme sectors, best first by savedPerFire / households. savedPerFire: expected households saved by
+   *  the sector alone, per training fire. */
+  sectors: { sector: number; households: number; savedPerFire: number }[]
+  validation: PlanValidation[]
+}

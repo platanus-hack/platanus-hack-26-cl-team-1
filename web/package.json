@@ -11,7 +11,8 @@
     "typecheck": "tsc",
     "test": "vitest run",
     "validate": "tsx src/engine/fire/calibrate.ts",
-    "validate:eaton": "tsx src/engine/fire/validate-event.ts eaton-2025"
+    "validate:eaton": "tsx src/engine/fire/validate-event.ts eaton-2025",
+    "plan": "tsx src/engine/plan/bake.ts"
   },
   "dependencies": {
     "maplibre-gl": "^5.24.1",

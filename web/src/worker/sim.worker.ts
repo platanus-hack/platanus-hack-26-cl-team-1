@@ -5,6 +5,7 @@
 import { simulateFire, DEFAULT_FIRE_PARAMS } from '../engine/fire'
 import { prepareEvac, simulateEvac, DEFAULT_EVAC_PARAMS } from '../engine/evac'
 import { applyRescue, planBrigades, type BrigadePlan } from '../engine/brigade'
+import { applyBelt, buildBelt, checkPlanAgainstData, programmeFor, type Belt } from '../engine/plan'
 import type { EvacParams, EvacPrepared, FireInput, FireResult } from '../engine/types'
 import type { BrigadesOut, FromWorker, RunResult, ToWorker } from './protocol'
 import { localToMin } from '../data/time'
@@ -20,6 +21,10 @@ const ctx = self as unknown as DedicatedWorkerGlobalScope
 let data: Dataset | null = null
 let prepared: EvacPrepared | null = null
 let wildDist: Float32Array | null = null
+/** The 200 m belt around inhabited land, by plan tile (src/engine/plan), built once per dataset. */
+let belt: Belt | null = null
+/** Visible notes about the plan for the last fire (e.g. ignition cells left untreated). */
+let planNotes: string[] = []
 let lastFireKey = ''
 let lastFire: FireResult | null = null
 let lastFireInput: FireInput | null = null
@@ -41,6 +46,8 @@ async function init(synthetic: boolean, timeline: TimelineChoice) {
   const loadMs = performance.now() - t
   prepared = prepareEvac(d.grid, d.fuel, d.roads, d.buildings, { safeDistanceM: DEFAULT_EVAC_PARAMS.safeDistanceM })
   wildDist = wildlandDistanceM(d.grid, d.fuel)
+  belt = buildBelt(d.grid, d.fuel, d.buildings)
+  if (d.plan) checkPlanAgainstData(belt, d.plan)
   lastFireKey = ''
   lastFire = null
   lastDefKey = ''
@@ -56,18 +63,34 @@ ctx.onmessage = (ev: MessageEvent<ToWorker>) => {
     return
   }
   try {
-    if (!data || !prepared || !wildDist) throw new Error('El simulador aún no tiene datos')
+    if (!data || !prepared || !wildDist || !belt) throw new Error('El simulador aún no tiene datos')
     const t = performance.now()
     const s = msg.scenario
     const wb = buildWeatherSeries(data.weather, data.grid.t0, s.weather, data.windDirCorrectionDeg)
     const key = fireKey(s)
     if (key !== lastFireKey || !lastFire) {
+      const ignitions = buildIgnitions(data.grid, data.ignitions, s)
+      let fuel = data.fuel
+      let firebreak = rasteriseFirebreaks(data.grid, s.firebreaks)
+      planNotes = []
+      if (s.planTiles.length > 0) {
+        // Plan de preparación: the belt cleared in the chosen tiles (src/engine/plan).
+        const a = applyBelt(belt, s.planTiles, fuel, firebreak, ignitions.map((g) => g.cell))
+        fuel = a.fuel
+        firebreak = a.firebreak
+        if (a.skippedIgnitionCells > 0)
+          planNotes.push(
+            a.skippedIgnitionCells === 1
+              ? 'Un foco cae en la franja tratada; esa celda se dejó sin tratar para que el fuego pueda empezar.'
+              : `${a.skippedIgnitionCells} focos caen en la franja tratada; esas celdas se dejaron sin tratar para que el fuego pueda empezar.`,
+          )
+      }
       lastFireInput = {
         grid: data.grid,
         elevation: data.elevation,
-        fuel: data.fuel,
-        firebreak: rasteriseFirebreaks(data.grid, s.firebreaks),
-        ignitions: buildIgnitions(data.grid, data.ignitions, s),
+        fuel,
+        firebreak,
+        ignitions,
         weather: wb.series,
         params: {
           ...DEFAULT_FIRE_PARAMS,
@@ -90,6 +113,8 @@ ctx.onmessage = (ev: MessageEvent<ToWorker>) => {
       footShare: s.footShare,
     }
     const edits = { closedEdges: s.closedEdges, addedLinks: s.addedLinks }
+    // Plan de preparación: households of the chosen sectors are in the community programme.
+    const programme = programmeFor(belt, s.planSectors, { prepMedianMin: s.prepMedianMin, cueShare: s.cueShare })
     // Firefighters (MODEL.md of engine/brigade): plan on the fire without them, then rerun the fire defended.
     const bKey = brigadeKey(s)
     let fire = lastFire
@@ -103,7 +128,7 @@ ctx.onmessage = (ev: MessageEvent<ToWorker>) => {
         const plan = planBrigades({
           prepared,
           grid: data.grid,
-          fuel: data.fuel,
+          fuel: lastFireInput!.fuel,
           arrivalMin: lastFire.arrivalMin,
           file: data.brigades,
           settings: s.brigades,
@@ -117,8 +142,8 @@ ctx.onmessage = (ev: MessageEvent<ToWorker>) => {
         lastDefKey = dKey
       }
       fire = lastDef.fire
-      const base = simulateEvac({ prepared, arrivalMin: lastFire.arrivalMin, params: evacParams, edits })
-      const defended = simulateEvac({ prepared, arrivalMin: fire.arrivalMin, params: evacParams, edits })
+      const base = simulateEvac({ prepared, arrivalMin: lastFire.arrivalMin, params: evacParams, edits, programme })
+      const defended = simulateEvac({ prepared, arrivalMin: fire.arrivalMin, params: evacParams, edits, programme })
       const rescue = applyRescue(prepared, defended.householdRisk, defended.householdStatus, lastDef.plan.units, data.horizonMin, defended.expectedTrappedHouseholds)
       evac = {
         ...defended,
@@ -141,7 +166,7 @@ ctx.onmessage = (ev: MessageEvent<ToWorker>) => {
         planMs: lastDef.planMs,
       }
     } else {
-      evac = simulateEvac({ prepared, arrivalMin: lastFire.arrivalMin, params: evacParams, edits })
+      evac = simulateEvac({ prepared, arrivalMin: lastFire.arrivalMin, params: evacParams, edits, programme })
     }
     const sentKey = key + (bKey ?? '')
     const fireChanged = sentKey !== lastSentKey
@@ -164,7 +189,7 @@ ctx.onmessage = (ev: MessageEvent<ToWorker>) => {
       brigades,
       safeNodes: safe,
       weather: wb.series,
-      notes: wb.notes,
+      notes: [...wb.notes, ...planNotes],
       workerMs: 0,
     }
     const e = result.evac

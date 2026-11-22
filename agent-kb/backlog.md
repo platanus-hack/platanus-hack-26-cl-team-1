@@ -24,6 +24,8 @@ Owner in brackets once someone takes an item. Project: Cortafuego (D-019). The O
     one hypothetical ignition at 14:00). [Anaís + agent]
 
 ## Next
+- [ ] Plan de preparación (D-033), next: ignitions sampled from fire records, several weather days, a
+  street-link optimizer (exact incremental evaluator in the 2026-11-22 optimizer session log), a geofenced alert mode.
 - [ ] Western stall of 14:05–16:25 (satellite) not reproduced: needs a cause the data shows (initial attack?
   local wind?); see `web/src/engine/fire/MODEL.md` section 6.
 - [ ] Pace back test polish (review of PR #53): GOES half-pixel 1.0 km vs a ~2.5–3 km pixel, look fires up by

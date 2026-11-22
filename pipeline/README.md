@@ -85,6 +85,7 @@ Every grid stays under Viña's 245,456 cells (`grid.MAX_CELLS`).
 | `goes.json` | `FirmsPoint[]`, GOES-16 fire pixels every 10 min, 2 Feb 12:00 - 3 Feb 04:00 local (scoring only, not loaded by the app) | NOAA GOES-16 ABI L2 FDC |
 | `ignitions.json` | `IgnitionPreset[]` | FIRMS first detections + press reports |
 | `brigades.json` | `BrigadesFile`: fire companies, trucks, dispatch, reinforcements, road cuts | **Curated by hand** (not baked): Viña from OpenStreetMap fire stations + press; Eaton (`eaton-2025/brigades.json`) from LA County's LMS layer + Pasadena FD's 2025 Standards of Cover; see `web/src/engine/brigade/MODEL.md` |
+| `plan.json` | `PlanFile`: preparation plan (belt tiles and programme sectors ranked over an ensemble of simulated fires, with validation) | **Computed in Node** from the files above (not baked by `bake.py`): `cd web && pnpm plan`; see `web/src/engine/plan/MODEL.md` |
 | `population_home.bin` | Float32 residents per cell | WorldPop 2024 (constrained, 100 m); Eaton: GHSL GHS-POP 2025 (3") |
 | `population_work.bin` | Float32 people per cell if every resident is at work or school | the residents + GHSL GHS-BUILT-V NRES 2025, gravity model |
 | `national/population_cl.{json,bin}` | Both layers for all of Chile, 30" (~0.9 km), sparse (`NationalPopulationMeta`) | same |
@@ -206,6 +207,11 @@ pace of the simulated fire (`web/src/engine/fire/MODEL.md` section 6); the brows
 around noon at Fundo Las Tablas, next to the reserve; the point is the upwind (southern) end of the first
 VIIRS cluster (14:47) and the time 12:05. Quilpué / Villa Alemana: centroid of the second cluster in the
 first VIIRS pass, start 30 min before that detection (14:17). Both are labelled approximate and say why.
+
+**plan.json** is not written by `bake.py` either: `cd web && pnpm plan` (`web/src/engine/plan/bake.ts`) runs the
+fire and evacuation engines over an ensemble of plausible fires and ranks the measures. Rerun it whenever the
+fuel, buildings, streets, weather or the fire calibration change; `parsePlan` refuses a file whose tile size,
+belt width or programme differ from the app's.
 
 **brigades.json** is not written by `bake.py`: it is curated by hand (`make data` leaves it alone) and
 validated against the grid on load (`parseBrigades`). Positions are the OpenStreetMap `amenity=fire_station`

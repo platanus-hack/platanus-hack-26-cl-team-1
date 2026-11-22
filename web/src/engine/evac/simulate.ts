@@ -413,6 +413,14 @@ export function simulateEvac(input: EvacInput): EvacResultExt {
   if (!(arrivalMin instanceof Float32Array) || arrivalMin.length !== rows * cols)
     fail(`arrivalMin must be a Float32Array of rows*cols = ${rows * cols} (got ${arrivalMin?.length})`)
   validateEdits(edits, N, E)
+  const prog = input.programme ?? null
+  if (prog) {
+    if (!(prog.member instanceof Uint8Array) || prog.member.length !== nB)
+      fail(`programme.member must be a Uint8Array of ${nB} buildings (got ${prog.member?.length})`)
+    if (!(prog.prepMedianMin > 0) || !Number.isFinite(prog.prepMedianMin)) fail(`programme.prepMedianMin = ${prog.prepMedianMin}: must be > 0`)
+    if (!(prog.cueShare >= 0 && prog.cueShare <= 1)) fail(`programme.cueShare = ${prog.cueShare}: must be in [0, 1]`)
+    if (prog.member.some((v) => v > 1)) fail('programme.member must hold only 0 or 1')
+  }
   const A = edits.addedLinks.length
   const M = E + A
   const margin = params.safetyMarginMin
@@ -512,8 +520,9 @@ export function simulateEvac(input: EvacInput): EvacResultExt {
   // Environmental cues: a share cueShare of the households starts its response when the fire comes within
   // cueRadiusM of the home (earliest arrival in an octagon window around its cell), if before the alert.
   const { alertMin, prepMedianMin, prepSigma } = params
-  const cueOn = params.cueShare > 0 && params.cueRadiusM > 0
+  const cueOn = params.cueRadiusM > 0 && (params.cueShare > 0 || (prog !== null && prog.cueShare > 0))
   const cueShare = cueOn ? params.cueShare : 0
+  const progCueShare = cueOn && prog ? prog.cueShare : 0
   const cueMin = new Float64Array(cueOn ? nB : 0)
   if (cueOn) {
     const near = minFilterOctagon(arrivalMin, rows, cols, octagonWindow(params.cueRadiusM / cellM))
@@ -525,7 +534,8 @@ export function simulateEvac(input: EvacInput): EvacResultExt {
 
   // Households.
   const walkMinPerM = minPerM(params.walkKmh)
-  const cdf = makeLognormalCdf(prepMedianMin, prepSigma)
+  const cdfDefault = makeLognormalCdf(prepMedianMin, prepSigma)
+  const cdfProg = prog ? makeLognormalCdf(prog.prepMedianMin, prepSigma) : cdfDefault
   const householdRisk = new Float32Array(nB)
   const householdStatus = new Uint8Array(nB)
   const Dfoot = new Float64Array(nB)
@@ -543,6 +553,10 @@ export function simulateEvac(input: EvacInput): EvacResultExt {
     const own = arr - margin
     const n = P.bldNode[b]
     const cn = P.bldCarNode[b]
+    // Programme households (EvacInput.programme) prepare faster and respond to cues more often.
+    const inProg = prog !== null && prog.member[b] === 1
+    const cdf = inProg ? cdfProg : cdfDefault
+    const shareB = inProg ? progCueShare : cueShare
     const accessFoot = P.bldAccessM[b] * walkMinPerM
     const lf = foot.L[n]
     const dF = Math.min(own, lf - accessFoot)
@@ -562,13 +576,13 @@ export function simulateEvac(input: EvacInput): EvacResultExt {
       }
       risk += carShare * (1 - cdf(dC - alertMin))
     }
-    if (cueOn && cueMin[b] < alertMin) {
+    if (cueOn && shareB > 0 && cueMin[b] < alertMin) {
       // Cue responders start at the cue; the others still wait for the alert.
       const cue = cueMin[b]
       buildingsCuedBeforeAlert++
       let riskCue = footShare > 0 ? footShare * (1 - cdf(dF - cue)) : 0
       if (car && carCc) riskCue += carShare * (1 - cdf(dC - cue))
-      risk = (1 - cueShare) * risk + cueShare * riskCue
+      risk = (1 - shareB) * risk + shareB * riskCue
     }
     Dfoot[b] = dF
     Dcar[b] = dC
@@ -602,10 +616,20 @@ export function simulateEvac(input: EvacInput): EvacResultExt {
   const horizonMin = maxFinite > 0 ? Math.ceil(maxFinite / 60) * 60 : 0
   if (horizonMin > MAX_HORIZON_MIN)
     fail(`arrivalMin has finite values up to ${maxFinite} min; unburned cells must be Infinity, not a large number`)
-  const curveModes: { share: number; D: Float64Array }[] = []
-  if (footShare > 0) curveModes.push({ share: footShare, D: Dfoot })
-  if (carShare > 0) curveModes.push({ share: carShare, D: Dcar })
-  const riskByAlert = riskCurve(nB, horizonMin, curveModes, prepMedianMin, prepSigma, cueOn ? { share: cueShare, cueMin } : null)
+  // The curve is a sum over buildings, so with a programme it is the default group's curve plus the
+  // programme group's, each computed with the other group's deadlines set to Infinity (counted as out).
+  const groupCurve = (keep: (b: number) => boolean, prep: number, share: number) => {
+    const mask = (D: Float64Array) => (prog ? D.map((d, b) => (keep(b) ? d : Infinity)) : D)
+    const modes: { share: number; D: Float64Array }[] = []
+    if (footShare > 0) modes.push({ share: footShare, D: mask(Dfoot) })
+    if (carShare > 0) modes.push({ share: carShare, D: mask(Dcar) })
+    return riskCurve(nB, horizonMin, modes, prep, prepSigma, cueOn && share > 0 ? { share, cueMin } : null)
+  }
+  let riskByAlert = groupCurve((b) => !prog || prog.member[b] === 0, prepMedianMin, cueShare)
+  if (prog) {
+    const pc = groupCurve((b) => prog.member[b] === 1, prog.prepMedianMin, progCueShare)
+    riskByAlert = riskByAlert.map((x, j) => ({ alertMin: x.alertMin, expectedTrappedHouseholds: x.expectedTrappedHouseholds + pc[j].expectedTrappedHouseholds }))
+  }
 
   return {
     householdRisk,

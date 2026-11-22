@@ -63,6 +63,8 @@ function scenario(patch: Partial<Scenario> = {}): Scenario {
     closedEdges: [],
     addedLinks: [],
     brigades: { enabled: false, units: {}, dispatchMin: {}, reinforcementUnits: {}, reinforcementMin: {}, historicalCuts: true },
+    planTiles: [],
+    planSectors: [],
     ...patch,
   }
 }

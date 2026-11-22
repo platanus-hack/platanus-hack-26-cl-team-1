@@ -9,6 +9,7 @@ import { LAG_CAP_MIN } from '../engine/fire/pacing'
 import { minToDateLabel, minToHHMM, localToMin, wallClockMin } from '../data/time'
 import type { BrigadesOut, EvacOut, FireOut } from '../worker/protocol'
 import { BrigadesSection } from './BrigadesSection'
+import { PlanSection } from './PlanSection'
 import type { FirebreakWidth, Scenario, WeatherSettings } from '../worker/scenario'
 import { FIREBREAK_WIDTHS, sampleAt } from '../worker/scenario'
 import { Compass, compassLabel, fmtInt, fmtSigned, Section, Segmented, Slider, Toggle } from './controls'
@@ -699,6 +700,7 @@ export function Panel(p: Props) {
         <ClimaSection {...p} />
         <FuegoSection {...p} />
         <CortafuegosSection {...p} />
+        <PlanSection data={p.data} scenario={p.scenario} update={p.update} />
         <BrigadesSection
           data={p.data}
           scenario={p.scenario}

@@ -63,6 +63,8 @@ function defaultScenario(data: Dataset): Scenario {
     closedEdges: [],
     addedLinks: [],
     brigades: data.brigades ? defaultBrigades(data.brigades, data.grid.t0) : noBrigades(),
+    planTiles: [],
+    planSectors: [],
   }
 }
 
@@ -77,6 +79,7 @@ const DEFAULT_LAYERS: LayerToggles = {
   combustible: false,
   bomberos: true,
   poblacion: false,
+  plan: true,
 }
 
 const TOOL_HINT: Record<Exclude<Tool, 'none'>, string> = {
@@ -324,6 +327,8 @@ function Explorer({
   const client = useRef<SimClient | null>(null)
   const scenarioRef = useRef(scenario)
   scenarioRef.current = scenario
+  /** Weather notes the panel already shows (set below), so only the worker's other notes go to the map. */
+  const weatherNotesRef = useRef<string[]>([])
   useEffect(() => {
     const c = new SimClient({
       onReady: () => performance.mark('cf:ready'),
@@ -343,6 +348,9 @@ function Explorer({
         setEvac(r.evac)
         setBrigadesOut(r.brigades ?? null)
         setSafe(r.safeNodes)
+        // Worker notes beyond the weather ones (e.g. a plan ignition cell left untreated) are shown on the map.
+        const extra = r.notes.filter((n) => !weatherNotesRef.current.includes(n))
+        onNote('sim', extra.length > 0 ? extra.join(' ') : null)
         setSimError(null)
         setTimings((prev) => ({ fireMs: r.fire ? r.fire.elapsedMs : (prev?.fireMs ?? null), fireRerun: !!r.fire, evacMs: r.evac.elapsedMs, roundTripMs }))
       },
@@ -374,6 +382,7 @@ function Explorer({
       return { series: rawSeries, notes: [`Clima inválido: ${(e as Error).message}`] }
     }
   }, [data, t0, scenario.weather, rawSeries])
+  weatherNotesRef.current = applied.notes
 
   // ------------------------------------------------------------ results
   const sorted = useMemo(() => (fire ? sortedArrivals(fire.arrivalMin) : null), [fire])
@@ -443,22 +452,25 @@ function Explorer({
   }, [])
   useEffect(() => onNote('tool', null), [tool, onNote])
 
-  // Layers this scenario has no data for: FIRMS in the today timeline, the scar where no fire was observed
-  // (EventDef.observedFire), population and firefighters where the event does not ship them (EventDef.layers).
-  const hiddenLayers = useMemo(
-    () => [
-      ...(data.firms.length === 0 ? (['firms'] as const) : []),
-      ...(data.event.observedFire ? [] : (['cicatriz'] as const)),
-      ...(data.population ? [] : (['poblacion'] as const)),
-      ...(data.brigades ? [] : (['bomberos'] as const)),
-    ],
-    [data],
-  )
   const effectiveLayers = useMemo(
     // the street tools and the evacuation routes need the street layer on
     () => (tool === 'closeRoad' || tool === 'link' || showRoutes ? { ...layers, calles: true } : layers),
     [layers, tool, showRoutes],
   )
+
+  // Layers this scenario has nothing to show for: FIRMS in the today timeline, the scar where no fire was observed
+  // (EventDef.observedFire), population and firefighters where the event does not ship them (EventDef.layers),
+  // the preparation plan while it is empty.
+  const noPlan = scenario.planTiles.length === 0 && scenario.planSectors.length === 0
+  const hiddenLayers = useMemo(() => {
+    const h: (keyof LayerToggles)[] = []
+    if (data.firms.length === 0) h.push('firms')
+    if (!data.event.observedFire) h.push('cicatriz')
+    if (!data.population) h.push('poblacion')
+    if (!data.brigades) h.push('bomberos')
+    if (noPlan) h.push('plan')
+    return h
+  }, [data, noPlan])
 
   const widthRef = useRef(firebreakWidth)
   widthRef.current = firebreakWidth
