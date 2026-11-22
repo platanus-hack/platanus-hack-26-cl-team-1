@@ -11,6 +11,9 @@
 - A bad answer (invalid JSON, an action outside the task, `null` action with quality `ok`…) becomes an
   uncertain observation (`action=None`, `quality=unknown`) so the supervisor stays silent. Real failures
   (server down, timeout, HTTP error, an undecodable frame) raise, and the session reports them.
+- Checked tasks (`check_tasks`, D-020): next to each call, one yes/no question per expected next step asks
+  whether that step's `completion_cue` is visible in the newest frame (at `check_max_side_px`). An expected
+  step counts only when its result is seen; actions that aren't expected (mistakes) pass straight through.
 """
 
 from __future__ import annotations
@@ -39,12 +42,13 @@ from contracts import (
 )
 from PIL import Image
 
-from .prompt import NOTE_MAX_CHARS, build_messages, task_json_schema
+from .prompt import CHECK_SCHEMA, NOTE_MAX_CHARS, build_messages, check_messages, task_json_schema
 
 log = logging.getLogger(__name__)
 
 MAX_TOKENS = 256  # enough for the JSON answer; a thinking model needs more (SUP_VLM_MAX_TOKENS)
 JPEG_QUALITY = 85
+CHECKED_CONFIDENCE = 0.9  # an expected step reported because its result was seen, not because of a motion
 
 
 class ChatCompleter(Protocol):
@@ -114,6 +118,45 @@ def uncertain(reason: str) -> VlmOutput:
     return VlmOutput(action=None, confidence=0.0, quality=Quality.UNKNOWN, note=reason[:NOTE_MAX_CHARS])
 
 
+def parse_check(raw: str) -> bool:
+    """`{"visible": true|false}`, possibly in a code fence. Anything else raises `ValueError`."""
+    text = raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+    value = json.loads(text).get("visible")
+    if not isinstance(value, bool):
+        raise ValueError(f"not a yes/no answer: {raw[:80]!r}")
+    return value
+
+
+def combine(output: VlmOutput, task: Task, next_steps: Sequence[str], seen: dict[str, bool]) -> VlmOutput:
+    """The main answer, checked against whether each expected step's result is visible (D-020).
+
+    - An expected step's action (quality ok/unknown) stands only if its result is seen; otherwise the
+      answer becomes uncertain, so the step isn't ticked on a motion that might not finish (holding a
+      padlock next to the switch is not locking it).
+    - Any other action (out of order, forbidden, a step done badly) passes unchanged: warnings must be fast.
+    - No action, but an expected step's result is seen: report that step's action, so a step whose
+      result just sits there (a padlock hanging) still gets ticked.
+    """
+    expected = {task.step(s).action: s for s in next_steps}
+    if output.action is not None:
+        step = expected.get(output.action)
+        if step is None or output.quality is Quality.BAD:
+            return output
+        if seen.get(step):
+            return output
+        return uncertain(f"unchecked {step}: result not visible. {output.note or ''}")
+    for step in next_steps:
+        if seen.get(step):
+            note = f"result of {step} visible: {task.step(step).completion_cue}"
+            return VlmOutput(
+                action=task.step(step).action,
+                confidence=CHECKED_CONFIDENCE,
+                quality=Quality.OK,
+                note=note[:NOTE_MAX_CHARS],
+            )
+    return output
+
+
 class VlmPerception:
     def __init__(
         self,
@@ -128,6 +171,8 @@ class VlmPerception:
         record_dir: Path | None = None,
         session: str | None = None,
         max_in_flight: int = 1,
+        check_tasks: frozenset[str] = frozenset(),
+        check_max_side_px: int = 1280,
     ) -> None:
         self._completer = completer
         self._ontology = ontology
@@ -145,6 +190,8 @@ class VlmPerception:
         self._max_in_flight = max_in_flight
         self._pending: deque[asyncio.Task[Observation]] = deque()
         self._calls = 0
+        self._check_tasks = check_tasks
+        self._check_max_side_px = check_max_side_px
         # One VlmPerception per session: the id groups recorded calls (re-judging keeps the original id).
         self._session = session or uuid.uuid4().hex[:8]
 
@@ -213,14 +260,34 @@ class VlmPerception:
         if task.id not in self._schemas:
             self._schemas[task.id] = task_json_schema(task)
         schema = self._schemas[task.id]
+        checked = list(next_steps) if task.id in self._check_tasks else []
         t0 = time.perf_counter()
-        raw = await self._completer(messages, schema)
+        if checked:
+            newest = await asyncio.to_thread(downscale_jpeg, picked[-1].jpeg, self._check_max_side_px)
+            raw, *answers = await asyncio.gather(
+                self._completer(messages, schema),
+                *(
+                    self._completer(check_messages(task.step(s).completion_cue, newest), CHECK_SCHEMA)
+                    for s in checked
+                ),
+            )
+        else:
+            raw, answers = await self._completer(messages, schema), []
         latency_ms = round((time.perf_counter() - t0) * 1000)
         try:
             output = parse_vlm_output(raw, task)
         except InvalidVlmOutput as error:
             log.warning("VLM answer rejected as uncertain (%s): %r", error, raw[:200])
             output = uncertain(f"invalid model output: {error}")
+        seen: dict[str, bool] = {}
+        for step, answer in zip(checked, answers, strict=True):
+            try:
+                seen[step] = parse_check(answer)
+            except ValueError as error:  # json.JSONDecodeError is a ValueError
+                log.warning("completion check for %s rejected as not seen (%s)", step, error)
+                seen[step] = False
+        if checked:
+            output = combine(output, task, checked, seen)
         last = picked[-1]
         log.info(
             "VLM %s seq=%d %d ms: %s %.2f %s",
@@ -241,6 +308,7 @@ class VlmPerception:
                 "t_ms": [f.t_ms for f in picked],
                 "latency_ms": latency_ms,
                 "raw": raw,
+                "seen": seen,
                 "output": output.model_dump(mode="json"),
             }
             await asyncio.to_thread(self._record, record, jpegs)

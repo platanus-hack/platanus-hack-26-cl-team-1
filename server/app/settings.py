@@ -49,6 +49,9 @@ class Settings:
     vlm_span_ms: int = 1100  # the frames shown to the model cover about this much time
     vlm_max_tokens: int = 256  # answer budget; a thinking model needs ~2000
     vlm_frames: int = 3  # frames per call, spread over vlm_span_ms (vLLM's --limit-mm-per-prompt caps it)
+    # tasks whose expected steps count only when their result is seen (D-020); one yes/no call per step
+    vlm_check_tasks: frozenset[str] = frozenset()
+    vlm_check_max_side_px: int = 1280  # the checked frame is sent bigger: small results (a padlock) matter
 
     def __post_init__(self) -> None:
         if (
@@ -82,6 +85,8 @@ class Settings:
             vlm_span_ms=int(os.environ.get("SUP_VLM_SPAN_MS", cls.vlm_span_ms)),
             vlm_max_tokens=int(os.environ.get("SUP_VLM_MAX_TOKENS", cls.vlm_max_tokens)),
             vlm_frames=int(os.environ.get("SUP_VLM_FRAMES", cls.vlm_frames)),
+            vlm_check_tasks=frozenset(t for t in os.environ.get("SUP_VLM_CHECK_TASKS", "").split(",") if t),
+            vlm_check_max_side_px=int(os.environ.get("SUP_VLM_CHECK_MAX_SIDE_PX", cls.vlm_check_max_side_px)),
             voice=VoiceMode(os.environ.get("SUP_VOICE", "browser")),
             elevenlabs_api_key=os.environ.get("ELEVENLABS_API_KEY", ""),
             elevenlabs_voice_id=os.environ.get("SUP_ELEVENLABS_VOICE_ID", ""),

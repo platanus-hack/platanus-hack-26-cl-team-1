@@ -85,6 +85,29 @@ def build_messages(
     ]
 
 
+CHECK_SCHEMA = {
+    "type": "object",
+    "properties": {"visible": {"type": "boolean"}},
+    "required": ["visible"],
+    "additionalProperties": False,
+}
+
+
+def check_messages(completion_cue: str, jpeg: bytes) -> list[dict]:
+    """A yes/no question about one frame: is this step's result visible right now? (D-020)"""
+    image = {
+        "type": "image_url",
+        "image_url": {"url": "data:image/jpeg;base64," + base64.b64encode(jpeg).decode()},
+    }
+    text = (
+        "Look at this camera frame. Is the following true in it RIGHT NOW? Judge only what the image shows, "
+        "not what usually happens next; an object held in a hand, or about to be placed, does not count as "
+        f'placed.\n\nStatement: "{completion_cue}"\n\n'
+        'Answer only the JSON: {"visible": true} or {"visible": false}.'
+    )
+    return [{"role": "user", "content": [image, {"type": "text", "text": text}]}]
+
+
 def task_json_schema(task: Task) -> dict:
     """`vlm_output_json_schema()` narrowed to the task: guided decoding can only emit the task's actions
     and objects, and a short note. The note comes first so the model describes the frames before it picks

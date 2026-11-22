@@ -237,6 +237,25 @@ with a pointer to their replacement; nothing is ever deleted from §3.
   Overlapping windows mean each brief action is seen by several calls. Accuracy per call is unchanged (same
   prompt); whether it catches more of the real actions needs a labelled live run.
 
+### D-020 — Count an expected step only when its result is visible (opt-in per task) (2026-11-22)
+- **Context:** on generated clips of a lockout task (a worker padlocks a conveyor's isolation switch, or
+  pockets the padlock and reaches into the belt), the 8B ticked "padlock on" while the worker only held the
+  padlock, or was putting it in his pocket. Its own note said "not yet attached", and a sharper cue only
+  cut that from 3/3 to 1/3 on the pocketing frames. In a live replay the step was ticked within the first second of the mistake clip. It
+  also never reports a finished state (padlock hanging, worker stepped back: null 3/3). The same model
+  answers a yes/no question about one full-resolution frame correctly: 11/11 on frames of both clips, ~200 ms.
+- **Decision:** for tasks listed in `SUP_VLM_CHECK_TASKS`, `VlmPerception` asks, next to each call and in
+  parallel with it, one yes/no question per expected next step: is its `completion_cue` visible in the newest
+  frame (sent at `SUP_VLM_CHECK_MAX_SIDE_PX`, default 1280)? Then:
+  - an expected step's action counts only if its result is seen (else the answer becomes uncertain);
+  - any other action (out of order, forbidden, done badly) passes unchanged, so warnings stay fast;
+  - no action, but an expected step's result is seen: that step's action is reported (confidence 0.9).
+  A garbled check answer counts as not seen (logged). No contract change: the output is still a `VlmOutput`.
+- **Consequences:** steps are ticked when their result shows, not when the motion starts (about 1 s later on
+  the clip). Completion cues of checked tasks must describe a still, visible result ("a red padlock hangs from
+  the red handle"), not an event ("the button was pressed"). One extra call per expected step (vLLM batches
+  them: p50 865 → 921 ms). Off by default: other tasks behave as before until measured with it.
+
 ## §2 Open (decide in block 1, see docs/VISION.md)
 
 - **D-?? Demo scenario.** Direction: physical assembly in robotics (a contact who assembles robots will give a

@@ -8,7 +8,7 @@ from pathlib import Path
 
 import openai
 import pytest
-from contracts import Frame, Ontology, Perception, Quality, Source
+from contracts import Frame, Ontology, Perception, Quality, Source, VlmOutput
 from contracts.protocol import pack_frame
 from fastapi.testclient import TestClient
 from PIL import Image
@@ -16,8 +16,8 @@ from PIL import Image
 from app.library.store import TaskLibrary
 from app.main import create_app
 from app.perception import factory
-from app.perception.prompt import task_json_schema
-from app.perception.vlm import VlmPerception, downscale_jpeg, pick_frames
+from app.perception.prompt import CHECK_SCHEMA, task_json_schema
+from app.perception.vlm import CHECKED_CONFIDENCE, VlmPerception, combine, downscale_jpeg, pick_frames
 from app.settings import PerceptionMode, Settings, VoiceMode
 
 TASKS_DIR = Path(__file__).resolve().parents[2] / "tasks"
@@ -333,3 +333,96 @@ def test_session_runs_on_pipelined_vlm_calls(monkeypatch):
             assert seq < 50, "the pipelined answers never reached the controller"
         seqs = [m["observation"]["seq"] for m in seen if m["type"] == "debug" and m.get("observation")]
         assert seqs == sorted(seqs)
+
+
+# --- completion checks (D-020) --------------------------------------------------------------------------
+
+
+class CheckingModel:
+    """Answers the main call with `main` and every yes/no completion check with `check`."""
+
+    def __init__(self, main: str, check: str):
+        self.main, self.check = main, check
+        self.calls: list[tuple[list[dict], dict]] = []
+
+    async def __call__(self, messages, json_schema):
+        self.calls.append((messages, json_schema))
+        return self.check if json_schema is CHECK_SCHEMA else self.main
+
+
+def checks(model) -> list[list[dict]]:
+    return [m for m, schema in model.calls if schema is CHECK_SCHEMA]
+
+
+def make_checked(model, ontology, task, **kw) -> VlmPerception:
+    return make(model, ontology, check_tasks=frozenset({task.id}), **kw)
+
+
+def out(**kw) -> VlmOutput:
+    return VlmOutput.model_validate_json(answer(**kw))
+
+
+def test_combine_needs_the_result_of_an_expected_step(task):
+    moving = out(action="wet_hands", confidence=0.95, quality="ok", note="hands moving to the tap")
+    dropped = combine(moving, task, ["wet"], {"wet": False})
+    assert dropped.action is None and dropped.quality is Quality.UNKNOWN
+    assert "unchecked wet" in dropped.note
+    assert combine(moving, task, ["wet"], {"wet": True}) == moving
+
+
+def test_combine_lets_unexpected_actions_and_bad_quality_through(task):
+    early = out(action="apply_soap", confidence=0.9, quality="ok")  # out of order: a warning, keep it fast
+    assert combine(early, task, ["wet"], {"wet": False}) == early
+    badly = out(action="wet_hands", confidence=0.9, quality="bad")  # attempted wrongly: `incomplete`
+    assert combine(badly, task, ["wet"], {"wet": False}) == badly
+
+
+def test_combine_reports_a_step_whose_result_is_seen(task):
+    nothing = out()
+    seen = combine(nothing, task, ["palms", "backs"], {"palms": False, "backs": True})
+    assert seen.action == "rub_backs" and seen.quality is Quality.OK
+    assert seen.confidence == CHECKED_CONFIDENCE
+    assert combine(nothing, task, ["palms", "backs"], {"palms": False, "backs": False}) == nothing
+
+
+def test_checked_task_asks_one_question_per_expected_step(task, ontology):
+    model = CheckingModel(answer(action="rub_palms", confidence=0.9, quality="ok"), '{"visible": false}')
+    obs = observe(make_checked(model, ontology, task), task, next_steps=("palms", "backs"))
+    assert len(checks(model)) == 2
+    asked = [m[0]["content"][1]["text"] for m in checks(model)]
+    assert task.step("palms").completion_cue in asked[0] and task.step("backs").completion_cue in asked[1]
+    assert obs.output.action is None  # palms reported, but its result wasn't seen
+
+
+def test_checked_task_keeps_a_step_whose_result_is_seen(task, ontology):
+    model = CheckingModel(
+        answer(action="wet_hands", confidence=0.9, quality="ok"), '```json{"visible": true}```'
+    )
+    assert observe(make_checked(model, ontology, task), task).output.action == "wet_hands"
+
+
+def test_a_garbled_check_counts_as_not_seen(task, ontology):
+    model = CheckingModel(answer(action="wet_hands", confidence=0.9, quality="ok"), "yes")
+    assert observe(make_checked(model, ontology, task), task).output.action is None
+
+
+def test_unchecked_tasks_make_no_check_calls(task, ontology):
+    model = CheckingModel(answer(action="wet_hands", confidence=0.9, quality="ok"), '{"visible": false}')
+    assert observe(make(model, ontology), task).output.action == "wet_hands"
+    assert checks(model) == []
+
+
+def test_the_checked_frame_is_bigger_than_the_main_frames(task, ontology):
+    model = CheckingModel(answer(), '{"visible": false}')
+    perception = make_checked(model, ontology, task, max_side_px=100, check_max_side_px=300)
+    observe(perception, task, frames(n=1, width=400, height=200))
+    url = checks(model)[0][0]["content"][0]["image_url"]["url"]
+    with Image.open(io.BytesIO(base64.b64decode(url.split(",", 1)[1]))) as img:
+        assert img.size == (300, 150)
+
+
+def test_check_tasks_come_from_the_environment(monkeypatch):
+    monkeypatch.setenv("SUP_VLM_CHECK_TASKS", "conveyor_lockout,led_flashlight")
+    assert Settings.from_env().vlm_check_tasks == frozenset({"conveyor_lockout", "led_flashlight"})
+    monkeypatch.delenv("SUP_VLM_CHECK_TASKS")
+    assert Settings.from_env().vlm_check_tasks == frozenset()
