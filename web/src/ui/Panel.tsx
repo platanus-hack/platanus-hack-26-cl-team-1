@@ -6,7 +6,7 @@ import type { PopulationDay, PresenceParams, WeatherSeries } from '../engine/typ
 import { POPULATION_DAY, TIMELINE } from '../engine/types'
 import { dayKind, type BurnedAreaPeople } from '../engine/population'
 import { LAG_CAP_MIN } from '../engine/fire/pacing'
-import { minToDateLabel, minToHHMM, localToMin, wallClockMin } from '../data/time'
+import { minToDateLabel, minToEndLabel, minToHHMM, localToMin, wallClockMin } from '../data/time'
 import type { BrigadesOut, EvacOut, FireOut } from '../worker/protocol'
 import { BrigadesSection } from './BrigadesSection'
 import { PlanSection } from './PlanSection'
@@ -94,7 +94,7 @@ function scenarioDayText(t0: string, params: PresenceParams): string {
 function ToolButton({ tool, current, setTool, label }: { tool: Tool; current: Tool; setTool: (t: Tool) => void; label: string }) {
   const on = current === tool
   return (
-    <button type="button" className={`btn tool${on ? ' active' : ''}`} aria-pressed={on} onClick={() => setTool(on ? 'none' : tool)}>
+    <button type="button" className={`btn tool${on ? ' active' : ''}`} onClick={() => setTool(on ? 'none' : tool)}>
       {on ? 'Cancelar (Esc)' : label}
     </button>
   )
@@ -156,7 +156,7 @@ export function Results(p: Props) {
           </div>
         </div>
         <div className="stat">
-          <div className="stat-label">Al final ({minToHHMM(t0, p.data.horizonMin)})</div>
+          <div className="stat-label">Al final ({minToEndLabel(t0, p.data.horizonMin)})</div>
           <div className="stat-value">
             {s ? fmtInt(s.burnedHaEnd) : '—'}
             <small> ha</small>
@@ -260,7 +260,7 @@ function ClimaSection(p: Props) {
       {real ? (
         <>
           <Slider
-            label="Viento (km/h)"
+            label="Viento (factor)"
             value={w.windFactor}
             min={0}
             max={2}
@@ -270,7 +270,7 @@ function ClimaSection(p: Props) {
             hint={hint(`${raw.windKmh.toFixed(0)} km/h`, `${used.windKmh.toFixed(0)} km/h`)}
           />
           <Slider
-            label="Dirección del viento (desde)"
+            label="Dirección del viento (giro)"
             value={w.windDirOffsetDeg}
             min={-180}
             max={180}
@@ -286,7 +286,7 @@ function ClimaSection(p: Props) {
             )}
           />
           <Slider
-            label="Humedad relativa (%)"
+            label="Humedad relativa (ajuste, pts)"
             value={w.rhOffset}
             min={-40}
             max={40}
@@ -296,7 +296,7 @@ function ClimaSection(p: Props) {
             hint={hint(`${raw.rh.toFixed(0)} %`, `${used.rh.toFixed(0)} %`)}
           />
           <Slider
-            label="Temperatura (°C)"
+            label="Temperatura (ajuste, °C)"
             value={w.tempOffsetC}
             min={-10}
             max={10}
@@ -409,7 +409,7 @@ function CortafuegosSection(p: Props) {
         <div className="field-head">
           <label>Ancho del próximo cortafuego</label>
         </div>
-        <Segmented label="Ancho" value={p.firebreakWidth} onChange={p.setFirebreakWidth} options={widthOpts} />
+        <Segmented label="Ancho del próximo cortafuego" value={p.firebreakWidth} onChange={p.setFirebreakWidth} options={widthOpts} />
       </div>
       {s.firebreaks.length === 0 ? (
         <p className="muted small">Sin cortafuegos. Dibuja una línea sobre el mapa: la vegetación bajo ella se elimina.</p>

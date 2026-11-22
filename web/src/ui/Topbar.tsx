@@ -21,18 +21,17 @@ export function Topbar({
     <header className="topbar">
       <div className="brand">
         <h1>Cortafuego</h1>
-        <p>{subtitle}</p>
+        <p title={subtitle}>{subtitle}</p>
       </div>
       <div className="topbar-end">
-        <div className="timeline-pick seg" role="radiogroup" aria-label="Escenario">
+        <div className="timeline-pick seg" role="group" aria-label="Escenario">
           {TIMELINE_OPTIONS.map((o) => {
             const off = offline && o.value === TIMELINE.TODAY
             return (
               <button
                 key={o.value}
                 type="button"
-                role="radio"
-                aria-checked={o.value === timeline}
+                aria-pressed={o.value === timeline}
                 className={o.value === timeline ? 'on' : ''}
                 disabled={off}
                 title={off ? 'Necesita conexión a internet para descargar el pronóstico' : undefined}
