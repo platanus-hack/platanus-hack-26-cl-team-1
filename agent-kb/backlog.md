@@ -11,10 +11,15 @@ Owner in brackets once someone takes an item. Project: Cortafuego (D-019). The O
   Pace against satellite passes (GOES-16 + VIIRS/MODIS) done (D-027) [Anaís + agent].
 - [ ] **Submission files:** `project-description.md`, the one-liner and description in the jsonc, a 1000×1000
   logo (≤ 500 KB), a short README written by the team. [team]
-  - Logo ready (D-025): `project-logo.svg` and `project-logo.png` (1000×1000, 58.9 KB); remaining submission
+  - Logo ready (D-029): `project-logo.svg` and `project-logo.png` (1000×1000, 32.5 KB); remaining submission
     text still needs the team's review.
+  - Web identity ready: header mark, SVG/ICO favicons, Apple touch icon and manifest app icons, generated
+    from the same SVG source (D-029).
+  - Animated splash ready: the canonical flame is cut by its diagonal firebreak, with a short exit fade,
+    reduced-motion support and a skip control; loading and worker initialization continue behind it.
 - [ ] **Pitch (3 min):** sober opening on 2 Feb 2024, live demo (wind, humidity, firebreak, alert time), the
   validation number, who pays (comunas under Ley 21.364, forestry companies, distributors, insurers). [team]
+  - The site now opens on today's forecast (D-028): open the demo at `https://cortafuego.app/?escenario=vina-2024`.
 
 ## Next
 - [ ] Western stall of 14:05–16:25 (satellite) not reproduced: needs a cause the data shows (initial attack?
@@ -37,6 +42,8 @@ Owner in brackets once someone takes an item. Project: Cortafuego (D-019). The O
 
 ## Done
 - [x] Bomberos: companies, trucks per type, dispatch, Ruta 68 cut, defended cells, rescue (D-026). [Anaís + agent]
+- [x] **Scenario that starts today** (D-028): opens by default on today's forecast over the same territory; the
+  2 Feb 2024 replay is in the picker and at `?escenario=vina-2024`. Branch `feat/scenario-today`.
 - [x] **Where people are by time of day, all of Chile** (D-024): national population product + grid layers,
   presence model, "personas donde llega el fuego" and a map layer. Branch `feat/population-by-hour`.
 - [x] Pivot research and decision (D-019).
