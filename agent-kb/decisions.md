@@ -78,10 +78,48 @@ with a pointer to their replacement; nothing is ever deleted from §3.
   absolute numbers are an exposure ceiling (no firefighting, no rescue); the pitch compares scenarios. Scar and
   FIRMS are used only to score and to pick global scalars (in-sample, disclosed).
 
+### D-022 — Render Static Site behind Cloudflare on cortafuego.app (2026-11-22)
+- **Context:** the user selected Render for the public static deployment and Cloudflare for the custom domain,
+  and requested Firefox for dashboard changes. The current app needs no backend or secrets.
+- **Decision:** deploy the public organizational repository's `main` branch as the Render Static Site
+  `cortafuego` (`srv-dc170amc6qcc73covp10`), root `web`, publish directory `dist`, Node 24. Build with
+  `npx --yes pnpm@10.34.9 install --frozen-lockfile && npx --yes pnpm@10.34.9 build` and
+  `SKIP_INSTALL_DEPS=true` to avoid a second, implicit dependency installation.
+  - `cortafuego.app` and `www.cortafuego.app` are proxied Cloudflare CNAMEs to `cortafuego.onrender.com`.
+    Both were DNS-only until Render reported **Verified / Certificate Issued**. Render redirects `www` to apex.
+  - Cloudflare: Full (Strict), Always Use HTTPS, minimum TLS 1.2, TLS 1.3, HTTP/2, HTTP/2 to origin, HTTP/3,
+    Early Hints, Standard caching, and Browser Cache TTL **Respect Existing Headers**. Rocket Loader stays off;
+    no paid upgrades or analytics beacon were enabled.
+  - Render headers: `/assets/*` gets `Cache-Control: public, max-age=31536000, immutable`; `/`, `/index.html`
+    and `/data/*` get `Cache-Control: no-cache`. All paths get `X-Content-Type-Options: nosniff` and
+    `Referrer-Policy: strict-origin-when-cross-origin`.
+- **Consequences:** https://cortafuego.app is the public link; https://cortafuego.onrender.com remains available.
+  Public Git source avoids granting a GitHub integration access or creating a mirror. The creation form says
+  public-repository auto-deploy and PR previews require Blueprints; automatic release delivery has **not** been
+  verified. Use Render **Manual Deploy → Deploy latest commit** for subsequent releases until CD is configured.
+  Do not cache unversioned dataset files long-term or enable blanket Cache Everything: an older data grid can
+  conflict with a newer engine. First deploy of `842d870` succeeded; Firefox loaded the map and worker results
+  over HTTPS, including after navigating through `www`.
+
+### D-023 — Deploy merged main commits to Render after CI passes (2026-11-22)
+- **Context:** the user requested auto-deploy on "master merge"; the repository's actual default/release branch
+  is `main`. D-022's public Git deployment had no verified native auto-deploy integration.
+- **Decision:** extend `.github/workflows/ci.yml` with a deployment job that needs both **Lint** and **Test**
+  and runs only for a `push` to `main` (merging a PR creates that push). PRs and manual CI runs do not deploy.
+  - Store only Cortafuego's existing service-scoped hook in the encrypted repository secret
+    `RENDER_CORTAFUEGO_DEPLOY_HOOK`; do not reuse the previous app's API/WEB/WORKER hook secrets.
+  - Pass the tested `${GITHUB_SHA}` as Render's `ref`, and skip a run if `main` has advanced. Queue deploy jobs
+    without cancelling in-flight requests. A missing secret, wrong service URL, or failed request fails visibly.
+  - Render's native Auto-Deploy is **Off** so it cannot race ahead of CI or duplicate GitHub's trigger.
+  - The job needs only `contents: read`, checks out no code, and never logs the secret URL. HTTP 200/202 means
+    Render accepted the request; Render's deployment page remains the source of truth for build success.
+- **Consequences:** D-022's manual-deploy fallback is replaced once this workflow is merged and its first
+  post-merge deployment is verified. D-020's Lint/Test validation and manual squash PR merge policy remain;
+  automatic deployment is not automatic PR merging. No `master` branch is created or monitored.
+
 ## §2 Open
 
-- **D-?? Public deploy target** for the static site (`web/dist`): Vercel or Render (both event sponsors) from
-  a personal mirror, or GitHub Pages (needs a repo admin to enable Pages).
+- Verify the first CI-gated Render deployment after merging the deployment workflow (D-023).
 
 ## §3 Superseded
 

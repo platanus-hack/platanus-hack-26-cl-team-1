@@ -8,8 +8,6 @@ Owner in brackets once someone takes an item. Project: Cortafuego (D-019). The O
   in the browser. [Alonso + agents]
 - [ ] **Calibrate and validate** against the Sentinel-2 scar: `make validate` prints the overlap (Dice) used in
   the pitch; tune `rosMultiplier` and the per-fuel factors, in-sample, and say so. [Alonso + agents]
-- [ ] **Public deploy** of `web/dist` (static): pick the host (decisions.md §2) and fill `deploy-url` in
-  `platanus-hack-project.jsonc`. [team]
 - [ ] **Submission files:** `project-description.md`, the one-liner and description in the jsonc, a 1000×1000
   logo (≤ 500 KB), a short README written by the team. [team]
 - [ ] **Pitch (3 min):** sober opening on 2 Feb 2024, live demo (wind, humidity, firebreak, alert time), the
@@ -25,3 +23,7 @@ Owner in brackets once someone takes an item. Project: Cortafuego (D-019). The O
 
 ## Done
 - [x] Pivot research and decision (D-019).
+- [x] **Public deploy:** Render Static Site behind Cloudflare at https://cortafuego.app (D-022), with
+  `www` redirecting to the apex. Deployment metadata and session notes are on `codex/render-cloudflare`.
+- [ ] **Auto-deploy:** CI-gated Render hook on merged `main` commits (D-023), implemented in
+  https://github.com/platanus-hack/platanus-hack-26-cl-team-1/pull/51; first post-merge deployment pending.
