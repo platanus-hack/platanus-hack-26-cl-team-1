@@ -144,6 +144,15 @@ with a pointer to their replacement; nothing is ever deleted from §3.
   - Known weakness: old mixed-use centres (Santiago, Concepción) are under-weighted as job centres
     (`pipeline/population_report.py`).
 
+### D-025 — Cortafuego logo: flame and protective masonry barrier (2026-11-22)
+- **Context:** the user requested a clean, professional, firewall-related SVG and reiterated the README's
+  submission requirement: a 1000×1000 PNG under 500 KB.
+- **Decision:** use an original orange flame above a pale staggered masonry barrier on dark slate, matching
+  the UI palette, with an outlined Cortafuego wordmark. `project-logo.svg` is the vector source;
+  `project-logo.png` is the raster submission asset already referenced by the README.
+- **Consequences:** the logo is self-contained (no linked images or runtime fonts). The PNG is exactly
+  1000×1000 and 58,882 bytes, below even a decimal 500 KB limit. The README itself is unchanged.
+
 ## §2 Open
 
 - Verify the first CI-gated Render deployment after merging the deployment workflow (D-023).
