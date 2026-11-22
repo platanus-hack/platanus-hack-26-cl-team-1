@@ -3,7 +3,8 @@ import VALIDATION from '../../public/data/validation.json'
 import type { WeatherSeries } from '../engine/types'
 import { ERA5_WIND_DIR_CORRECTION_DEG } from '../engine/fire/model'
 import { minToHHMM, localToMin } from '../data/time'
-import type { EvacOut, FireOut } from '../worker/protocol'
+import type { BrigadesOut, EvacOut, FireOut } from '../worker/protocol'
+import { BrigadesSection } from './BrigadesSection'
 import type { FirebreakWidth, Scenario, WeatherSettings } from '../worker/scenario'
 import { FIREBREAK_WIDTHS, HORIZON_MIN, sampleAt } from '../worker/scenario'
 import { Compass, compassLabel, fmtInt, fmtSigned, Section, Segmented, Slider, Toggle } from './controls'
@@ -37,6 +38,7 @@ interface Props {
   setTool: (t: Tool) => void
   fire: FireOut | null
   evac: EvacOut | null
+  brigadesOut: BrigadesOut | null
   burnedHaNow: number
   summary: Summary | null
   baseline: Summary | null
@@ -142,8 +144,9 @@ export function Results(p: Props) {
         </div>
       </div>
       <div className="muted small">
-        Sin bomberos ni rescate: las cifras absolutas son un techo de exposición, no daños ni víctimas. Lo
-        confiable es comparar escenarios.
+        {p.scenario.brigades.enabled
+          ? 'Con bomberos simulados (sección Bomberos, con sus supuestos): las cifras absolutas siguen siendo un techo de exposición, no daños ni víctimas. Lo confiable es comparar escenarios.'
+          : 'Sin bomberos ni rescate: las cifras absolutas son un techo de exposición, no daños ni víctimas. Lo confiable es comparar escenarios.'}
       </div>
       <div className="base-row">
         <button type="button" className="btn small" disabled={!s} onClick={() => s && p.setBaseline(s)}>
@@ -515,6 +518,15 @@ export function Panel(p: Props) {
         <ClimaSection {...p} />
         <FuegoSection {...p} />
         <CortafuegosSection {...p} />
+        <BrigadesSection
+          data={p.data}
+          scenario={p.scenario}
+          update={p.update}
+          out={p.brigadesOut}
+          burnedHaEnd={p.summary?.burnedHaEnd ?? null}
+          buildingsReached={p.summary?.buildingsReached ?? null}
+          trappedHouseholds={p.summary?.trappedHouseholds ?? null}
+        />
         <EvacuacionSection {...p} />
         <ValidacionSection {...p} />
       </div>

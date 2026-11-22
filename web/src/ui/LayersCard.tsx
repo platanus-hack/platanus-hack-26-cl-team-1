@@ -13,6 +13,7 @@ const ITEMS: { key: keyof LayerToggles; label: string; swatch: string }[] = [
   { key: 'firms', label: 'NASA FIRMS', swatch: 'firms' },
   { key: 'cicatriz', label: 'Cicatriz real (Sentinel-2)', swatch: 'scar' },
   { key: 'combustible', label: 'Combustible', swatch: 'fuel' },
+  { key: 'bomberos', label: 'Bomberos (rutas, sitios, cortes)', swatch: 'brig' },
 ]
 
 export function LayersCard({

@@ -6,6 +6,7 @@ export type Geometry =
   | { type: 'Point'; coordinates: Position }
   | { type: 'MultiPoint'; coordinates: Position[] }
   | { type: 'LineString'; coordinates: Position[] }
+  | { type: 'MultiLineString'; coordinates: Position[][] }
 export type LineString = Extract<Geometry, { type: 'LineString' }>
 export interface Feature {
   type: 'Feature'

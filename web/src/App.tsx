@@ -6,7 +6,7 @@ import { loadRealDataset } from './data/load'
 import { makeMockDataset } from './data/mock'
 import { localToMin, minToHHMM } from './data/time'
 import { SimClient } from './worker/client'
-import type { EvacOut, FireOut } from './worker/protocol'
+import type { BrigadesOut, EvacOut, FireOut } from './worker/protocol'
 import type { FirebreakWidth, Scenario, WeatherSettings } from './worker/scenario'
 import { buildWeatherSeries, countAtOrBefore, defaultBrigades, HORIZON_MIN, sampleAt, sortedArrivals } from './worker/scenario'
 import { MapView } from './ui/MapView'
@@ -67,6 +67,7 @@ const DEFAULT_LAYERS: LayerToggles = {
   firms: true,
   cicatriz: false,
   combustible: false,
+  bomberos: true,
 }
 
 const TOOL_HINT: Record<Exclude<Tool, 'none'>, string> = {
@@ -128,6 +129,7 @@ function Explorer({ data }: { data: Dataset }) {
 
   const [fire, setFire] = useState<FireOut | null>(null)
   const [evac, setEvac] = useState<EvacOut | null>(null)
+  const [brigadesOut, setBrigadesOut] = useState<BrigadesOut | null>(null)
   const [safe, setSafe] = useState<Uint8Array | null>(null)
   // true until the first result arrives (the worker first prepares the street graph)
   const [busy, setBusy] = useState(true)
@@ -166,6 +168,7 @@ function Explorer({ data }: { data: Dataset }) {
         }
         if (r.fire) setFire(r.fire)
         setEvac(r.evac)
+        setBrigadesOut(r.brigades ?? null)
         setSafe(r.safeNodes)
         setSimError(null)
         setTimings((prev) => ({ fireMs: r.fire ? r.fire.elapsedMs : (prev?.fireMs ?? null), fireRerun: !!r.fire, evacMs: r.evac.elapsedMs, roundTripMs }))
@@ -301,6 +304,7 @@ function Explorer({ data }: { data: Dataset }) {
     setTool,
     fire,
     evac,
+    brigadesOut,
     burnedHaNow,
     summary,
     baseline,
@@ -343,6 +347,7 @@ function Explorer({ data }: { data: Dataset }) {
             data={data}
             fire={fire}
             evac={evac}
+            brigades={brigadesOut}
             safe={safe}
             clock={clock}
             layers={effectiveLayers}
