@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest'
 import type { GridMeta, WeatherFile } from '../engine/types'
 import { FUEL } from '../engine/types'
 import {
+  brigadeKey,
+  scaleUnits,
   buildIgnitions,
   buildWeatherSeries,
+  defaultBrigades,
   countAtOrBefore,
   fireKey,
   rasteriseFirebreaks,
@@ -59,6 +62,7 @@ function scenario(patch: Partial<Scenario> = {}): Scenario {
     footShare: 0.5,
     closedEdges: [],
     addedLinks: [],
+    brigades: { enabled: false, units: {}, dispatchMin: {}, reinforcementUnits: {}, reinforcementMin: {}, historicalCuts: true },
     ...patch,
   }
 }
@@ -175,5 +179,31 @@ describe('results helpers', () => {
   it('fireKey ignores evacuation-only settings', () => {
     expect(fireKey(scenario({ alertMin: 1 }))).toBe(fireKey(scenario({ alertMin: 2, closedEdges: [3] })))
     expect(fireKey(scenario({ droughtFactor: 5 }))).not.toBe(fireKey(scenario()))
+  })
+})
+
+describe('brigade settings', () => {
+  it('defaults come from brigades.json and are off; the key is null while off', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { parseBrigades, parseGrid } = await import('../data/load')
+    const g = parseGrid(JSON.parse(readFileSync(new URL('../../public/data/grid.json', import.meta.url), 'utf8')))
+    const file = parseBrigades(JSON.parse(readFileSync(new URL('../../public/data/brigades.json', import.meta.url), 'utf8')), g)
+    const b = defaultBrigades(file, g.t0)
+    expect(b.enabled).toBe(false)
+    expect(b.dispatchMin['Viña del Mar']).toBe(190) // 15:10
+    expect(b.reinforcementMin.rm).toBe(540) // 21:00
+    expect(b.units['valpo-10']).toEqual([0, 0, 0, 1])
+    expect(brigadeKey(scenario({ brigades: b }))).toBeNull()
+    expect(brigadeKey(scenario({ brigades: { ...b, enabled: true } }))).not.toBeNull()
+  })
+})
+
+describe('scaleUnits (Mitad / Doble)', () => {
+  it('halves the total per type even when every company has 1 truck, and doubling clamps at 99', () => {
+    const u = Object.fromEntries(Array.from({ length: 28 }, (_, i) => [`s${i}`, [1, 0, 0, 0]]))
+    const half = scaleUnits(u, 0.5)
+    expect(Object.values(half).reduce((a, x) => a + x[0], 0)).toBe(14)
+    expect(scaleUnits({ rm: [50, 0, 0, 1] }, 2).rm).toEqual([99, 0, 0, 2])
+    expect(scaleUnits({ a: [3, 1, 0, 0] }, 2).a).toEqual([6, 2, 0, 0])
   })
 })

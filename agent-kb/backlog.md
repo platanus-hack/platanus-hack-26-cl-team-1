@@ -16,6 +16,8 @@ Owner in brackets once someone takes an item. Project: Cortafuego (D-019). The O
   validation number, who pays (comunas under Ley 21.364, forestry companies, distributors, insurers). [team]
 
 ## Next
+- [ ] Bomberos (D-026): real inventories per company (ask each cuerpo), reopening time of Ruta 68, hydrant
+  availability as a variable, congestion slowing the trucks, units that move between sectors.
 - [ ] Evacuation by time of day: people per building at the alert time from the population layers (D-024),
   instead of a fixed 2.9 per household; offices and schools as origins on weekdays.
 - [ ] Better job proxy for old mixed-use centres (business POIs, the origin-destination surveys, SII employment by
@@ -28,6 +30,7 @@ Owner in brackets once someone takes an item. Project: Cortafuego (D-019). The O
 - [ ] Any comuna: bake the data for another bounding box from the same pipeline.
 
 ## Done
+- [x] Bomberos: companies, trucks per type, dispatch, Ruta 68 cut, defended cells, rescue (D-026). [Anaís + agent]
 - [x] **Where people are by time of day, all of Chile** (D-024): national population product + grid layers,
   presence model, "personas donde llega el fuego" and a map layer. Branch `feat/population-by-hour`.
 - [x] Pivot research and decision (D-019).
