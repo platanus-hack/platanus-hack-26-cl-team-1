@@ -70,7 +70,7 @@ export function BrigadesSection(p: Props) {
   if (!p.data.brigades)
     return (
       <Section title="Bomberos" defaultOpen={false}>
-        <p className="muted small">Aún no hay datos de bomberos para este {p.data.event.observedFire ? 'incendio' : 'escenario'}: por ahora esta sección está disponible solo para Viña del Mar.</p>
+        <p className="muted small">Aún no hay datos de bomberos para este {p.data.event.observedFire ? 'incendio' : 'escenario'}: por ahora esta sección está disponible para Viña del Mar y Eaton (California).</p>
       </Section>
     )
   return <BrigadesBody {...p} file={p.data.brigades} />

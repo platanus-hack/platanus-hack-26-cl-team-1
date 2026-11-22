@@ -14,7 +14,8 @@ import { localToMin, minToDateLabel, minToHHMM, wallClockMin } from './data/time
 import { SimClient } from './worker/client'
 import type { BrigadesOut, EvacOut, FireOut } from './worker/protocol'
 import type { FirebreakWidth, Scenario, WeatherSettings } from './worker/scenario'
-import { buildWeatherSeries, countAtOrBefore, defaultBrigades, noBrigades, sampleAt, sortedArrivals } from './worker/scenario'
+import { buildWeatherSeries, countAtOrBefore, defaultBrigades, noBrigades, rasteriseFirebreaks, sampleAt, sortedArrivals } from './worker/scenario'
+import { lonLatToCell } from './data/grid'
 import { MapView } from './ui/MapView'
 import type { LayerToggles, Tool } from './ui/MapView'
 import { Panel } from './ui/Panel'
@@ -151,6 +152,8 @@ export default function App() {
   /** Baked datasets by event, each loaded the first time a timeline needs it (src/data/events.ts). */
   const [bases, setBases] = useState<Partial<Record<EventId, Dataset>>>({})
   const [fatal, setFatal] = useState<string | null>(null)
+  /** Bumped by "Reintentar" after a failed load, so the same event is fetched again. */
+  const [loadAttempt, setLoadAttempt] = useState(0)
   const [timeline, setTimeline] = useState<TimelineId>(initialTimeline)
   const [badParam, setBadParam] = useState<string | null>(unknownTimelineParam)
   /** null until the today timeline is first shown (and again after "Reintentar"). */
@@ -179,7 +182,7 @@ export default function App() {
     return () => {
       live = false
     }
-  }, [eventId, bases])
+  }, [eventId, bases, loadAttempt])
   // The forecast is downloaded the first time the today timeline is shown, and again if it is shown on a later
   // date than the one downloaded (a tab left open past midnight).
   useEffect(() => {
@@ -192,6 +195,7 @@ export default function App() {
       .catch((e: unknown) => setForecast({ status: 'error', message: e instanceof Error ? e.message : String(e) }))
   }, [timeline, forecast])
   const pickTimeline = useCallback((t: TimelineId) => {
+    setFatal(null)
     setTimeline(t)
     setBadParam(null)
     setTimelineParam(t)
@@ -226,10 +230,25 @@ export default function App() {
   const error = view?.error ?? (forecast?.status === 'error' ? forecast.message : null)
   let content: ReactNode
   if (fatal) {
+    // Keeps the scenario picker and offers a retry: a network drop at a venue must not be a dead end.
     content = (
-      <div className="fullscreen-msg">
-        <h1>Cortafuego</h1>
-        <div className="alert error">No se pudieron cargar los datos: {fatal}</div>
+      <div className="app">
+        {topbar()}
+        <div className="timeline-msg">
+          <div className="alert error">No se pudieron cargar los datos: {fatal}</div>
+          <div className="row">
+            <button
+              type="button"
+              className="btn"
+              onClick={() => {
+                setFatal(null)
+                setLoadAttempt((n) => n + 1)
+              }}
+            >
+              Reintentar
+            </button>
+          </div>
+        </div>
       </div>
     )
   } else if (!base) {
@@ -387,7 +406,10 @@ function Explorer({
   }, [data, choice])
 
   // Re-run on any scenario change, debounced.
+  // Busy from the moment the scenario changes (not only once the debounced run is sent), so "Fijar como escenario
+  // base" cannot save the previous result in the 250 ms gap.
   useEffect(() => {
+    setBusy(true)
     const id = window.setTimeout(() => client.current?.run(scenario), 250)
     return () => window.clearTimeout(id)
   }, [scenario])
@@ -469,7 +491,10 @@ function Explorer({
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
-  useEffect(() => onNote('tool', null), [tool, onNote])
+  useEffect(() => {
+    onNote('tool', null)
+    onNote('place', null)
+  }, [tool, onNote])
   // A map tool needs the map: close the sheet when one starts (phone layout).
   useEffect(() => {
     if (tool !== 'none') setSheet('peek')
@@ -497,13 +522,32 @@ function Explorer({
 
   const widthRef = useRef(firebreakWidth)
   widthRef.current = firebreakWidth
-  const onAddIgnition = useCallback((lon: number, lat: number) => {
-    setScenario((s) => ({ ...s, userIgnitions: [...s.userIgnitions, { id: newId('ig'), lon, lat, tMin: Math.round(clockRef.current) }] }))
-    setTool('none')
-  }, [])
-  const onFirebreak = useCallback((points: [number, number][]) => {
-    setScenario((s) => ({ ...s, firebreaks: [...s.firebreaks, { id: newId('fb'), points, widthM: widthRef.current }] }))
-  }, [])
+  // The base map extends beyond the simulated area: a click outside it would make the worker refuse the scenario,
+  // so it is not added and the map says why (the tool stays on for another click).
+  const onAddIgnition = useCallback(
+    (lon: number, lat: number) => {
+      if (lonLatToCell(data.grid, lon, lat) < 0) {
+        onNote('place', 'Ese punto está fuera del área simulada: el foco no se agregó. Haz clic dentro de la zona con datos.')
+        return
+      }
+      onNote('place', null)
+      setScenario((s) => ({ ...s, userIgnitions: [...s.userIgnitions, { id: newId('ig'), lon, lat, tMin: Math.round(clockRef.current) }] }))
+      setTool('none')
+    },
+    [data, onNote],
+  )
+  const onFirebreak = useCallback(
+    (points: [number, number][]) => {
+      const fb = { id: newId('fb'), points, widthM: widthRef.current }
+      if (!rasteriseFirebreaks(data.grid, [fb]).includes(1)) {
+        onNote('place', 'Ese cortafuego queda entero fuera del área simulada: no se agregó.')
+        return
+      }
+      onNote('place', null)
+      setScenario((s) => ({ ...s, firebreaks: [...s.firebreaks, fb] }))
+    },
+    [data, onNote],
+  )
   const onToggleEdge = useCallback((edge: number) => {
     setScenario((s) => ({
       ...s,

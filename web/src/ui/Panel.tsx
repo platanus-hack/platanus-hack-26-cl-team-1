@@ -193,7 +193,7 @@ export function Results(p: Props) {
           : 'Sin bomberos ni rescate: las cifras absolutas son un techo de exposición, no daños ni víctimas. Lo confiable es comparar escenarios.'}
       </div>
       <div className="base-row">
-        <button type="button" className="btn small" disabled={!s} onClick={() => s && p.setBaseline(s)}>
+        <button type="button" className="btn small" disabled={!s || p.busy || p.simError !== null} onClick={() => s && p.setBaseline(s)}>
           Fijar como escenario base
         </button>
         {b && (
@@ -412,7 +412,10 @@ function CortafuegosSection(p: Props) {
         <Segmented label="Ancho del próximo cortafuego" value={p.firebreakWidth} onChange={p.setFirebreakWidth} options={widthOpts} />
       </div>
       {s.firebreaks.length === 0 ? (
-        <p className="muted small">Sin cortafuegos. Dibuja una línea sobre el mapa: la vegetación bajo ella se elimina.</p>
+        <p className="muted small">
+          Sin cortafuegos. Dibuja una línea sobre el mapa: la vegetación bajo ella se elimina desde el inicio de la simulación. En la grilla de{' '}
+          {p.data.grid.cellM} m, los anchos menores que una celda ocupan una celda.
+        </p>
       ) : (
         <ul className="list">
           {s.firebreaks.map((f, i) => (
