@@ -18,9 +18,11 @@ import { DEFAULT_FIRE_PARAMS, ERA5_WIND_DIR_CORRECTION_DEG, simulateFire } from 
 
 const arg = process.argv[2] ?? 'eaton-2025'
 const id = EVENT_IDS.find((e) => e === arg) as EventId | undefined
-if (!id) throw new Error(`validate-event: unknown event "${arg}" (events: ${EVENT_IDS.join(', ')})`)
+const scorable = EVENT_IDS.filter((e) => EVENTS[e].observedFire && e !== 'vina-2024')
+if (!id) throw new Error(`validate-event: unknown event "${arg}" (events: ${scorable.join(', ')})`)
 const event = checkEvent(EVENTS[id])
 if (event.id === 'vina-2024') throw new Error('validate-event: Viña is in-sample; its score comes from calibrate.ts (pnpm validate)')
+if (!event.observedFire) throw new Error(`validate-event: ${event.id} is a hypothetical scenario (no observed fire): there is no scar or FIRMS to score against`)
 const dir = fileURLToPath(new URL(`../../../public/data/${event.dir}`, import.meta.url))
 const bin = (f: string) => {
   const b = readFileSync(dir + f)

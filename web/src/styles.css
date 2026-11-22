@@ -1096,6 +1096,10 @@ input[type='range']:focus-visible {
   }
   .topbar-end {
     min-width: 0;
+    /* four scenarios + Fuentes do not fit in one row at 375 px: Fuentes wraps under the picker */
+    max-width: 100%;
+    flex-wrap: wrap;
+    row-gap: 6px;
   }
   .topbar-end > .btn {
     padding-inline: 10px;

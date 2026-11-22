@@ -266,9 +266,9 @@ D-026 to D-028 were taken by #54, #53 and the today scenario._
     GOES) or none (`observed_fire` False); a mix stops at import, and a fire-less event needs fixed ignition presets.
     Its bake writes `scar.bin` all 255 ("no data"), `firms.json` `[]` and no `goes.json`; `validate_outputs`
     checks it. In the web, `EventDef.observedFire` false hides the scar layer and the Validación section.
-  - `talca`: 464 × 529 cells of 60 m around Talca (whole city, Maule, Pencahue, grassland hills SSW, wooded hills
+  - `talca`: 464 × 529 cells of 60 m around Talca (whole city, Maule, Pencahue, the valley and hills SW, wooded hills
     across the Río Claro), the real ERA5 weather of a hot reference day, 8 Feb 2025 (37 °C, 13 % RH, SSW wind
-    up to 25 km/h at 17:00), 12:00 to midnight, one hypothetical ignition at 14:00 on grassland 4 km SSW of the
+    up to 25 km/h at 17:00), 12:00 to midnight, one hypothetical ignition at 14:00 on valley grassland 10 km SW of the centre of the
     city, alert 17:00 (assumption), population from the national product, no firefighters, no wind correction.
   - Picker option "Talca, Maule · hipotético" (`?escenario=talca`); a note says it reproduces no real fire and
     the model was calibrated only on Viña 2024 with no local validation.

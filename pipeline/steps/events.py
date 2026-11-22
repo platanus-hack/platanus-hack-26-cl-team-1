@@ -309,15 +309,16 @@ EATON_2025 = Event(
 
 # Hypothetical scenario: no fire happened here; the fire-only fields stay None (Event.observed_fire is False).
 TALCA_SOURCE_IGNITION = (
-    "Punto elegido para la demostración en lomas de pastizal (ESA WorldCover) a unos 4 km al sur-suroeste del borde "
-    "urbano de Talca, a barlovento del viento de la tarde de ese día (del sur-suroeste). No corresponde a un incendio "
+    "Punto elegido para la demostración en pastizal del valle (ESA WorldCover), unos 2 km al oeste-noroeste del "
+    "pueblo de Maule y 10 km al suroeste del centro de Talca: con el viento de la tarde de ese día (del sur-suroeste) "
+    "el fuego avanza hacia la ciudad. No corresponde a un incendio "
     "ocurrido."
 )
 TALCA = Event(
     id="talca",
-    # 27.8 x 31.7 km: Talca's whole built-up area (with Maule Norte), the grassland hills SSW of the city (upwind of
-    # the summer afternoon wind) and the wooded hills across the Río Claro to the W/NW. ESA WorldCover share of
-    # cells: 29 % tree, 34 % grass, 2 % shrub, 27 % crop, 6 % built-up.
+    # 27.8 x 31.7 km: Talca's whole built-up area (with Maule Norte), the grass and crop valley and the hills SW
+    # of the city (upwind of the summer afternoon wind) and the wooded hills across the Río Claro to the W/NW.
+    # ESA WorldCover share of cells: 29 % tree, 34 % grass, 2 % shrub, 27 % crop, 6 % built-up.
     lat_max=-35.305,
     lon_min=-71.905,
     rows=464,
@@ -371,9 +372,9 @@ TALCA = Event(
     ignitions=(
         {
             "id": "talca-hipotetico-sso",
-            "label": "Foco hipotético: lomas al sur-suroeste de Talca",
+            "label": "Foco hipotético: pastizal al suroeste de Talca",
             "lon": -71.72,
-            "lat": -35.505,
+            "lat": -35.505,  # valley floor, 104 m, WorldCover grassland
             "timeLocal": "2025-02-08T14:00",
             "source": TALCA_SOURCE_IGNITION,
         },

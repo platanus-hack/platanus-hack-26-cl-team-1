@@ -666,8 +666,8 @@ function EatonNote() {
 function TalcaNote() {
   return (
     <div className="alert info timeline-note">
-      <b>Escenario hipotético en Talca</b> (región del Maule): no reproduce un incendio ocurrido. Usa el tiempo real de un día caluroso, seco y
-      ventoso (8 de febrero de 2025, de 12:00 a 24:00), un punto de inicio elegido para la demostración en las lomas de pastizal al sur-suroeste de
+      <b>Escenario hipotético en Talca</b> (región del Maule): no reproduce un incendio ocurrido. Usa la meteorología registrada de un día caluroso,
+      seco y ventoso (8 de febrero de 2025, de 12:00 a 24:00), un punto de inicio elegido para la demostración en pastizal del valle, unos 10 km al suroeste del centro de
       la ciudad, y el mismo modelo calibrado solo con el incendio de Viña del Mar 2024, sin validación local. Aún sin bomberos. Sirve para explorar y
       planificar, no para predecir.
     </div>

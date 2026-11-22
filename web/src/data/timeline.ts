@@ -31,7 +31,7 @@ export const TIMELINE_OPTIONS: { value: TimelineId; label: string; short: string
   { value: TIMELINE.TODAY, label: 'Desde hoy (pronóstico)', short: 'Desde hoy' },
   { value: TIMELINE.VINA_2024, label: '2 feb 2024 · Viña del Mar', short: '2 feb 2024' },
   { value: TIMELINE.EATON_2025, label: '7 ene 2025 · Eaton, California', short: 'Eaton 2025' },
-  { value: TIMELINE.TALCA, label: 'Talca, Maule · hipotético', short: 'Talca' },
+  { value: TIMELINE.TALCA, label: 'Talca, Maule · hipotético', short: 'Talca (hipot.)' },
 ]
 
 export function isTimelineId(v: string | null): v is TimelineId {

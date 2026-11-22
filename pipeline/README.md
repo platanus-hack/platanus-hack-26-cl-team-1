@@ -271,7 +271,7 @@ Same steps and methods; the fire-only steps are skipped (see "Events"). Measured
 
 - **Grid and clock**: `latMax = -35.305`, `lonMin = -71.905`, 464 x 529 cells of 60 m (`ref_lat` 35.43; to about
   lat -35.555, lon -71.555), `t0 = 2025-02-08T12:00:00-03:00`. The box holds Talca's whole built-up area (with
-  Maule Norte), Maule, Pencahue, the grassland hills SSW of the city (upwind of the summer afternoon wind) and
+  Maule Norte), Maule, Pencahue, the grass and crop valley and hills SW of the city (upwind of the summer afternoon wind) and
   the wooded hills across the Río Claro. WorldCover majority class: 29 % tree, 34 % grass, 2 % shrub, 27 % crop,
   6 % built-up, 1 % water / bare.
 - **elevation.bin**: GLO-30 tile `S36_00_W072_00`; 31-621 m.
@@ -284,8 +284,9 @@ Same steps and methods; the fire-only steps are skipped (see "Events"). Measured
   12:00-20:00 on 8 Feb: 27-37 °C, RH 34-13 %, wind 15-25 km/h from the SSW (201-210°), gusts up to 52 km/h. Chosen
   as a hot, dry, windy reference afternoon; days on which a real fire is known to have burned in Maule were
   left out (25 Jan 2017, 11 Jan 2026).
-- **ignitions.json**: one hypothetical preset at 14:00 on WorldCover grassland 4 km SSW of the city's edge
-  (-35.505, -71.72), labelled as a point chosen for the demo.
+- **ignitions.json**: one hypothetical preset at 14:00 on WorldCover grassland on the valley floor (104 m),
+  2 km WNW of the town of Maule and 10 km SW of Talca's centre (-35.505, -71.72), labelled as a point chosen for
+  the demo; under that afternoon's SSW wind the fire runs NNE into the city's south-west side.
 - **population_{home,work}.bin**: from the committed national product: 306,396 residents in the grid.
 
 - Copernicus DEM GLO-30: © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018, provided
