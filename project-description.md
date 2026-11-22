@@ -39,8 +39,8 @@ haces mal, y nadie está mirando.
   medir el controlador sin horas de video.
 - **Controlador:** un autómata con reglas (el de la demo) y, como alternativa, una red GRU pequeña por tarea
   entrenada en el simulador. En el despegue del C172 con ruido de percepción simulado medio, la GRU termina en
-  el estado correcto en el 93,8% de las ejecuciones contra 36,9% de las reglas, aunque detecta menos errores
-  (38,7% contra 63,1%) (`training/results/controller.md`).
+  el estado correcto en el 93,8% de las ejecuciones contra 37,4% de las reglas, aunque detecta menos errores
+  (38,7% contra 55,6%) (`training/results/controller.md`).
 - **Percepción** servida con vLLM en una RTX 5090: unos 0,75 s por observación en el servidor (p50,
   `training/results/perception.md`).
 - **Voz** en español con ElevenLabs o con la voz del navegador, con una cola en la que una corrección corta
