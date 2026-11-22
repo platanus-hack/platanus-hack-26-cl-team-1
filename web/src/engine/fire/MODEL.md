@@ -135,9 +135,11 @@ Spotting runs only when `params.spotting` is on. It starts from settled cells wh
 
 **Drawn firebreaks in the app (D-034).** Because a 30-120 m firebreak is crossed whenever D_max is longer, whether
 a drawn line holds depends mostly on `spotMetresPerKmh`, which was calibrated only on Viña 2024. When the user has
-drawn firebreaks, the worker (`src/worker/emberRange.ts`) also runs the scenario, without firefighters, at each
-distance the calibration tried (12, 15 and 25 m per km/h, section 6), without and with the lines, and the
-Cortafuegos panel shows the range. `pnpm exec tsx scripts/firebreak-embers.ts` measures the same for one line; on
+drawn firebreaks, the worker (`src/worker/emberRange.ts`) also runs the scenario, without firefighters, at the
+scenario's own ember setting (so one row always matches the main result without firefighters, embers off included)
+and at each distance the calibration tried (12, 15 and 25 m per km/h, section 6), without and with the lines, and the
+Cortafuegos panel shows the range. Fires are cached per setting, so a change that only affects the evacuation
+reruns the evacuations only. `pnpm exec tsx scripts/firebreak-embers.ts` measures the same for one line; on
 Talca (D-032), an 8 km x 120 m line 1 km ahead of the fire, measured on 2026-11-22:
 
 | Embers | Households cut off, without -> with the line | Burned by midnight |

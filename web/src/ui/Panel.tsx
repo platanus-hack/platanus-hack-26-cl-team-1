@@ -446,7 +446,7 @@ function CortafuegosSection(p: Props) {
           <button type="button" className="btn small ghost" onClick={() => p.update({ firebreaks: [] })}>
             Borrar todos
           </button>
-          <FirebreakEmberRange range={p.emberRange} cellM={p.data.grid.cellM} spotting={s.spotting} />
+          <FirebreakEmberRange range={p.emberRange} cellM={p.data.grid.cellM} own={s.spotting ? s.spotMetresPerKmh : null} />
         </>
       )}
     </Section>

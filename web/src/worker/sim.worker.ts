@@ -14,8 +14,8 @@ import { loadRealDataset } from '../data/load'
 import { makeMockDataset } from '../data/mock'
 import { timelineDataset, type TimelineChoice } from '../data/timeline'
 import { checkEvent, EVENTS, eventOfTimeline } from '../data/events'
-import { EMBER_RANGE_M_PER_KMH, emberRangeKey, emberRangeRow, type EmberRangeRow } from './emberRange'
-import { brigadeKey, buildIgnitions, buildWeatherSeries, fireKey, rasteriseFirebreaks, safeNodes, wildlandDistanceM } from './scenario'
+import { emberFire, emberLabel, emberRangeEvacKey, emberRangeFireKey, emberSettings, type EmberRangeRow } from './emberRange'
+import { brigadeKey, buildIgnitions, buildWeatherSeries, fireKey, rasteriseFirebreaks, safeNodes, wildlandDistanceM, type Scenario } from './scenario'
 
 const ctx = self as unknown as DedicatedWorkerGlobalScope
 
@@ -35,11 +35,15 @@ let lastNoLinesFirebreak: Uint8Array | null = null
 let lastDefKey = ''
 let lastDef: { fire: FireResult; plan: BrigadePlan; planMs: number } | null = null
 let lastSentKey = ''
-/** Ember range (emberRange.ts): computed after the result, one distance per task so a new run can start in between;
- *  rows are kept per emberRangeKey and resumed when the key is unchanged. */
+/** Ember range (emberRange.ts): computed after the result, one fire or one pair of evacuations per task so a new run
+ *  can start in between. Fires are kept per emberRangeFireKey and rows per emberRangeEvacKey too, by setting, so a
+ *  change that only affects the evacuation reruns the evacuations, and moving the ember slider adds one setting. */
+type RangeFire = { arrivalMin: Float32Array; burnedCells: number }
 let rangeTimer: ReturnType<typeof setTimeout> | null = null
-let rangeKey = ''
-let rangeRows: EmberRangeRow[] = []
+let rangeFireKey = ''
+let rangeEvacKey = ''
+const rangeFires = new Map<string, { without?: RangeFire; with?: RangeFire }>()
+const rangeRows = new Map<string, EmberRangeRow>()
 
 function post(msg: FromWorker, transfer: Transferable[] = []) {
   ctx.postMessage(msg, transfer)
@@ -61,8 +65,10 @@ async function init(synthetic: boolean, timeline: TimelineChoice) {
   lastDefKey = ''
   lastDef = null
   lastSentKey = ''
-  rangeKey = ''
-  rangeRows = []
+  rangeFireKey = ''
+  rangeEvacKey = ''
+  rangeFires.clear()
+  rangeRows.clear()
   post({ type: 'ready', loadMs, prepareMs: performance.now() - t - loadMs })
 }
 
@@ -222,7 +228,7 @@ ctx.onmessage = (ev: MessageEvent<ToWorker>) => {
     post({ type: 'result', result }, transfer)
     if (s.firebreaks.length > 0) {
       const pr = prepared
-      scheduleEmberRange(msg.id, emberRangeKey(s), lastFireInput!, lastNoLinesFirebreak!, (arrivalMin) =>
+      scheduleEmberRange(msg.id, s, lastFireInput!, lastNoLinesFirebreak!, (arrivalMin) =>
         simulateEvac({ prepared: pr, arrivalMin, params: evacParams, edits, programme }).expectedTrappedHouseholds,
       )
     }
@@ -231,30 +237,57 @@ ctx.onmessage = (ev: MessageEvent<ToWorker>) => {
   }
 }
 
-/** Drawn firebreaks under each ember distance (emberRange.ts), after the result: cached rows are sent at once,
- *  missing ones are computed one per task (a new run cancels the timer and resumes them if its key is the same). */
-function scheduleEmberRange(id: number, key: string, input: FireInput, noLines: Uint8Array, trapped: (arrivalMin: Float32Array) => number) {
-  if (key !== rangeKey) {
-    rangeKey = key
-    rangeRows = []
+/** Drawn firebreaks under each ember setting (emberRange.ts), after the result: cached rows are sent at once, missing
+ *  ones are computed one fire (or one pair of evacuations) per task; a new run cancels the timer and keeps what is
+ *  still valid for its keys. */
+function scheduleEmberRange(id: number, s: Scenario, input: FireInput, noLines: Uint8Array, trapped: (arrivalMin: Float32Array) => number) {
+  const fk = emberRangeFireKey(s)
+  const ek = emberRangeEvacKey(s)
+  if (fk !== rangeFireKey) {
+    rangeFireKey = fk
+    rangeFires.clear()
+    rangeRows.clear()
   }
-  if (rangeRows.length === EMBER_RANGE_M_PER_KMH.length) {
-    post({ type: 'emberRange', id, rows: rangeRows, error: null })
+  if (ek !== rangeEvacKey) {
+    rangeEvacKey = ek
+    rangeRows.clear()
+  }
+  const settings = emberSettings(s)
+  const labels = new Set(settings.map(emberLabel))
+  // Keep only the settings shown now (the ember slider can visit many values).
+  for (const k of [...rangeFires.keys()]) if (!labels.has(k)) rangeFires.delete(k)
+  for (const k of [...rangeRows.keys()]) if (!labels.has(k)) rangeRows.delete(k)
+  const done = () => settings.every((e) => rangeRows.has(emberLabel(e)))
+  const send = () => post({ type: 'emberRange', id, rows: settings.map((e) => rangeRows.get(emberLabel(e))!), error: null })
+  if (done()) {
+    send()
     return
   }
   post({ type: 'emberRange', id, rows: null, error: null })
   const step = () => {
     rangeTimer = null
     try {
-      rangeRows.push(emberRangeRow(input, noLines, EMBER_RANGE_M_PER_KMH[rangeRows.length], trapped))
-    } catch (e) {
-      rangeKey = ''
-      rangeRows = []
-      post({ type: 'emberRange', id, rows: null, error: e instanceof Error ? e.message : String(e) })
+      const e = settings.find((x) => !rangeRows.has(emberLabel(x)))!
+      const L = emberLabel(e)
+      let f = rangeFires.get(L)
+      if (!f) rangeFires.set(L, (f = {}))
+      if (!f.without) f.without = emberFire(input, noLines, e)
+      else if (!f.with) f.with = emberFire(input, input.firebreak, e)
+      else
+        rangeRows.set(L, {
+          spotMetresPerKmh: e,
+          without: { burnedCells: f.without.burnedCells, households: trapped(f.without.arrivalMin) },
+          with: { burnedCells: f.with.burnedCells, households: trapped(f.with.arrivalMin) },
+        })
+    } catch (err) {
+      rangeFireKey = ''
+      rangeFires.clear()
+      rangeRows.clear()
+      post({ type: 'emberRange', id, rows: null, error: err instanceof Error ? err.message : String(err) })
       return
     }
-    if (rangeRows.length < EMBER_RANGE_M_PER_KMH.length) rangeTimer = setTimeout(step, 0)
-    else post({ type: 'emberRange', id, rows: rangeRows, error: null })
+    if (done()) send()
+    else rangeTimer = setTimeout(step, 0)
   }
   rangeTimer = setTimeout(step, 0)
 }

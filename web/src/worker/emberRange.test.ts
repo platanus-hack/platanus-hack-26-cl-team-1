@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_FIRE_PARAMS } from '../engine/fire'
 import { FUEL, type FireInput, type GridMeta } from '../engine/types'
-import { emberRangeKey, emberRangeRow, linesCutPct } from './emberRange'
+import { emberRangeEvacKey, emberRangeFireKey, emberRangeRow, emberSettings, linesCutPct } from './emberRange'
 import type { Scenario } from './scenario'
 
 // Forest, 30 m cells, 45 km/h wind from the west, a 60 m firebreak (columns 30-31) across the whole grid.
@@ -64,11 +64,35 @@ describe('emberRangeRow', () => {
   })
 })
 
-describe('emberRangeKey', () => {
+describe('emberSettings', () => {
+  it('puts the scenario own setting first and the calibration distances after, without repeats', () => {
+    expect(emberSettings({ spotting: true, spotMetresPerKmh: 25 })).toEqual([25, 12, 15])
+    expect(emberSettings({ spotting: true, spotMetresPerKmh: 40 })).toEqual([40, 12, 15, 25])
+    expect(emberSettings({ spotting: false, spotMetresPerKmh: 25 })).toEqual([null, 12, 15, 25])
+  })
+})
+
+describe('emberRangeRow with embers off', () => {
+  it('runs without embers, where the 60 m line holds', () => {
+    const { withLines, noLines } = input()
+    const off = emberRangeRow({ ...withLines, params: { ...withLines.params, spotting: true } }, noLines, null, eastBurned)
+    expect(off.spotMetresPerKmh).toBeNull()
+    expect(off.with.households).toBe(0)
+    expect(off.without.households).toBeGreaterThan(500)
+  })
+})
+
+describe('emberRange keys', () => {
   const s = { weather: {}, droughtFactor: 10, spotting: true, spotMetresPerKmh: 25, presetIgnitions: ['a'], userIgnitions: [], firebreaks: [], alertMin: 300, cueShare: 0.65, cueRadiusM: 500, prepMedianMin: 10, footShare: 0.2, closedEdges: [], addedLinks: [], planTiles: [], planSectors: [] } as unknown as Scenario
-  it('ignores the ember settings and the firefighters, not the rest', () => {
-    expect(emberRangeKey({ ...s, spotting: false, spotMetresPerKmh: 5, brigades: { enabled: true } } as unknown as Scenario)).toBe(emberRangeKey(s))
-    expect(emberRangeKey({ ...s, alertMin: 360 })).not.toBe(emberRangeKey(s))
-    expect(emberRangeKey({ ...s, firebreaks: [{ id: 'f', points: [[0, 0], [1, 1]], widthM: 60 }] })).not.toBe(emberRangeKey(s))
+  const both = (x: Scenario) => [emberRangeFireKey(x), emberRangeEvacKey(x)]
+  it('ignore the ember settings and the firefighters', () => {
+    expect(both({ ...s, spotting: false, spotMetresPerKmh: 5, brigades: { enabled: true } } as unknown as Scenario)).toEqual(both(s))
+  })
+  it('an evacuation change touches only the evacuation key; a firebreak only the fire key', () => {
+    expect(emberRangeFireKey({ ...s, alertMin: 360 })).toBe(emberRangeFireKey(s))
+    expect(emberRangeEvacKey({ ...s, alertMin: 360 })).not.toBe(emberRangeEvacKey(s))
+    const fb = { ...s, firebreaks: [{ id: 'f', points: [[0, 0], [1, 1]], widthM: 60 }] } as unknown as Scenario
+    expect(emberRangeFireKey(fb)).not.toBe(emberRangeFireKey(s))
+    expect(emberRangeEvacKey(fb)).toBe(emberRangeEvacKey(s))
   })
 })

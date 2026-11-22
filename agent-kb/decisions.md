@@ -333,9 +333,11 @@ D-026 to D-028 were taken by #54, #53 and the today scenario._
   households cut off), while with embers off the same line removes 27-96 %. The answer to "does my line hold?" is
   set mostly by one knob calibrated only on Viña 2024.
 - **Decision (no contract change in `types.ts`; worker protocol gains an `emberRange` message):** when the scenario
-  has drawn firebreaks, the worker, after sending the normal result, runs the scenario without firefighters at 12,
-  15 and 25 m per km/h (the distances the calibration tried), without and with the lines, one distance per task so
-  the next change interrupts it, cached per `emberRangeKey`. The Cortafuegos panel shows households cut off and
+  has drawn firebreaks, the worker, after sending the normal result, runs the scenario without firefighters at its own
+  ember setting (embers off included, so one row matches the main result) and at 12, 15 and 25 m per km/h (the
+  distances the calibration tried), without and with the lines, one fire or one pair of evacuations per task so the
+  next change interrupts it. Fires are cached per setting under `emberRangeFireKey`, evacuations under
+  `emberRangeEvacKey`. After a failed run the panel says the range could not be computed. The Cortafuegos panel shows households cut off and
   burned area per distance and the range, and says the distances were calibrated only on Viña. The main result is
   unchanged. `scripts/firebreak-embers.ts` measures one line with the same helper.
 - **Consequences:** on Talca an 8 km x 120 m line 1 km ahead of the fire reads -5.5 % to -35.5 % (fire `MODEL.md`

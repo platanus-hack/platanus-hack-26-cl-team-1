@@ -357,7 +357,11 @@ function Explorer({
         setSimError(null)
         setTimings((prev) => ({ fireMs: r.fire ? r.fire.elapsedMs : (prev?.fireMs ?? null), fireRerun: !!r.fire, evacMs: r.evac.elapsedMs, roundTripMs }))
       },
-      onError: (m) => setSimError(m),
+      onError: (m) => {
+        setSimError(m)
+        // The range below the firebreaks belonged to the last good run: say so instead of showing it or "Calculando…".
+        setEmberRange({ rows: null, error: 'el escenario actual no se pudo simular' })
+      },
       onBusy: setBusy,
       onEmberRange: (m) => setEmberRange({ rows: m.rows, error: m.error }),
     })

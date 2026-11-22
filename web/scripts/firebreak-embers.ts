@@ -95,8 +95,5 @@ const show = (label: string, row: ReturnType<typeof emberRangeRow>) => {
   )
 }
 for (const m of EMBER_RANGE_M_PER_KMH) show(`embers ${m} m per km/h`, emberRangeRow(withLines, noLines, m, trapped))
-// Reference, not shown in the panel: embers off.
-const off = { ...withLines, params: { ...params, spotting: false } }
-const a = simulateFire({ ...off, firebreak: noLines })
-const b = simulateFire(off)
-show('embers off (reference)', { spotMetresPerKmh: 0, without: { burnedCells: a.burnedCells, households: trapped(a.arrivalMin) }, with: { burnedCells: b.burnedCells, households: trapped(b.arrivalMin) } })
+// Embers off: the panel's first row when the scenario has them off.
+show('embers off', emberRangeRow(withLines, noLines, null, trapped))
