@@ -139,6 +139,11 @@ describe('planBrigades', () => {
     expect(p.units[0].status).toBe('no_access')
     expect(p.defendedCells).toBe(0)
   })
+  it('refuses a historical cut that matches no road (never fails silently)', () => {
+    const settings: BrigadeSettings = { units: { s1: [1, 0, 0, 0] }, dispatchMin: { X: 0 }, reinforcementUnits: {}, reinforcementMin: {}, historicalCuts: true }
+    const cutFile: BrigadesFile = { ...file, cuts: [{ id: 'c', label: 'Corte', lines: [[ll(2, 2), ll(2, 5)]], fromLocal: '2024-02-02T12:00', toLocal: null, source: 'test' }] }
+    expect(() => planBrigades({ prepared, grid, fuel, arrivalMin: arrival, file: cutFile, settings, toMin: () => 0, safetyMarginMin: 5, carKmhByClass: KMH, horizonMin: 720 })).toThrow(/Corte/)
+  })
   it('refuses settings without a dispatch time or with bad unit counts', () => {
     const settings: BrigadeSettings = { units: { s1: [1, 0, 0] }, dispatchMin: { X: 0 }, reinforcementUnits: {}, reinforcementMin: {}, historicalCuts: false }
     expect(() => planBrigades({ prepared, grid, fuel, arrivalMin: arrival, file, settings, toMin: () => 0, safetyMarginMin: 5, carKmhByClass: KMH, horizonMin: 720 })).toThrow(/units/)
@@ -146,6 +151,13 @@ describe('planBrigades', () => {
 })
 
 describe('applyRescue', () => {
+  it('with no rescue units returns the evacuation total unchanged (exactly)', () => {
+    const nB = buildings.length / 3
+    const risk = new Float32Array(nB).map((_, i) => ((i * 7919) % 97) / 97)
+    const total = 123.456789
+    const res = applyRescue(prepared, risk, new Uint8Array(nB), [], 720, total)
+    expect(res.expectedTrappedHouseholds).toBe(total)
+  })
   it('takes out at most rescuePerHour x hours households within the radius, highest risk first', () => {
     const p = plan([0, 0, 0, 1])
     const u = p.units[0]
@@ -154,7 +166,7 @@ describe('applyRescue', () => {
     const risk = new Float32Array(nB).map((_, i) => 0.2 + 0.7 * ((i * 7919) % 97) / 97)
     const status = new Uint8Array(nB).fill(HOUSEHOLD.AT_RISK)
     const horizon = u.arriveMin + 60
-    const res = applyRescue(prepared, risk, status, p.units, horizon)
+    const res = applyRescue(prepared, risk, status, p.units, horizon, risk.reduce((a, b) => a + b, 0))
     const taken = [...risk.keys()].filter((b) => res.householdRisk[b] === 0)
     expect(taken).toHaveLength(FIREFIGHT_MODEL.rescuePerHour.value)
     expect(res.rescuedExpected).toBeCloseTo(taken.reduce((a, b) => a + risk[b], 0), 4)

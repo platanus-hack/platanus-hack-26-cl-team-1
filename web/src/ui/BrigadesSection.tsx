@@ -7,7 +7,7 @@ import type { UnitStatus } from '../engine/brigade'
 import { UNIT_COUNT, UNIT_LABEL_ES, UNIT_SHORT_ES, type UnitType } from '../engine/types'
 import type { BrigadesOut } from '../worker/protocol'
 import type { BrigadeScenario, Scenario } from '../worker/scenario'
-import { defaultBrigades, HORIZON_MIN } from '../worker/scenario'
+import { defaultBrigades, HORIZON_MIN, MAX_UNITS, scaleUnits } from '../worker/scenario'
 import { fmtInt, fmtSigned, Section, Slider, Toggle } from './controls'
 
 interface Props {
@@ -47,13 +47,13 @@ function Stepper({ value, onChange, label }: { value: number; onChange: (v: numb
       className="stepper"
       type="number"
       min={0}
-      max={99}
+      max={MAX_UNITS}
       step={1}
       value={value}
       aria-label={label}
       onChange={(e) => {
         const v = Math.round(Number(e.target.value))
-        if (Number.isFinite(v) && v >= 0) onChange(Math.min(99, v))
+        if (Number.isFinite(v) && v >= 0) onChange(Math.min(MAX_UNITS, v))
       }}
     />
   )
@@ -69,11 +69,7 @@ export function BrigadesSection(p: Props) {
   const t0 = p.data.grid.t0
   const b = p.scenario.brigades
   const set = (patch: Partial<BrigadeScenario>) => p.update({ brigades: { ...b, ...patch } })
-  const scaleAll = (k: number) =>
-    set({
-      units: Object.fromEntries(Object.entries(b.units).map(([id, u]) => [id, u.map((x) => Math.round(x * k))])),
-      reinforcementUnits: Object.fromEntries(Object.entries(b.reinforcementUnits).map(([id, u]) => [id, u.map((x) => Math.round(x * k))])),
-    })
+  const scaleAll = (k: number) => set({ units: scaleUnits(b.units, k), reinforcementUnits: scaleUnits(b.reinforcementUnits, k) })
   const setUnit = (id: string, k: number, v: number) => set({ units: { ...b.units, [id]: b.units[id].map((x, j) => (j === k ? v : x)) } })
   const setReinf = (id: string, k: number, v: number) =>
     set({ reinforcementUnits: { ...b.reinforcementUnits, [id]: b.reinforcementUnits[id].map((x, j) => (j === k ? v : x)) } })
@@ -124,7 +120,7 @@ export function BrigadesSection(p: Props) {
                 {fmtInt(out.units.length)} carros: {fmtInt(count('deployed'))} trabajando
                 {count('late') > 0 && <> · {fmtInt(count('late'))} llegan tarde</>}
                 {count('no_access') > 0 && <> · <b className="warn-text">{fmtInt(count('no_access'))} sin acceso</b></>}
-                {count('idle') > 0 && <> · {fmtInt(count('idle'))} sin sector</>}. {fmtInt(out.defendedCells)} celdas de 60 m defendidas
+                {count('idle') > 0 && <> · {fmtInt(count('idle'))} sin sector</>}. {fmtInt(out.defendedCells)} celdas de {fmtInt(p.data.grid.cellM)} m defendidas
                 {out.rescuedExpected >= 0.5 && <>; ≈ {fmtInt(out.rescuedExpected)} hogares rescatados</>}.
               </div>
               {stranded.length > 0 && (
@@ -272,7 +268,14 @@ export function BrigadesSection(p: Props) {
                 </li>
               ))}
               <li>Velocidad de los carros: la de un auto en flujo libre según el tipo de calle, sin congestión ni sirenas (supuesto).</li>
-              <li>Sin grifos: el agua es la del estanque y la de los aljibes del mismo sector (la SISS informó falta de agua por sobredemanda).</li>
+              <li>
+                Sin grifos (supuesto): el agua es la del estanque y la de los aljibes del mismo sector. La síntesis de la comisión investigadora de la
+                Cámara recoge que la SISS atribuyó la falta de agua a la sobredemanda de grifos (
+                <a href="https://obtienearchivo.bcn.cl/obtienearchivo?id=repositorio%2F10221%2F36551%2F1%2FConclusiones_CEI.pdf" target="_blank" rel="noreferrer">
+                  BCN
+                </a>
+                ).
+              </li>
               <li>
                 Las rutas se calculan con el fuego sin bomberos: una calle que los bomberos salvaron igual figura cortada. Las calles cerradas con
                 "Cerrar calle" solo afectan a la evacuación.

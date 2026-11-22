@@ -335,6 +335,7 @@ export function parseBrigades(j: unknown, g: GridMeta): BrigadesFile {
     }
     checkTime(f, x.fromLocal)
     if (x.toLocal !== null) checkTime(f, x.toLocal)
+    for (const l of x.lines) for (const [lon, lat] of l) insideGrid(f, g, lon, lat, `un punto del corte ${x.id}`)
     return x
   })
   return { stations, dispatch, reinforcements, cuts }

@@ -66,6 +66,9 @@ Planning takes ~200 ms; the whole two-pass run ~0.5 s in the browser.
 - Routes use the pass-1 fire, so a street the firefighters saved still counts as cut (pessimistic).
 - One work window per cell; a later, disjoint window at the same cell is dropped. Aljibe water is shared
   regardless of when the aljibe arrives (optimistic).
+- Routing does not wait at nodes, which is exact only while cut windows never reopen (true for the shipped
+  Ruta 68 cut). A cut with a finite reopening time can mark a unit "sin acceso" that could have waited.
+- The "Hogares con la salida cortada según la hora de la alerta" chart is not adjusted for rescues.
 - Units do not move once deployed, do not refill, and have no crews, radios (the ~30 min radio outage after
   18:30 is not modelled), traffic or congestion.
 - The Forestal intensity check uses the head rate of spread of the cell (overstates flank intensity).

@@ -114,7 +114,7 @@ ctx.onmessage = (ev: MessageEvent<ToWorker>) => {
       fire = lastDef.fire
       const base = simulateEvac({ prepared, arrivalMin: lastFire.arrivalMin, params: evacParams, edits })
       const defended = simulateEvac({ prepared, arrivalMin: fire.arrivalMin, params: evacParams, edits })
-      const rescue = applyRescue(prepared, defended.householdRisk, defended.householdStatus, lastDef.plan.units, HORIZON_MIN)
+      const rescue = applyRescue(prepared, defended.householdRisk, defended.householdStatus, lastDef.plan.units, HORIZON_MIN, defended.expectedTrappedHouseholds)
       evac = {
         ...defended,
         householdRisk: rescue.householdRisk,

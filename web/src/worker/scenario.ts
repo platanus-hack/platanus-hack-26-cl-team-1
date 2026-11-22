@@ -82,6 +82,24 @@ export function defaultBrigades(file: BrigadesFile, t0: string): BrigadeScenario
   }
 }
 
+/** Max trucks of one type per company (the panel's stepper limit). */
+export const MAX_UNITS = 99
+
+/** Scales every count by k with cumulative rounding per type across entries, so halving 28 companies of
+ *  one truck gives 14 trucks (not 28), and clamps each count to MAX_UNITS. */
+export function scaleUnits(units: Record<string, number[]>, k: number): Record<string, number[]> {
+  const out: Record<string, number[]> = {}
+  const cum: number[] = []
+  for (const [id, u] of Object.entries(units)) {
+    out[id] = u.map((x, t) => {
+      const prev = cum[t] ?? 0
+      cum[t] = prev + x
+      return Math.min(MAX_UNITS, Math.round(cum[t] * k) - Math.round(prev * k))
+    })
+  }
+  return out
+}
+
 /** Everything the second (defended) fire run depends on beyond fireKey: null when firefighters are off. */
 export function brigadeKey(s: Scenario): string | null {
   return s.brigades.enabled ? JSON.stringify(s.brigades) : null

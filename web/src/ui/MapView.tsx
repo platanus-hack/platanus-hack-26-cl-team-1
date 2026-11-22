@@ -200,6 +200,8 @@ export function MapView(props: Props) {
   }
 
   function updateBrigades() {
+    // Road geometries are filled when the layers are set up; syncAll() reruns this then.
+    if (!ready.current) return
     const { data, brigades, scenario } = p.current
     const on = scenario.brigades.enabled
     const out = on ? brigades : null

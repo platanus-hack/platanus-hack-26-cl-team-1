@@ -54,7 +54,7 @@ function run(label: string, b: BrigadeScenario) {
   const planMs = performance.now() - t
   const fire = simulateFire({ ...fireInput, defense: plan.defense })
   const ev = simulateEvac({ prepared, arrivalMin: fire.arrivalMin, params: evacParams, edits })
-  const res = applyRescue(prepared, ev.householdRisk, ev.householdStatus, plan.units, HORIZON_MIN)
+  const res = applyRescue(prepared, ev.householdRisk, ev.householdStatus, plan.units, HORIZON_MIN, ev.expectedTrappedHouseholds)
   const st = (s: string) => plan.units.filter((u) => u.status === s).length
   console.log(
     `${label}: ${plan.units.length} carros (${st('deployed')} trabajando, ${st('late')} tarde, ${st('no_access')} sin acceso, ${st('idle')} sin sector); ` +

@@ -3,6 +3,7 @@ import type { GridMeta, WeatherFile } from '../engine/types'
 import { FUEL } from '../engine/types'
 import {
   brigadeKey,
+  scaleUnits,
   buildIgnitions,
   buildWeatherSeries,
   defaultBrigades,
@@ -194,5 +195,15 @@ describe('brigade settings', () => {
     expect(b.units['valpo-10']).toEqual([0, 0, 0, 1])
     expect(brigadeKey(scenario({ brigades: b }))).toBeNull()
     expect(brigadeKey(scenario({ brigades: { ...b, enabled: true } }))).not.toBeNull()
+  })
+})
+
+describe('scaleUnits (Mitad / Doble)', () => {
+  it('halves the total per type even when every company has 1 truck, and doubling clamps at 99', () => {
+    const u = Object.fromEntries(Array.from({ length: 28 }, (_, i) => [`s${i}`, [1, 0, 0, 0]]))
+    const half = scaleUnits(u, 0.5)
+    expect(Object.values(half).reduce((a, x) => a + x[0], 0)).toBe(14)
+    expect(scaleUnits({ rm: [50, 0, 0, 1] }, 2).rm).toEqual([99, 0, 0, 2])
+    expect(scaleUnits({ a: [3, 1, 0, 0] }, 2).a).toEqual([6, 2, 0, 0])
   })
 })

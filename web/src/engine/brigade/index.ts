@@ -331,7 +331,9 @@ export function planBrigades(input: BrigadeInput): BrigadePlan {
     for (const c of file.cuts) {
       const from = toMin(c.fromLocal)
       const to = c.toLocal === null ? Infinity : toMin(c.toLocal)
-      for (const e of snapCut(P, grid, c.lines)) {
+      const edges = snapCut(P, grid, c.lines)
+      if (edges.length === 0) fail(`historical cut "${c.label}" (${c.id}) matches no motorway or primary road within ${FIREFIGHT_MODEL.cutSnapM} m of its line`)
+      for (const e of edges) {
         cuts.push({ edge: e, fromMin: from, toMin: to })
         cutEdges.push(e)
       }
@@ -483,7 +485,15 @@ export interface RescueResult {
 /** Each deployed Escala / rescate unit takes out, from its arrival to the horizon, up to rescuePerHour
  *  households per hour among those within rescueRadiusM of its site, highest risk first: their risk
  *  becomes 0. */
-export function applyRescue(prepared: EvacPrepared, risk: Float32Array, status: Uint8Array, units: PlannedUnit[], horizonMin: number): RescueResult {
+export function applyRescue(
+  prepared: EvacPrepared,
+  risk: Float32Array,
+  status: Uint8Array,
+  units: PlannedUnit[],
+  horizonMin: number,
+  /** The evacuation's expectedTrappedHouseholds (kept exact when nobody is rescued). */
+  evacExpectedTrapped: number,
+): RescueResult {
   const P = asPrepared(prepared)
   if (risk.length !== P.buildingCount || status.length !== P.buildingCount) fail('risk / status do not match the buildings')
   const out = risk.slice()
@@ -513,7 +523,5 @@ export function applyRescue(prepared: EvacPrepared, risk: Float32Array, status: 
       if (st[b] !== HOUSEHOLD.UNAFFECTED) st[b] = HOUSEHOLD.SAFE
     }
   }
-  let total = 0
-  for (let b = 0; b < out.length; b++) total += out[b]
-  return { householdRisk: out, householdStatus: st, expectedTrappedHouseholds: total, rescuedExpected: rescued }
+  return { householdRisk: out, householdStatus: st, expectedTrappedHouseholds: evacExpectedTrapped - rescued, rescuedExpected: rescued }
 }
