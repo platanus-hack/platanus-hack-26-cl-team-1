@@ -2,7 +2,7 @@
 
 **Current project logo:** project-logo.png
 
-<img src="./project-logo.png" alt="Project Logo" width="200" />
+<img src="./project-logo.png" alt="Cortafuego logo: an orange flame cut by a diagonal firebreak" width="200" />
 
 Track: 🌐 Simulations
 
