@@ -1,5 +1,18 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { DataError, parseElevation, parseFuel, parseGoes, parseGrid, parseRoads, parseScar, parseWeather, parseBuildings } from './load'
+import {
+  DataError,
+  parseElevation,
+  parseFuel,
+  parseGoes,
+  parseGrid,
+  parseRoads,
+  parseScar,
+  parseWeather,
+  parseBuildings,
+  parseNationalPopulation,
+  parsePopulationLayer,
+} from './load'
 import { makeMockDataset } from './mock'
 import { localToMin, minToDateLabel, minToHHMM } from './time'
 import { lonLatToCell, cellCentre } from './grid'
@@ -77,6 +90,11 @@ describe('mock dataset', () => {
     expect(parseWeather(d.weather).times).toHaveLength(48)
     expect(d.buildings.length % 3).toBe(0)
     for (const g of d.ignitions) expect(lonLatToCell(d.grid, g.lon, g.lat)).toBeGreaterThanOrEqual(0)
+    const home = parsePopulationLayer('population_home.bin', d.populationHome.buffer as ArrayBuffer, n)
+    const work = parsePopulationLayer('population_work.bin', d.populationWork.buffer as ArrayBuffer, n)
+    const sum = (a: Float32Array) => a.reduce((x, y) => x + y, 0)
+    expect(sum(home)).toBeGreaterThan(1000)
+    expect(sum(work)).toBeCloseTo(sum(home), 0)
   })
 
   it('cell centre round-trips through lonLatToCell', () => {
@@ -85,5 +103,65 @@ describe('mock dataset', () => {
       const [lon, lat] = cellCentre(d.grid, cell)
       expect(lonLatToCell(d.grid, lon, lat)).toBe(cell)
     }
+  })
+})
+
+describe('population files', () => {
+  const nationalBuf = (cells: number[], home: number[], work: number[], nres: number[]) => {
+    const n = cells.length
+    const buf = new ArrayBuffer(16 * n)
+    new Uint32Array(buf, 0, n).set(cells)
+    new Float32Array(buf, 4 * n, n).set(home)
+    new Float32Array(buf, 8 * n, n).set(work)
+    new Float32Array(buf, 12 * n, n).set(nres)
+    return buf
+  }
+  const meta = {
+    version: 1,
+    lonMin: -72,
+    latMax: -33,
+    dLon: 1 / 120,
+    dLat: 1 / 120,
+    rows: 2,
+    cols: 2,
+    n: 3,
+    layout: 'x',
+    commute: { scaleM: 10000, maxM: 30000 },
+    totals: { home: 30, work: 30, stayHome: 0, nonResidentialMillionM3: 0 },
+    source: 's',
+  }
+
+  it('validates the per-cell layers', () => {
+    expect(parsePopulationLayer('population_home.bin', new Float32Array([0, 1.5, 3]).buffer, 3)).toHaveLength(3)
+    expect(() => parsePopulationLayer('population_home.bin', new Float32Array(2).buffer, 3)).toThrow(/8 bytes, se esperaban 12/)
+    expect(() => parsePopulationLayer('population_work.bin', new Float32Array([0, -1, 3]).buffer, 3)).toThrow(/celda 1/)
+    expect(() => parsePopulationLayer('population_work.bin', new Float32Array([0, NaN, 3]).buffer, 3)).toThrow(/NaN/)
+  })
+
+  it('validates the national product', () => {
+    const ok = parseNationalPopulation(meta, nationalBuf([0, 1, 3], [10, 20, 0], [0, 5, 25], [0, 1e4, 9e4]))
+    expect(Array.from(ok.cell)).toEqual([0, 1, 3])
+    expect(() => parseNationalPopulation(meta, nationalBuf([0, 3, 1], [10, 20, 0], [0, 5, 25], [0, 0, 0]))).toThrow(/no creciente/)
+    expect(() => parseNationalPopulation(meta, nationalBuf([0, 1, 4], [10, 20, 0], [0, 5, 25], [0, 0, 0]))).toThrow(/fuera de rango/)
+    expect(() => parseNationalPopulation(meta, nationalBuf([0, 1, 3], [10, 20, 9], [0, 5, 25], [0, 0, 0]))).toThrow(/totals.home/)
+    expect(() => parseNationalPopulation({ ...meta, version: 2 }, nationalBuf([0], [1], [1], [0]))).toThrow(/versión/)
+    expect(() => parseNationalPopulation(meta, new ArrayBuffer(47))).toThrow(/47 bytes/)
+  })
+
+  it('the committed files pass their own checks and conserve people', () => {
+    const read = (f: string) => {
+      const b = readFileSync(new URL(`../../public/data/${f}`, import.meta.url))
+      return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer
+    }
+    const national = parseNationalPopulation(JSON.parse(new TextDecoder().decode(read('national/population_cl.json'))), read('national/population_cl.bin'))
+    // The gravity model moves people, it does not create them (the totals are rounded to whole persons).
+    expect(Math.abs(national.meta.totals.home - national.meta.totals.work)).toBeLessThanOrEqual(1)
+    expect(national.meta.totals.home).toBeGreaterThan(15e6)
+    const grid = parseGrid(JSON.parse(new TextDecoder().decode(read('grid.json'))))
+    const cells = grid.rows * grid.cols
+    const home = parsePopulationLayer('population_home.bin', read('population_home.bin'), cells)
+    const work = parsePopulationLayer('population_work.bin', read('population_work.bin'), cells)
+    expect(home.reduce((x, y) => x + y, 0)).toBeGreaterThan(5e5)
+    expect(work.reduce((x, y) => x + y, 0)).toBeGreaterThan(5e5)
   })
 })

@@ -5,6 +5,7 @@
 import { FUEL, type FireInput, type FireParams, type FireResult, type WeatherSample } from '../types'
 import { CellHeap } from './heap'
 import {
+  FIRELINE,
   FIRE_MODEL,
   SPREAD_MODEL,
   eccentricity,
@@ -21,6 +22,7 @@ import {
 
 export {
   ERA5_WIND_DIR_CORRECTION_DEG,
+  FIRELINE,
   FIRE_MODEL,
   SPREAD_MODEL,
   flatRosKmh,
@@ -105,7 +107,7 @@ const KMH_TO_M_PER_MIN = 1000 / 60
 export function simulateFire(input: FireInput): FireResult {
   const started = performance.now()
   validateInput(input)
-  const { grid, elevation, fuel, firebreak, ignitions, weather, params } = input
+  const { grid, elevation, fuel, firebreak, ignitions, weather, params, defense } = input
   const { rows, cols, cellM } = grid
   const n = rows * cols
   const M = FIRE_MODEL
@@ -192,14 +194,15 @@ export function simulateFire(input: FireInput): FireResult {
   if (!(M.spotRefRosMPerMin > 0)) throw new Error(`simulateFire: FIRE_MODEL.spotRefRosMPerMin must be > 0 (got ${M.spotRefRosMPerMin})`)
   if (!(M.spotMaxScale >= 1)) throw new Error(`simulateFire: FIRE_MODEL.spotMaxScale must be >= 1 (got ${M.spotMaxScale})`)
   let burned = 0
+  // A cell the fire can pass between: burnable, and not held by firefighters at time t against a fire of
+  // this intensity (a defended line is watertight while it is held, like a firebreak).
+  const passable = (j: number, t: number, iKwM: number): boolean =>
+    burnable[j] === 1 && !(defense && t >= defense.fromMin[j] && t <= defense.toMin[j] && iKwM <= defense.maxKwM[j])
 
   while (heap.size > 0) {
     const i = heap.pop()
     const t = time[i]
     if (t > horizon) break
-    settled[i] = 1
-    arrival[i] = t
-    burned++
 
     if (t !== lastT) {
       lastT = t
@@ -226,6 +229,20 @@ export function simulateFire(input: FireInput): FireResult {
     const e = eccentricity(lengthToBreadth(U))
     const hx = U > 0 ? ex / U : 0
     const hy = U > 0 ? ey / U : 1
+
+    // Firefighters holding this cell while the fire reaches it, at an intensity they can attack: it does not
+    // burn and stays unburnable (the front passed while it was held). Byram I = H w R, see FIRELINE.
+    const intensityKwM = defense ? FIRELINE.heatKJPerKg * (fuelModel[f] === SPREAD_MODEL.MCARTHUR_FOREST ? fuelLoad[f] : FIRELINE.grassLoadTHa) * 0.1 * (Rh / 60) : 0
+    if (defense && t >= defense.fromMin[i] && t <= defense.toMin[i]) {
+      if (intensityKwM <= defense.maxKwM[i]) {
+        settled[i] = 1
+        burnable[i] = 0
+        continue
+      }
+    }
+    settled[i] = 1
+    arrival[i] = t
+    burned++
     headR[i] = Rh
     headX[i] = hx
     headY[i] = hy
@@ -270,10 +287,10 @@ export function simulateFire(input: FireInput): FireResult {
       const kind = KIND[k]
       if (kind === KIND_DIAG) {
         // No corner-cutting between two unburnable cells (keeps 8-connected firebreak lines watertight).
-        if (!burnable[(r + P1R[k]) * cols + c] && !burnable[r * cols + c + P2C[k]]) continue
+        if (!passable((r + P1R[k]) * cols + c, t, intensityKwM) && !passable(r * cols + c + P2C[k], t, intensityKwM)) continue
       } else if (kind === KIND_KNIGHT) {
         // A knight move must pass between two burnable cells.
-        if (!burnable[(r + P1R[k]) * cols + c + P1C[k]] || !burnable[(r + P2R[k]) * cols + c + P2C[k]]) continue
+        if (!passable((r + P1R[k]) * cols + c + P1C[k], t, intensityKwM) || !passable((r + P2R[k]) * cols + c + P2C[k], t, intensityKwM)) continue
       }
       let tt = t + LEN[k] * cellM * (1 - e * (UX[k] * hx + UY[k] * hy)) * inv
       let from = i
@@ -396,6 +413,16 @@ function validateInput(input: FireInput): void {
   if (!(params.rosMultiplier > 0) || !Number.isFinite(params.rosMultiplier)) throw new Error(`simulateFire: rosMultiplier must be > 0 (got ${params.rosMultiplier})`)
   if (!(params.spotMetresPerKmh >= 0) || !Number.isFinite(params.spotMetresPerKmh)) throw new Error(`simulateFire: spotMetresPerKmh must be >= 0 (got ${params.spotMetresPerKmh})`)
   if (Number.isNaN(params.horizonMin)) throw new Error('simulateFire: horizonMin is NaN')
+  if (input.defense) {
+    const d = input.defense
+    for (const [name, arr] of [
+      ['fromMin', d.fromMin],
+      ['toMin', d.toMin],
+      ['maxKwM', d.maxKwM],
+    ] as const) {
+      if (!(arr instanceof Float32Array) || arr.length !== n) throw new Error(`simulateFire: defense.${name} must be a Float32Array of ${n} cells`)
+    }
+  }
 }
 
 /** Nearest burnable cell (has fuel, not a firebreak) to `cell` within `maxRadiusCells` (Chebyshev rings),

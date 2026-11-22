@@ -1,7 +1,8 @@
 import { DEFAULT_FIRE_PARAMS, ERA5_WIND_DIR_CORRECTION_DEG } from '../engine/fire'
 // The user's scenario (everything the control panel can change) and the pure functions that turn it into
 // engine inputs. Shared by the UI thread and the simulation worker.
-import type { GridMeta, IgnitionPreset, Ignition, WeatherFile, WeatherSample, WeatherSeries } from '../engine/types'
+import type { BrigadesFile, GridMeta, IgnitionPreset, Ignition, WeatherFile, WeatherSample, WeatherSeries } from '../engine/types'
+import type { BrigadeSettings } from '../engine/brigade'
 import { FUEL } from '../engine/types'
 import { lonLatToCell, lonLatToColRow } from '../data/grid'
 import { localToMin } from '../data/time'
@@ -61,6 +62,47 @@ export interface Scenario {
   footShare: number
   closedEdges: number[]
   addedLinks: { u: number; v: number }[]
+  /** Firefighters (off by default: the calibrated model has no suppression). */
+  brigades: BrigadeScenario
+}
+
+export interface BrigadeScenario extends BrigadeSettings {
+  enabled: boolean
+}
+
+/** The firefighter settings as brigades.json ships them (counts, dispatch and arrival times, cuts on), off. */
+export function defaultBrigades(file: BrigadesFile, t0: string): BrigadeScenario {
+  return {
+    enabled: false,
+    units: Object.fromEntries(file.stations.map((s) => [s.id, s.units.slice()])),
+    dispatchMin: Object.fromEntries(file.dispatch.map((d) => [d.cuerpo, localToMin(t0, d.dispatchLocal)])),
+    reinforcementUnits: Object.fromEntries(file.reinforcements.map((r) => [r.id, r.units.slice()])),
+    reinforcementMin: Object.fromEntries(file.reinforcements.map((r) => [r.id, localToMin(t0, r.arrivalLocal)])),
+    historicalCuts: true,
+  }
+}
+
+/** Max trucks of one type per company (the panel's stepper limit). */
+export const MAX_UNITS = 99
+
+/** Scales every count by k with cumulative rounding per type across entries, so halving 28 companies of
+ *  one truck gives 14 trucks (not 28), and clamps each count to MAX_UNITS. */
+export function scaleUnits(units: Record<string, number[]>, k: number): Record<string, number[]> {
+  const out: Record<string, number[]> = {}
+  const cum: number[] = []
+  for (const [id, u] of Object.entries(units)) {
+    out[id] = u.map((x, t) => {
+      const prev = cum[t] ?? 0
+      cum[t] = prev + x
+      return Math.min(MAX_UNITS, Math.round(cum[t] * k) - Math.round(prev * k))
+    })
+  }
+  return out
+}
+
+/** Everything the second (defended) fire run depends on beyond fireKey: null when firefighters are off. */
+export function brigadeKey(s: Scenario): string | null {
+  return s.brigades.enabled ? JSON.stringify(s.brigades) : null
 }
 
 /** The part of the scenario the fire depends on (the worker reruns the fire only when this changes). */

@@ -395,3 +395,54 @@ describe('input validation', () => {
     expect(nearestBurnableCell(inp.grid, new Uint8Array(100), inp.firebreak, 55, 3)).toBe(-1)
   })
 })
+
+describe('defended cells (firefighters)', () => {
+  // Wind from the west on grass: the fire runs east. A wall of defended cells across column 20.
+  const base = () => makeInput({ rows: 21, cols: 40, ignitions: [{ r: 10, c: 2 }], weather: { tempC: 30, rh: 30, windKmh: 20, windFromDeg: 270 }, params: { horizonMin: 600 } })
+  function defense(inp: FireInput, from: number, to: number, maxKwM: number) {
+    const n = inp.grid.rows * inp.grid.cols
+    const d = { fromMin: new Float32Array(n).fill(Infinity), toMin: new Float32Array(n).fill(Infinity), maxKwM: new Float32Array(n).fill(Infinity) }
+    for (let r = 0; r < inp.grid.rows; r++) {
+      const i = r * inp.grid.cols + 20
+      d.fromMin[i] = from
+      d.toMin[i] = to
+      d.maxKwM[i] = maxKwM
+    }
+    return d
+  }
+  it('with every fromMin Infinity it equals the run without defense bit for bit', () => {
+    const inp = base()
+    const plain = simulateFire(inp)
+    const n = inp.grid.rows * inp.grid.cols
+    const none = { fromMin: new Float32Array(n).fill(Infinity), toMin: new Float32Array(n).fill(Infinity), maxKwM: new Float32Array(n).fill(Infinity) }
+    const d = simulateFire({ ...inp, defense: none })
+    expect(Array.from(d.arrivalMin)).toEqual(Array.from(plain.arrivalMin))
+    expect(d.burnedCells).toBe(plain.burnedCells)
+  })
+  it('a line held while the front arrives does not burn and stops the spread like a break', () => {
+    const inp = base()
+    const plain = simulateFire(inp)
+    expect(at(inp, plain.arrivalMin, 10, 30)).toBeLessThan(Infinity)
+    const d = simulateFire({ ...inp, defense: defense(inp, 0, 600, Infinity) })
+    for (let r = 0; r < 21; r++) expect(at(inp, d.arrivalMin, r, 20)).toBe(Infinity)
+    expect(at(inp, d.arrivalMin, 10, 30)).toBe(Infinity)
+    expect(at(inp, d.arrivalMin, 10, 10)).toBe(at(inp, plain.arrivalMin, 10, 10))
+  })
+  it('a window that ends before the fire arrives changes nothing', () => {
+    const inp = base()
+    const plain = simulateFire(inp)
+    const d = simulateFire({ ...inp, defense: defense(inp, 0, 1, Infinity) })
+    expect(Array.from(d.arrivalMin)).toEqual(Array.from(plain.arrivalMin))
+  })
+  it('an intensity limit below the fire there has no effect', () => {
+    const inp = base()
+    const plain = simulateFire(inp)
+    const d = simulateFire({ ...inp, defense: defense(inp, 0, 600, 1) })
+    expect(Array.from(d.arrivalMin)).toEqual(Array.from(plain.arrivalMin))
+  })
+  it('rejects a defense of the wrong size', () => {
+    const inp = base()
+    const bad = { fromMin: new Float32Array(3), toMin: new Float32Array(3), maxKwM: new Float32Array(3) }
+    expect(() => simulateFire({ ...inp, defense: bad })).toThrow(/defense.fromMin/)
+  })
+})

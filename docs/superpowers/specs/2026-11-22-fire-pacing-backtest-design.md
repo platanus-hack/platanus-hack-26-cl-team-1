@@ -76,4 +76,4 @@ weights of the fit score, and which of (a)–(c) to implement after the diagnosi
 - The Concón METAR (approved mid-way) made every score worse and was dropped; mechanisms (a) and (c) did not
   fit the data (both fires ran at the same clock time, ~16:30, at different ages; no model shows a weather
   change then); (b) was a knife edge. Shipped instead: McArthur ×4 and matorral at half of it, the only change
-  better at all three winds. Numbers: `agent-kb/decisions.md` D-024, `web/src/engine/fire/MODEL.md` §6.
+  better at all three winds. Numbers: `agent-kb/decisions.md` D-027, `web/src/engine/fire/MODEL.md` §6.

@@ -64,6 +64,29 @@ export function drawFuel(canvas: HTMLCanvasElement, grid: GridMeta, fuel: Uint8A
   ctx.putImageData(img, 0, 0)
 }
 
+/** People per cell above which the population layer is drawn at full colour (log scale below it). */
+export const POPULATION_FULL_AT = 300
+
+/** People per cell at a given share of residents away (home + away * (work - home)): violet, more opaque and
+ *  lighter with more people, on a log scale; empty cells transparent. */
+export function drawPopulation(canvas: HTMLCanvasElement, grid: GridMeta, home: Float32Array, work: Float32Array, away: number) {
+  sizeCanvas(canvas, grid)
+  const ctx = canvas.getContext('2d')!
+  const img = ctx.createImageData(grid.cols, grid.rows)
+  const top = Math.log1p(POPULATION_FULL_AT)
+  for (let i = 0; i < home.length; i++) {
+    const n = home[i] + away * (work[i] - home[i])
+    if (n < 0.5) continue
+    const k = Math.min(1, Math.log1p(n) / top)
+    const o = i * 4
+    img.data[o] = Math.round(110 + 135 * k)
+    img.data[o + 1] = Math.round(60 + 150 * k)
+    img.data[o + 2] = 255
+    img.data[o + 3] = Math.round(70 + 170 * k)
+  }
+  ctx.putImageData(img, 0, 0)
+}
+
 /** Sentinel-2 burn scar at one pixel per cell: opaque outline cells, diagonal hatching and a faint tint, so
  *  it stays readable from the overview zoom (where one cell is about one screen pixel) to street level. */
 export function drawScar(canvas: HTMLCanvasElement, grid: GridMeta, scar: Uint8Array) {

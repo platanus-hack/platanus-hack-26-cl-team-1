@@ -1,0 +1,618 @@
+{
+ "note": "Curated by hand for Cortafuego (see pipeline/README.md, 'brigades.json'). units = [Bomba, Forestal, Aljibe, Escala/rescate]; unitsSource/source/arrivalSource null = supuesto.",
+ "stations": [
+  {
+   "id": "vina-1",
+   "cuerpo": "Viña del Mar",
+   "company": "1ª Compañía",
+   "lon": -71.55492,
+   "lat": -33.02634,
+   "units": [
+    1,
+    0,
+    0,
+    0
+   ],
+   "unitsSource": null,
+   "locationSource": "OpenStreetMap amenity=fire_station, way 549644355 (© OpenStreetMap contributors, ODbL)"
+  },
+  {
+   "id": "vina-2",
+   "cuerpo": "Viña del Mar",
+   "company": "2ª Compañía",
+   "lon": -71.5502,
+   "lat": -33.02511,
+   "units": [
+    1,
+    0,
+    0,
+    0
+   ],
+   "unitsSource": null,
+   "locationSource": "OpenStreetMap amenity=fire_station, way 553789282 (© OpenStreetMap contributors, ODbL)"
+  },
+  {
+   "id": "vina-3",
+   "cuerpo": "Viña del Mar",
+   "company": "3ª Compañía",
+   "lon": -71.52664,
+   "lat": -33.03613,
+   "units": [
+    1,
+    0,
+    0,
+    0
+   ],
+   "unitsSource": null,
+   "locationSource": "OpenStreetMap amenity=fire_station, way 553598274 (© OpenStreetMap contributors, ODbL)"
+  },
+  {
+   "id": "vina-4",
+   "cuerpo": "Viña del Mar",
+   "company": "4ª Compañía",
+   "lon": -71.54174,
+   "lat": -33.01268,
+   "units": [
+    1,
+    0,
+    0,
+    0
+   ],
+   "unitsSource": null,
+   "locationSource": "OpenStreetMap amenity=fire_station, way 629225917 (© OpenStreetMap contributors, ODbL)"
+  },
+  {
+   "id": "vina-5",
+   "cuerpo": "Viña del Mar",
+   "company": "5ª Compañía",
+   "lon": -71.51814,
+   "lat": -32.99791,
+   "units": [
+    1,
+    0,
+    0,
+    0
+   ],
+   "unitsSource": null,
+   "locationSource": "OpenStreetMap amenity=fire_station, way 629224530 (© OpenStreetMap contributors, ODbL)"
+  },
+  {
+   "id": "vina-7",
+   "cuerpo": "Viña del Mar",
+   "company": "7ª Compañía",
+   "lon": -71.55508,
+   "lat": -33.03363,
+   "units": [
+    1,
+    0,
+    0,
+    0
+   ],
+   "unitsSource": null,
+   "locationSource": "OpenStreetMap amenity=fire_station, node 259833419 (© OpenStreetMap contributors, ODbL)"
+  },
+  {
+   "id": "vina-8",
+   "cuerpo": "Viña del Mar",
+   "company": "8ª Compañía",
+   "lon": -71.53764,
+   "lat": -32.97219,
+   "units": [
+    1,
+    0,
+    0,
+    0
+   ],
+   "unitsSource": null,
+   "locationSource": "OpenStreetMap amenity=fire_station, node 255337542 (© OpenStreetMap contributors, ODbL)"
+  },
+  {
+   "id": "vina-9",
+   "cuerpo": "Viña del Mar",
+   "company": "9ª Compañía",
+   "lon": -71.48817,
+   "lat": -32.99963,
+   "units": [
+    1,
+    0,
+    0,
+    0
+   ],
+   "unitsSource": null,
+   "locationSource": "OpenStreetMap amenity=fire_station, way 629222134 (© OpenStreetMap contributors, ODbL)"
+  },
+  {
+   "id": "vina-10",
+   "cuerpo": "Viña del Mar",
+   "company": "10ª Compañía",
+   "lon": -71.50396,
+   "lat": -33.02246,
+   "units": [
+    1,
+    0,
+    0,
+    0
+   ],
+   "unitsSource": null,
+   "locationSource": "OpenStreetMap amenity=fire_station, way 604713392 (© OpenStreetMap contributors, ODbL)"
+  },
+  {
+   "id": "valpo-3",
+   "cuerpo": "Valparaíso",
+   "company": "3ª Compañía",
+   "lon": -71.61515,
+   "lat": -33.04743,
+   "units": [
+    1,
+    0,
+    0,
+    0
+   ],
+   "unitsSource": null,
+   "locationSource": "OpenStreetMap amenity=fire_station, way 358228711 (© OpenStreetMap contributors, ODbL)"
+  },
+  {
+   "id": "valpo-4",
+   "cuerpo": "Valparaíso",
+   "company": "4ª Compañía",
+   "lon": -71.61436,
+   "lat": -33.04451,
+   "units": [
+    1,
+    0,
+    0,
+    0
+   ],
+   "unitsSource": null,
+   "locationSource": "OpenStreetMap amenity=fire_station, node 4349771310 (© OpenStreetMap contributors, ODbL)"
+  },
+  {
+   "id": "valpo-5",
+   "cuerpo": "Valparaíso",
+   "company": "5ª Compañía",
+   "lon": -71.61428,
+   "lat": -33.0443,
+   "units": [
+    1,
+    0,
+    0,
+    0
+   ],
+   "unitsSource": null,
+   "locationSource": "OpenStreetMap amenity=fire_station, node 4349764507 (© OpenStreetMap contributors, ODbL)"
+  },
+  {
+   "id": "valpo-6",
+   "cuerpo": "Valparaíso",
+   "company": "6ª Compañía",
+   "lon": -71.61385,
+   "lat": -33.04872,
+   "units": [
+    1,
+    0,
+    0,
+    0
+   ],
+   "unitsSource": null,
+   "locationSource": "OpenStreetMap amenity=fire_station, way 333210771 (© OpenStreetMap contributors, ODbL)"
+  },
+  {
+   "id": "valpo-7",
+   "cuerpo": "Valparaíso",
+   "company": "7ª Compañía",
+   "lon": -71.61234,
+   "lat": -33.04703,
+   "units": [
+    1,
+    0,
+    0,
+    0
+   ],
+   "unitsSource": null,
+   "locationSource": "OpenStreetMap amenity=fire_station, way 333210770 (© OpenStreetMap contributors, ODbL)"
+  },
+  {
+   "id": "valpo-8",
+   "cuerpo": "Valparaíso",
+   "company": "8ª Compañía",
+   "lon": -71.62394,
+   "lat": -33.04274,
+   "units": [
+    1,
+    0,
+    0,
+    0
+   ],
+   "unitsSource": null,
+   "locationSource": "OpenStreetMap amenity=fire_station, node 4349769569 (© OpenStreetMap contributors, ODbL)"
+  },
+  {
+   "id": "valpo-9",
+   "cuerpo": "Valparaíso",
+   "company": "9ª Compañía",
+   "lon": -71.61428,
+   "lat": -33.04468,
+   "units": [
+    1,
+    0,
+    0,
+    0
+   ],
+   "unitsSource": null,
+   "locationSource": "OpenStreetMap amenity=fire_station, node 8282202634 (© OpenStreetMap contributors, ODbL)"
+  },
+  {
+   "id": "valpo-10",
+   "cuerpo": "Valparaíso",
+   "company": "10ª Compañía",
+   "lon": -71.61388,
+   "lat": -33.04859,
+   "units": [
+    0,
+    0,
+    0,
+    1
+   ],
+   "unitsSource": "Compañía de escalas y rescate; 'nuestro carro no maneja agua' (voluntaria de la 10ª, BioBioChile, 8 feb 2024: https://www.biobiochile.cl/especial/bbcl-investiga/noticias/articulos/2024/02/08/era-como-si-hubiese-caido-una-bomba-los-intimos-relatos-de-los-bomberos-de-la-tormenta-de-fuego.shtml). Uno solo: supuesto.",
+   "locationSource": "OpenStreetMap amenity=fire_station, node 4349764809 (© OpenStreetMap contributors, ODbL)"
+  },
+  {
+   "id": "valpo-11",
+   "cuerpo": "Valparaíso",
+   "company": "11ª Compañía",
+   "lon": -71.62403,
+   "lat": -33.04283,
+   "units": [
+    1,
+    0,
+    0,
+    0
+   ],
+   "unitsSource": null,
+   "locationSource": "OpenStreetMap amenity=fire_station, way 333210773 (© OpenStreetMap contributors, ODbL)"
+  },
+  {
+   "id": "valpo-13",
+   "cuerpo": "Valparaíso",
+   "company": "13ª Compañía",
+   "lon": -71.57418,
+   "lat": -33.11863,
+   "units": [
+    1,
+    0,
+    0,
+    0
+   ],
+   "unitsSource": null,
+   "locationSource": "OpenStreetMap amenity=fire_station, way 891109981 (© OpenStreetMap contributors, ODbL)"
+  },
+  {
+   "id": "valpo-14",
+   "cuerpo": "Valparaíso",
+   "company": "14ª Compañía",
+   "lon": -71.57473,
+   "lat": -33.04952,
+   "units": [
+    1,
+    0,
+    0,
+    0
+   ],
+   "unitsSource": null,
+   "locationSource": "OpenStreetMap amenity=fire_station, way 553332703 (© OpenStreetMap contributors, ODbL)"
+  },
+  {
+   "id": "valpo-15",
+   "cuerpo": "Valparaíso",
+   "company": "15ª Compañía",
+   "lon": -71.57665,
+   "lat": -33.05815,
+   "units": [
+    1,
+    0,
+    0,
+    0
+   ],
+   "unitsSource": null,
+   "locationSource": "OpenStreetMap amenity=fire_station, node 4395581889 (© OpenStreetMap contributors, ODbL)"
+  },
+  {
+   "id": "quilpue-1",
+   "cuerpo": "Quilpué",
+   "company": "1ª Compañía",
+   "lon": -71.43885,
+   "lat": -33.04596,
+   "units": [
+    1,
+    0,
+    0,
+    0
+   ],
+   "unitsSource": null,
+   "locationSource": "OpenStreetMap amenity=fire_station, way 709066488 (© OpenStreetMap contributors, ODbL)"
+  },
+  {
+   "id": "quilpue-2",
+   "cuerpo": "Quilpué",
+   "company": "2ª Compañía",
+   "lon": -71.44315,
+   "lat": -33.04954,
+   "units": [
+    1,
+    0,
+    0,
+    0
+   ],
+   "unitsSource": null,
+   "locationSource": "OpenStreetMap amenity=fire_station, way 405942737 (© OpenStreetMap contributors, ODbL)"
+  },
+  {
+   "id": "quilpue-3",
+   "cuerpo": "Quilpué",
+   "company": "3ª Compañía",
+   "lon": -71.43985,
+   "lat": -33.03765,
+   "units": [
+    1,
+    0,
+    0,
+    0
+   ],
+   "unitsSource": null,
+   "locationSource": "OpenStreetMap amenity=fire_station, way 507424589 (© OpenStreetMap contributors, ODbL)"
+  },
+  {
+   "id": "quilpue-4",
+   "cuerpo": "Quilpué",
+   "company": "4ª Compañía",
+   "lon": -71.41946,
+   "lat": -33.04898,
+   "units": [
+    1,
+    0,
+    0,
+    0
+   ],
+   "unitsSource": null,
+   "locationSource": "OpenStreetMap amenity=fire_station, way 394885574 (© OpenStreetMap contributors, ODbL)"
+  },
+  {
+   "id": "quilpue-5",
+   "cuerpo": "Quilpué",
+   "company": "5ª Compañía",
+   "lon": -71.4361,
+   "lat": -33.06341,
+   "units": [
+    1,
+    0,
+    0,
+    0
+   ],
+   "unitsSource": null,
+   "locationSource": "OpenStreetMap amenity=fire_station, node 4969327284 (© OpenStreetMap contributors, ODbL)"
+  },
+  {
+   "id": "valemana-1",
+   "cuerpo": "Villa Alemana",
+   "company": "1ª Compañía",
+   "lon": -71.37251,
+   "lat": -33.04764,
+   "units": [
+    1,
+    0,
+    0,
+    0
+   ],
+   "unitsSource": null,
+   "locationSource": "OpenStreetMap amenity=fire_station, way 421693624 (© OpenStreetMap contributors, ODbL)"
+  },
+  {
+   "id": "valemana-2",
+   "cuerpo": "Villa Alemana",
+   "company": "2ª Compañía",
+   "lon": -71.37181,
+   "lat": -33.04335,
+   "units": [
+    1,
+    0,
+    0,
+    0
+   ],
+   "unitsSource": null,
+   "locationSource": "OpenStreetMap amenity=fire_station, way 707963268 (© OpenStreetMap contributors, ODbL)"
+  },
+  {
+   "id": "valemana-4",
+   "cuerpo": "Villa Alemana",
+   "company": "4ª Compañía",
+   "lon": -71.39105,
+   "lat": -33.05602,
+   "units": [
+    1,
+    0,
+    0,
+    0
+   ],
+   "unitsSource": null,
+   "locationSource": "OpenStreetMap amenity=fire_station, node 7688288006 (© OpenStreetMap contributors, ODbL)"
+  }
+ ],
+ "dispatch": [
+  {
+   "cuerpo": "Viña del Mar",
+   "dispatchLocal": "2024-02-02T15:10",
+   "source": "Acuartelamiento del Cuerpo de Bomberos de Viña del Mar a las 15:10 (La Tercera, 14 abr 2024: https://www.latercera.com/la-tercera-domingo/noticia/crisis-del-fuego-la-saga-de-fallas-y-errores-en-los-incendios-de-vina-del-mar-y-quilpue/YOSCAZ3H2ZCMZKXZ2YQOW7CYLU/)"
+  },
+  {
+   "cuerpo": "Valparaíso",
+   "dispatchLocal": "2024-02-02T15:10",
+   "source": null
+  },
+  {
+   "cuerpo": "Quilpué",
+   "dispatchLocal": "2024-02-02T15:10",
+   "source": null
+  },
+  {
+   "cuerpo": "Villa Alemana",
+   "dispatchLocal": "2024-02-02T15:10",
+   "source": null
+  }
+ ],
+ "reinforcements": [
+  {
+   "id": "rm",
+   "label": "Refuerzo Región Metropolitana",
+   "units": [
+    50,
+    0,
+    0,
+    0
+   ],
+   "source": "50 carros de la Región Metropolitana anunciados el 2 feb 2024 (Radio Prensa: https://www.radioprensa.cl/bomberos-de-la-region-metropolitana-acuden-a-vina-del-mar-para-apoyar-en-combate-de-incendio/). Todos como carro bomba: supuesto.",
+   "arrivalLocal": "2024-02-02T21:00",
+   "arrivalSource": null,
+   "entries": [
+    {
+     "label": "Ruta 68 (desde Casablanca)",
+     "lon": -71.47523,
+     "lat": -33.21384,
+     "delayMin": 0,
+     "source": "OpenStreetMap amenity=fire_station, Ruta 68, ref 68 (© OpenStreetMap contributors, ODbL)"
+    },
+    {
+     "label": "Ruta 60 (desde Quillota)",
+     "lon": -71.29584,
+     "lat": -32.966,
+     "delayMin": 45,
+     "source": null
+    }
+   ]
+  }
+ ],
+ "cuts": [
+  {
+   "id": "ruta68",
+   "label": "Ruta 68 cortada",
+   "lines": [
+    [
+     [
+      -71.47523,
+      -33.21384
+     ],
+     [
+      -71.48218,
+      -33.20729
+     ],
+     [
+      -71.49091,
+      -33.19895
+     ],
+     [
+      -71.49781,
+      -33.19054
+     ],
+     [
+      -71.50502,
+      -33.18155
+     ],
+     [
+      -71.50899,
+      -33.17818
+     ],
+     [
+      -71.51963,
+      -33.17275
+     ],
+     [
+      -71.53005,
+      -33.16744
+     ],
+     [
+      -71.5342,
+      -33.16532
+     ],
+     [
+      -71.54184,
+      -33.16128
+     ],
+     [
+      -71.55063,
+      -33.1568
+     ],
+     [
+      -71.55508,
+      -33.15441
+     ],
+     [
+      -71.55719,
+      -33.15196
+     ],
+     [
+      -71.5585,
+      -33.14929
+     ],
+     [
+      -71.56048,
+      -33.14528
+     ],
+     [
+      -71.56236,
+      -33.14138
+     ],
+     [
+      -71.56298,
+      -33.13875
+     ],
+     [
+      -71.56248,
+      -33.1337
+     ],
+     [
+      -71.56174,
+      -33.12808
+     ],
+     [
+      -71.56136,
+      -33.12364
+     ],
+     [
+      -71.5609,
+      -33.11953
+     ],
+     [
+      -71.56014,
+      -33.11274
+     ],
+     [
+      -71.55957,
+      -33.11099
+     ],
+     [
+      -71.55708,
+      -33.10916
+     ],
+     [
+      -71.5524,
+      -33.10775
+     ],
+     [
+      -71.54913,
+      -33.1062
+     ],
+     [
+      -71.54822,
+      -33.10136
+     ],
+     [
+      -71.54762,
+      -33.09881
+     ]
+    ]
+   ],
+   "fromLocal": "2024-02-02T17:00",
+   "toLocal": null,
+   "source": "La Ruta 68 se mantenía cortada desde las 17:00 (La Tercera, 14 abr 2024: https://www.latercera.com/la-tercera-domingo/noticia/crisis-del-fuego-la-saga-de-fallas-y-errores-en-los-incendios-de-vina-del-mar-y-quilpue/YOSCAZ3H2ZCMZKXZ2YQOW7CYLU/). Trazado: OpenStreetMap amenity=fire_station, ref 68 (© OpenStreetMap contributors, ODbL); hora de reapertura sin fuente (se deja cortada hasta el final)."
+  }
+ ]
+}

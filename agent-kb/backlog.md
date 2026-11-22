@@ -8,15 +8,23 @@ Owner in brackets once someone takes an item. Project: Cortafuego (D-019). The O
   in the browser. [Alonso + agents]
 - [ ] **Calibrate and validate** against the Sentinel-2 scar: `make validate` prints the overlap (Dice) used in
   the pitch; tune `rosMultiplier` and the per-fuel factors, in-sample, and say so. [Alonso + agents]
-  Pace against satellite passes (GOES-16 + VIIRS/MODIS) done (D-024) [Anaís + agent].
+  Pace against satellite passes (GOES-16 + VIIRS/MODIS) done (D-027) [Anaís + agent].
 - [ ] **Submission files:** `project-description.md`, the one-liner and description in the jsonc, a 1000×1000
   logo (≤ 500 KB), a short README written by the team. [team]
+  - Logo ready (D-025): `project-logo.svg` and `project-logo.png` (1000×1000, 58.9 KB); remaining submission
+    text still needs the team's review.
 - [ ] **Pitch (3 min):** sober opening on 2 Feb 2024, live demo (wind, humidity, firebreak, alert time), the
   validation number, who pays (comunas under Ley 21.364, forestry companies, distributors, insurers). [team]
 
 ## Next
 - [ ] Western stall of 14:05–16:25 (satellite) not reproduced: needs a cause the data shows (initial attack?
   local wind?); see `web/src/engine/fire/MODEL.md` section 6.
+- [ ] Bomberos (D-026): real inventories per company (ask each cuerpo), reopening time of Ruta 68, hydrant
+  availability as a variable, congestion slowing the trucks, units that move between sectors.
+- [ ] Evacuation by time of day: people per building at the alert time from the population layers (D-024),
+  instead of a fixed 2.9 per household; offices and schools as origins on weekdays.
+- [ ] Better job proxy for old mixed-use centres (business POIs, the origin-destination surveys, SII employment by
+  comuna); public holidays and February vacations in the presence model.
 - [ ] Congestion on evacuation routes (today free flow).
 - [ ] Ensemble (perturbed wind and spotting) for a burn-probability map and a range on the counts.
 - [ ] A second event (Penco / Lirquén, January 2026) to show it generalises.
@@ -25,6 +33,9 @@ Owner in brackets once someone takes an item. Project: Cortafuego (D-019). The O
 - [ ] Any comuna: bake the data for another bounding box from the same pipeline.
 
 ## Done
+- [x] Bomberos: companies, trucks per type, dispatch, Ruta 68 cut, defended cells, rescue (D-026). [Anaís + agent]
+- [x] **Where people are by time of day, all of Chile** (D-024): national population product + grid layers,
+  presence model, "personas donde llega el fuego" and a map layer. Branch `feat/population-by-hour`.
 - [x] Pivot research and decision (D-019).
 - [x] **Public deploy:** Render Static Site behind Cloudflare at https://cortafuego.app (D-022), with
   `www` redirecting to the apex. Deployment metadata and session notes are on `codex/render-cloudflare`.

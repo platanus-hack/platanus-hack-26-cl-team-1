@@ -229,3 +229,13 @@ function normDeg(d: number): number {
   const r = d % 360
   return r < 0 ? r + 360 : r
 }
+
+/** Byram fireline intensity I = H w R (kW/m with H kJ/kg, w kg/m^2 consumed, R m/s), used only to decide
+ *  whether firefighters can attack a cell directly (FireInput.defense.maxKwM). */
+export const FIRELINE = {
+  /** Low heat of combustion of fine fuels, the value Byram's intensity is usually computed with. */
+  heatKJPerKg: 18000,
+  /** Grass fuel load for grass-model fuels (their spread model needs none): 4.5 t/ha, the standard natural
+   *  pasture load of the CSIRO grassland model (Cheney & Sullivan 2008, Grassfires, CSIRO Publishing). */
+  grassLoadTHa: 4.5,
+} as const

@@ -1,8 +1,9 @@
 // Loads and validates the baked data files in web/public/data/ (formats in src/engine/types.ts).
 // Every malformed file throws a DataError naming the file; the UI shows it. No silent fallbacks: the synthetic
 // dataset is used only when grid.json is absent altogether (data not baked yet), and the UI says so.
-import type { FirmsPoint, GridMeta, IgnitionPreset, RoadsFile, WeatherFile } from '../engine/types'
-import { FUEL, ROAD } from '../engine/types'
+import type { BrigadesFile, BrigadeStation, FirmsPoint, GridMeta, IgnitionPreset, NationalPopulation, NationalPopulationMeta, Reinforcement, RoadsFile, RouteCut, WeatherFile } from '../engine/types'
+import { FUEL, ROAD, UNIT_COUNT } from '../engine/types'
+import { lonLatToColRow } from './grid'
 import { wallClockMin } from './time'
 
 export interface Dataset {
@@ -15,6 +16,11 @@ export interface Dataset {
   weather: WeatherFile
   ignitions: IgnitionPreset[]
   firms: FirmsPoint[]
+  brigades: BrigadesFile
+  /** Residents per cell (population_home.bin) and people per cell when everyone is at work or school
+   *  (population_work.bin); src/engine/population combines them by time of day. */
+  populationHome: Float32Array
+  populationWork: Float32Array
   /** true when this is the in-browser synthetic dataset (src/data/mock.ts). */
   synthetic: boolean
 }
@@ -113,6 +119,73 @@ export function parseElevation(buf: ArrayBuffer, cells: number): Float32Array {
   for (let i = 0; i < a.length; i++)
     if (!Number.isFinite(a[i])) throw new DataError('elevation.bin', `valor no finito en la celda ${i}`)
   return a
+}
+
+/** population_home.bin / population_work.bin: Float32 persons per cell, finite and >= 0. */
+export function parsePopulationLayer(file: string, buf: ArrayBuffer, cells: number): Float32Array {
+  checkBinary(file, buf, cells * 4)
+  const a = new Float32Array(buf)
+  for (let i = 0; i < a.length; i++)
+    if (!(a[i] >= 0 && Number.isFinite(a[i]))) throw new DataError(file, `valor ${a[i]} en la celda ${i} (se esperan personas >= 0)`)
+  return a
+}
+
+/** national/population_cl.json + .bin (layout in NationalPopulationMeta). Checks sizes, ascending in-range
+ *  cells, non-negative values, and that the stored totals match the data (home and work within 0.1 %). */
+export function parseNationalPopulation(metaJson: unknown, buf: ArrayBuffer): NationalPopulation {
+  const f = 'national/population_cl.json'
+  const fb = 'national/population_cl.bin'
+  if (!isObj(metaJson)) throw new DataError(f, 'no es un objeto JSON')
+  const j = metaJson
+  if (j.version !== 1) throw new DataError(f, `versión ${String(j.version)} desconocida (se espera 1)`)
+  const commute = j.commute
+  const totals = j.totals
+  if (!isObj(commute) || !isObj(totals)) throw new DataError(f, 'faltan "commute" o "totals"')
+  const meta: NationalPopulationMeta = {
+    version: 1,
+    lonMin: num(f, j, 'lonMin'),
+    latMax: num(f, j, 'latMax'),
+    dLon: num(f, j, 'dLon'),
+    dLat: num(f, j, 'dLat'),
+    rows: num(f, j, 'rows'),
+    cols: num(f, j, 'cols'),
+    n: num(f, j, 'n'),
+    layout: str(f, j, 'layout'),
+    commute: { scaleM: num(f, commute, 'scaleM'), maxM: num(f, commute, 'maxM') },
+    totals: {
+      home: num(f, totals, 'home'),
+      work: num(f, totals, 'work'),
+      stayHome: num(f, totals, 'stayHome'),
+      nonResidentialMillionM3: num(f, totals, 'nonResidentialMillionM3'),
+    },
+    source: str(f, j, 'source'),
+  }
+  const { n, rows, cols } = meta
+  if (![n, rows, cols].every((v) => Number.isInteger(v) && v > 0)) throw new DataError(f, 'n, rows y cols deben ser enteros positivos')
+  checkBinary(fb, buf, n * 16)
+  const cell = new Uint32Array(buf, 0, n)
+  const home = new Float32Array(buf, 4 * n, n)
+  const work = new Float32Array(buf, 8 * n, n)
+  const nonResidentialM3 = new Float32Array(buf, 12 * n, n)
+  let sumHome = 0
+  let sumWork = 0
+  for (let i = 0; i < n; i++) {
+    if (cell[i] >= rows * cols || (i > 0 && cell[i] <= cell[i - 1])) throw new DataError(fb, `celda ${cell[i]} (posición ${i}) fuera de rango o no creciente`)
+    for (const [name, a] of [
+      ['home', home],
+      ['work', work],
+      ['nonResidentialM3', nonResidentialM3],
+    ] as const)
+      if (!(a[i] >= 0 && Number.isFinite(a[i]))) throw new DataError(fb, `${name} inválido (${a[i]}) en la posición ${i}`)
+    sumHome += home[i]
+    sumWork += work[i]
+  }
+  for (const [name, got, want] of [
+    ['home', sumHome, meta.totals.home],
+    ['work', sumWork, meta.totals.work],
+  ] as const)
+    if (Math.abs(got - want) > 1e-3 * want) throw new DataError(fb, `la suma de ${name} (${Math.round(got)}) no coincide con totals.${name} (${want})`)
+  return { meta, cell, home, work, nonResidentialM3 }
 }
 
 export function parseBuildings(buf: ArrayBuffer): Float32Array {
@@ -251,6 +324,98 @@ async function fetchBin(file: string): Promise<ArrayBuffer> {
 }
 
 /** Returns null when the real data has not been baked yet (no grid.json). Throws DataError otherwise. */
+function insideGrid(file: string, g: GridMeta, lon: number, lat: number, what: string) {
+  const [c, r] = lonLatToColRow(g, lon, lat)
+  if (!(c >= 0 && c < g.cols && r >= 0 && r < g.rows)) throw new DataError(file, `${what} (${lon}, ${lat}) queda fuera de la grilla`)
+}
+function nullableStr(file: string, o: Obj, k: string): string | null {
+  if (o[k] === null) return null
+  return str(file, o, k)
+}
+function units(file: string, o: Obj, what: string): number[] {
+  const u = o.units
+  if (!Array.isArray(u) || u.length !== UNIT_COUNT || !u.every((x) => Number.isInteger(x) && x >= 0))
+    throw new DataError(file, `${what}: "units" debe ser una lista de ${UNIT_COUNT} enteros >= 0 [Bomba, Forestal, Aljibe, Escala/rescate]`)
+  return u as number[]
+}
+function list(file: string, o: Obj, k: string): Obj[] {
+  const v = o[k]
+  if (!Array.isArray(v) || !v.every(isObj)) throw new DataError(file, `"${k}" debe ser una lista de objetos`)
+  return v as Obj[]
+}
+
+/** brigades.json: hand-curated fire companies, dispatch times, reinforcements and historical road cuts. */
+export function parseBrigades(j: unknown, g: GridMeta): BrigadesFile {
+  const f = 'brigades.json'
+  if (!isObj(j)) throw new DataError(f, 'no es un objeto JSON')
+  const dispatch = list(f, j, 'dispatch').map((d) => {
+    const x = { cuerpo: str(f, d, 'cuerpo'), dispatchLocal: str(f, d, 'dispatchLocal'), source: nullableStr(f, d, 'source') }
+    checkTime(f, x.dispatchLocal)
+    return x
+  })
+  const cuerpos = new Set(dispatch.map((d) => d.cuerpo))
+  if (cuerpos.size !== dispatch.length) throw new DataError(f, 'un cuerpo aparece dos veces en "dispatch"')
+  const ids = new Set<string>()
+  const uniqueId = (id: string) => {
+    if (ids.has(id)) throw new DataError(f, `id duplicado "${id}"`)
+    ids.add(id)
+    return id
+  }
+  const stations: BrigadeStation[] = list(f, j, 'stations').map((s) => {
+    const x: BrigadeStation = {
+      id: uniqueId(str(f, s, 'id')),
+      cuerpo: str(f, s, 'cuerpo'),
+      company: str(f, s, 'company'),
+      lon: num(f, s, 'lon'),
+      lat: num(f, s, 'lat'),
+      units: units(f, s, `estación ${String(s.id)}`),
+      unitsSource: nullableStr(f, s, 'unitsSource'),
+      locationSource: str(f, s, 'locationSource'),
+    }
+    if (!cuerpos.has(x.cuerpo)) throw new DataError(f, `la estación ${x.id} es del cuerpo "${x.cuerpo}", que no tiene hora de despacho en "dispatch"`)
+    insideGrid(f, g, x.lon, x.lat, `la estación ${x.id}`)
+    return x
+  })
+  if (stations.length === 0) throw new DataError(f, 'no tiene estaciones')
+  const reinforcements: Reinforcement[] = list(f, j, 'reinforcements').map((r) => {
+    const x: Reinforcement = {
+      id: uniqueId(str(f, r, 'id')),
+      label: str(f, r, 'label'),
+      units: units(f, r, `refuerzo ${String(r.id)}`),
+      source: nullableStr(f, r, 'source'),
+      arrivalLocal: str(f, r, 'arrivalLocal'),
+      arrivalSource: nullableStr(f, r, 'arrivalSource'),
+      entries: list(f, r, 'entries').map((e) => {
+        const y = { label: str(f, e, 'label'), lon: num(f, e, 'lon'), lat: num(f, e, 'lat'), delayMin: num(f, e, 'delayMin'), source: nullableStr(f, e, 'source') }
+        if (y.delayMin < 0) throw new DataError(f, `entrada "${y.label}": delayMin < 0`)
+        insideGrid(f, g, y.lon, y.lat, `la entrada "${y.label}"`)
+        return y
+      }),
+    }
+    checkTime(f, x.arrivalLocal)
+    if (x.entries.length === 0) throw new DataError(f, `el refuerzo ${x.id} no tiene entradas`)
+    return x
+  })
+  const cuts: RouteCut[] = list(f, j, 'cuts').map((c) => {
+    const lines = c.lines
+    if (!Array.isArray(lines) || lines.length === 0 || !lines.every((l) => Array.isArray(l) && l.length >= 2 && l.every((p) => Array.isArray(p) && p.length === 2 && p.every((v) => typeof v === 'number' && Number.isFinite(v)))))
+      throw new DataError(f, `corte ${String(c.id)}: "lines" debe ser una lista de polilíneas [lon, lat] de 2 o más puntos`)
+    const x: RouteCut = {
+      id: uniqueId(str(f, c, 'id')),
+      label: str(f, c, 'label'),
+      lines: lines as [number, number][][],
+      fromLocal: str(f, c, 'fromLocal'),
+      toLocal: nullableStr(f, c, 'toLocal'),
+      source: str(f, c, 'source'),
+    }
+    checkTime(f, x.fromLocal)
+    if (x.toLocal !== null) checkTime(f, x.toLocal)
+    for (const l of x.lines) for (const [lon, lat] of l) insideGrid(f, g, lon, lat, `un punto del corte ${x.id}`)
+    return x
+  })
+  return { stations, dispatch, reinforcements, cuts }
+}
+
 export async function loadRealDataset(): Promise<Dataset | null> {
   let probe: Response
   try {
@@ -268,7 +433,7 @@ export async function loadRealDataset(): Promise<Dataset | null> {
   }
   const grid = parseGrid(gridJson)
   const cells = grid.rows * grid.cols
-  const [elev, fuel, scar, bld, roads, weather, ignitions, firms] = await Promise.all([
+  const [elev, fuel, scar, bld, roads, weather, ignitions, firms, popHome, popWork, brigades] = await Promise.all([
     fetchBin('elevation.bin'),
     fetchBin('fuel.bin'),
     fetchBin('scar.bin'),
@@ -277,6 +442,9 @@ export async function loadRealDataset(): Promise<Dataset | null> {
     fetchJson('weather.json'),
     fetchJson('ignitions.json'),
     fetchJson('firms.json'),
+    fetchBin('population_home.bin'),
+    fetchBin('population_work.bin'),
+    fetchJson('brigades.json'),
   ])
   return {
     grid,
@@ -288,6 +456,16 @@ export async function loadRealDataset(): Promise<Dataset | null> {
     weather: parseWeather(weather),
     ignitions: parseIgnitions(ignitions),
     firms: parseFirms(firms),
+    brigades: parseBrigades(brigades, grid),
+    populationHome: parsePopulationLayer('population_home.bin', popHome, cells),
+    populationWork: parsePopulationLayer('population_work.bin', popWork, cells),
     synthetic: false,
   }
+}
+
+/** The national population product (all of Chile, ~0.9 km), for scenarios outside the baked grid. Not loaded
+ *  by the explorer today: 4 MB that the Viña del Mar grid does not need. */
+export async function loadNationalPopulation(): Promise<NationalPopulation> {
+  const [meta, bin] = await Promise.all([fetchJson('national/population_cl.json'), fetchBin('national/population_cl.bin')])
+  return parseNationalPopulation(meta, bin)
 }

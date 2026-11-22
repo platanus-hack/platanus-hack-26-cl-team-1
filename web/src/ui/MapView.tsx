@@ -5,10 +5,10 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import type { Dataset } from '../data/load'
 import { gridBounds, gridCorners } from '../data/grid'
 import { localToMin } from '../data/time'
-import type { EvacOut, FireOut } from '../worker/protocol'
+import type { BrigadesOut, EvacOut, FireOut } from '../worker/protocol'
 import type { Scenario } from '../worker/scenario'
 import { HOUSEHOLD } from '../engine/types'
-import { drawFire, drawFuel, drawHillshade, drawScar } from './overlays'
+import { drawFire, drawFuel, drawHillshade, drawPopulation, drawScar } from './overlays'
 import type { Feature, FeatureCollection, LineString, SetDataArg } from './geo'
 
 export type Tool = 'none' | 'ignition' | 'firebreak' | 'closeRoad' | 'link'
@@ -29,6 +29,8 @@ export interface LayerToggles {
   firms: boolean
   cicatriz: boolean
   combustible: boolean
+  bomberos: boolean
+  poblacion: boolean
 }
 
 export const BASE_STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty'
@@ -48,8 +50,11 @@ interface Props {
   data: Dataset
   fire: FireOut | null
   evac: EvacOut | null
+  brigades: BrigadesOut | null
   safe: Uint8Array | null
   clock: number
+  /** Share of residents at work or school at the clock's time (src/engine/population), for the population layer. */
+  awayNow: number
   layers: LayerToggles
   showRoutes: boolean
   terrain3d: boolean
@@ -84,6 +89,7 @@ export function MapView(props: Props) {
     fuel: document.createElement('canvas'),
     scar: document.createElement('canvas'),
     hill: document.createElement('canvas'),
+    pop: document.createElement('canvas'),
   })
   const roadGeoms = useRef<LineString[]>([])
   const popup = useRef<maplibregl.Popup | null>(null)
@@ -99,6 +105,18 @@ export function MapView(props: Props) {
     const { data, fire, clock } = p.current
     drawFire(canvases.current.fire, data.grid, fire?.arrivalMin ?? null, fire?.rosMPerMin ?? null, clock)
     const s = map.getSource('fire') as CanvasSource | undefined
+    if (s) {
+      s.play()
+      s.pause()
+    }
+  }
+
+  function updatePopulation() {
+    const map = mapRef.current
+    if (!map || !ready.current) return
+    const { data, awayNow } = p.current
+    drawPopulation(canvases.current.pop, data.grid, data.populationHome, data.populationWork, awayNow)
+    const s = map.getSource('pop') as CanvasSource | undefined
     if (s) {
       s.play()
       s.pause()
@@ -197,6 +215,39 @@ export function MapView(props: Props) {
     src('ignitions')?.setData(fc(feats))
   }
 
+  function updateBrigades() {
+    // Road geometries are filled when the layers are set up; syncAll() reruns this then.
+    if (!ready.current) return
+    const { data, brigades, scenario } = p.current
+    const on = scenario.brigades.enabled
+    const out = on ? brigades : null
+    const stations: Feature[] = on
+      ? [
+          ...data.brigades.stations.map((s): Feature => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [s.lon, s.lat] }, properties: { entry: 0 } })),
+          ...data.brigades.reinforcements.flatMap((r) =>
+            r.entries.map((e): Feature => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [e.lon, e.lat] }, properties: { entry: 1 } })),
+          ),
+        ]
+      : []
+    src('brig-stations')?.setData(fc(stations))
+    const routeEdges = new Set<number>()
+    const sites = new Map<number, number>()
+    if (out)
+      for (const u of out.units)
+        if (u.status === 'deployed') {
+          for (const e of u.path) routeEdges.add(e)
+          sites.set(u.siteNode, (sites.get(u.siteNode) ?? 0) + 1)
+        }
+    const lines = (edges: Iterable<number>): Feature[] => [
+      { type: 'Feature', geometry: { type: 'MultiLineString', coordinates: [...edges].map((e) => roadGeoms.current[e].coordinates) }, properties: {} },
+    ]
+    src('brig-routes')?.setData(fc(lines(routeEdges)))
+    src('brig-cuts')?.setData(fc(lines(out ? out.cutEdges : [])))
+    src('brig-sites')?.setData(
+      fc([...sites].map(([n, k]): Feature => ({ type: 'Feature', geometry: { type: 'Point', coordinates: data.roads.nodes[n] }, properties: { n: k } }))),
+    )
+  }
+
   function setVis(id: string, on: boolean) {
     const map = mapRef.current
     if (map?.getLayer(id)) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none')
@@ -207,12 +258,14 @@ export function MapView(props: Props) {
     setVis('fire', L.fuego)
     setVis('fuel', L.combustible)
     setVis('scar', L.cicatriz)
+    setVis('pop', L.poblacion)
     setVis('roads', L.calles)
     setVis('roads-closed', L.calles)
     setVis('links', L.calles)
     setVis('links-pt', L.calles)
     setVis('bld-all', L.viviendas)
     setVis('bld-status', L.viviendas)
+    for (const id of ['brig-cuts', 'brig-routes', 'brig-sites', 'brig-stations']) setVis(id, L.bomberos)
     setVis('safe', L.zonasSeguras)
     setVis('firebreaks', L.cortafuegos)
     setVis('firebreaks-casing', L.cortafuegos)
@@ -234,6 +287,7 @@ export function MapView(props: Props) {
   function syncAll() {
     updateClockState()
     updateFire()
+    updatePopulation()
     updateRoads()
     updateLinks()
     updateBuildings()
@@ -241,6 +295,7 @@ export function MapView(props: Props) {
     updateFirebreaks()
     updateDraft()
     updateIgnitions()
+    updateBrigades()
     updateVisibility()
     updateTerrain()
   }
@@ -278,6 +333,10 @@ export function MapView(props: Props) {
     map.addSource('fuel', { type: 'canvas', canvas: canvases.current.fuel, coordinates: corners, animate: false })
     map.addLayer({ id: 'fuel', type: 'raster', source: 'fuel', paint: { 'raster-resampling': 'nearest', 'raster-fade-duration': 0 } }, firstSymbol)
 
+    drawPopulation(canvases.current.pop, g, data.populationHome, data.populationWork, p.current.awayNow)
+    map.addSource('pop', { type: 'canvas', canvas: canvases.current.pop, coordinates: corners, animate: false })
+    map.addLayer({ id: 'pop', type: 'raster', source: 'pop', paint: { 'raster-resampling': 'nearest', 'raster-fade-duration': 0 } }, firstSymbol)
+
     drawScar(canvases.current.scar, g, data.scar)
     map.addSource('scar', { type: 'canvas', canvas: canvases.current.scar, coordinates: corners, animate: false })
 
@@ -287,7 +346,7 @@ export function MapView(props: Props) {
     map.addLayer({ id: 'scar', type: 'raster', source: 'scar', paint: { 'raster-resampling': 'nearest', 'raster-fade-duration': 0 } }, firstSymbol)
 
     const empty = fc([])
-    for (const id of ['roads', 'links', 'bld-all', 'bld-status', 'safe', 'firebreaks', 'draft', 'ignitions', 'firms'])
+    for (const id of ['roads', 'links', 'bld-all', 'bld-status', 'safe', 'firebreaks', 'draft', 'ignitions', 'firms', 'brig-cuts', 'brig-routes', 'brig-sites', 'brig-stations'])
       map.addSource(id, { type: 'geojson', data: empty })
 
     // MapLibre's tile workers may evaluate a layer before they receive the global state (null for a moment);
@@ -431,6 +490,27 @@ export function MapView(props: Props) {
         'circle-color': ['case', ['==', ['get', 'on'], 1], ['case', ['==', ['get', 'user'], 1], '#ff8c42', '#ff3d2e'], 'rgba(0,0,0,0)'] as never,
         'circle-stroke-color': ['case', ['==', ['get', 'on'], 1], '#ffffff', '#9aa4b5'] as never,
         'circle-stroke-width': 2,
+      },
+    })
+
+    // Firefighters: historical cuts, unit routes, work sites, cuarteles and reinforcement entries.
+    map.addLayer({ id: 'brig-cuts', type: 'line', source: 'brig-cuts', paint: { 'line-color': '#ef4444', 'line-width': 5, 'line-opacity': 0.85, 'line-dasharray': [1, 1] } })
+    map.addLayer({ id: 'brig-routes', type: 'line', source: 'brig-routes', paint: { 'line-color': '#38bdf8', 'line-width': 2.5, 'line-opacity': 0.85 } })
+    map.addLayer({
+      id: 'brig-sites',
+      type: 'circle',
+      source: 'brig-sites',
+      paint: { 'circle-radius': ['min', 14, ['+', 5, ['get', 'n']]] as never, 'circle-color': 'rgba(56, 189, 248, 0.25)', 'circle-stroke-color': '#38bdf8', 'circle-stroke-width': 2 },
+    })
+    map.addLayer({
+      id: 'brig-stations',
+      type: 'circle',
+      source: 'brig-stations',
+      paint: {
+        'circle-radius': 5,
+        'circle-color': ['case', ['==', ['get', 'entry'], 1], '#a78bfa', '#38bdf8'] as never,
+        'circle-stroke-color': '#ffffff',
+        'circle-stroke-width': 1.5,
       },
     })
 
@@ -678,6 +758,8 @@ export function MapView(props: Props) {
 
   // ---------------------------------------------------------------- prop -> map sync
   useEffect(updateFire, [props.fire, props.clock])
+  // The away share only changes during the morning and evening ramps: redraw when it moves by 0.5 points.
+  useEffect(updatePopulation, [Math.round(props.awayNow * 200)])
   useEffect(updateClockState, [Math.floor(props.clock / CLOCK_STEP_MIN), props.showRoutes])
   useEffect(updateRoads, [props.evac, props.scenario.closedEdges])
   useEffect(updateBuildings, [props.evac])
@@ -685,6 +767,7 @@ export function MapView(props: Props) {
   useEffect(updateFirebreaks, [props.scenario.firebreaks])
   useEffect(updateIgnitions, [props.scenario.presetIgnitions, props.scenario.userIgnitions])
   useEffect(updateLinks, [props.scenario.addedLinks])
+  useEffect(updateBrigades, [props.brigades, props.scenario.brigades.enabled])
   useEffect(updateVisibility, [props.layers])
   useEffect(updateTerrain, [props.terrain3d])
   useEffect(() => {

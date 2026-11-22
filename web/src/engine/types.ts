@@ -144,6 +144,16 @@ export interface Ignition {
   tMin: number
 }
 
+/** Cells defended by firefighters (src/engine/brigade). Per cell: a cell the fire reaches at t with
+ *  fromMin <= t <= toMin, and whose fireline intensity at t is <= maxKwM, does not burn and stays unburnable
+ *  (the front passed while it was held). fromMin = Infinity where the cell is not defended. */
+export interface FireDefense {
+  fromMin: Float32Array
+  toMin: Float32Array
+  /** Direct-attack intensity limit, kW/m (Infinity = no limit, structure protection). */
+  maxKwM: Float32Array
+}
+
 export interface FireInput {
   grid: GridMeta
   elevation: Float32Array
@@ -153,6 +163,8 @@ export interface FireInput {
   ignitions: Ignition[]
   weather: WeatherSeries
   params: FireParams
+  /** Optional firefighter defence (absent = no firefighting, the calibrated model). */
+  defense?: FireDefense
 }
 
 export interface FireResult {
@@ -249,3 +261,145 @@ export interface EvacResult {
 //   params: Pick<EvacParams, 'safeDistanceM'>): EvacPrepared
 // export function simulateEvac(input: EvacInput): EvacResult
 // export const DEFAULT_EVAC_PARAMS: EvacParams
+
+// ---------------------------------------------------------------------------------------------------------
+// Firefighters: brigades.json (hand-curated, read by src/data/load.ts) and the brigade engine
+// ---------------------------------------------------------------------------------------------------------
+
+/** Truck (unit) type, closed set. Index into every `units` array. */
+export const UNIT = {
+  BOMBA: 0, // carro bomba: water, structure protection
+  FORESTAL: 1, // carro forestal: small tank, direct attack on wildland fronts
+  ALJIBE: 2, // carro aljibe: water supply for the units at its site
+  RESCATE: 3, // escala / rescate: no water, rescues households
+} as const
+export type UnitType = (typeof UNIT)[keyof typeof UNIT]
+export const UNIT_COUNT = 4
+export const UNIT_LABEL_ES: Record<UnitType, string> = { 0: 'Bomba', 1: 'Forestal', 2: 'Aljibe', 3: 'Escala / rescate' }
+export const UNIT_SHORT_ES: Record<UnitType, string> = { 0: 'B', 1: 'F', 2: 'Z', 3: 'R' }
+
+/** A company (compañía) at its cuartel. units: count per UnitType. A null source means "supuesto". */
+export interface BrigadeStation {
+  id: string
+  cuerpo: string
+  company: string
+  lon: number
+  lat: number
+  units: number[]
+  unitsSource: string | null
+  locationSource: string
+}
+
+/** When a cuerpo's companies leave their cuarteles (local time ISO without offset). */
+export interface CuerpoDispatch {
+  cuerpo: string
+  dispatchLocal: string
+  source: string | null
+}
+
+/** A road into the grid for a reinforcement group; delayMin is added to the group's arrival time. */
+export interface ReinforcementEntry {
+  label: string
+  lon: number
+  lat: number
+  delayMin: number
+  source: string | null
+}
+
+/** Units from outside the area that enter the grid at arrivalLocal (+ entry delay). */
+export interface Reinforcement {
+  id: string
+  label: string
+  units: number[]
+  source: string | null
+  arrivalLocal: string
+  arrivalSource: string | null
+  entries: ReinforcementEntry[]
+}
+
+/** A documented road cut: road edges along `lines` are unusable from fromLocal until toLocal (null = never reopens). */
+export interface RouteCut {
+  id: string
+  label: string
+  lines: [number, number][][]
+  fromLocal: string
+  toLocal: string | null
+  source: string
+}
+
+export interface BrigadesFile {
+  stations: BrigadeStation[]
+  dispatch: CuerpoDispatch[]
+  reinforcements: Reinforcement[]
+  cuts: RouteCut[]
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// Population: where people are by time of day (pipeline/steps/population.py, src/engine/population/)
+// ---------------------------------------------------------------------------------------------------------
+
+// population_home.bin: Float32Array(rows*cols), residents per cell: where people are at night and, in this model,
+//   all weekend (WorldPop 2024 refined onto the grid).
+// population_work.bin: Float32Array(rows*cols), where people are if every resident is at their workplace or
+//   school (gravity model to non-residential building volume, GHSL 2025). It counts commuters from outside the grid
+//   and leaves out residents who work outside it, so its total differs from home's.
+// The share of residents actually away at a given local time is PresenceParams; people in a cell at that time
+// = home + away * (work - home).
+
+/** national/population_cl.json: the same two layers for all of Chile on a 30" grid (~0.9 km), aligned with
+ *  WorldPop's 3" grid. Row 0 is the NORTH edge; cell index = r * cols + c. The binary
+ *  national/population_cl.bin holds, little-endian: Uint32 cell[n] (ascending), Float32 home[n],
+ *  Float32 work[n], Float32 nonResidentialM3[n]. Only cells with residents, workers or non-residential
+ *  buildings are stored. sum(home) == sum(work): the gravity model moves people, it does not create them. */
+export interface NationalPopulationMeta {
+  version: 1
+  lonMin: number
+  latMax: number
+  dLon: number
+  dLat: number
+  rows: number
+  cols: number
+  /** Number of stored cells. */
+  n: number
+  layout: string
+  /** Gravity kernel exp(-d / scaleM), cut at maxM (metres). */
+  commute: { scaleM: number; maxM: number }
+  totals: { home: number; work: number; stayHome: number; nonResidentialMillionM3: number }
+  source: string
+}
+
+export interface NationalPopulation {
+  meta: NationalPopulationMeta
+  cell: Uint32Array
+  home: Float32Array
+  work: Float32Array
+  nonResidentialM3: Float32Array
+}
+
+/** Who is out of home at a given local time. Piecewise-linear schedules are [hour (0..24), share 0..1] knots
+ *  in increasing hour order. Weekends (Saturday, Sunday) everyone is home. */
+export interface PresenceParams {
+  /** Employed persons / population. */
+  workerShare: number
+  /** Enrolled students (school + higher education) / population. */
+  studentShare: number
+  /** Share of workers at their workplace on a weekday, by local hour. */
+  workSchedule: [number, number][]
+  /** Share of students at school on a school day, by local hour. */
+  schoolSchedule: [number, number][]
+  /** School term [month (1-12), day] start and end, both inclusive, and the winter break inside it. */
+  schoolTerm: { start: [number, number]; end: [number, number]; winterBreak: [[number, number], [number, number]] }
+}
+
+/** Which day the population model assumes. 'real' = the simulation's own date. Closed set. */
+export const POPULATION_DAY = {
+  REAL: 'real',
+  WEEKDAY_SCHOOL: 'laboral_con_clases',
+  WEEKDAY_NO_SCHOOL: 'laboral_sin_clases',
+  WEEKEND: 'fin_de_semana',
+} as const
+export type PopulationDay = (typeof POPULATION_DAY)[keyof typeof POPULATION_DAY]
+
+// export function awayShare(localIso: string, params: PresenceParams, day?: PopulationDay): number
+// export function peopleInBurnedArea(...)  (src/engine/population/index.ts)
+// export const DEFAULT_PRESENCE_PARAMS: PresenceParams

@@ -20,7 +20,7 @@
 - `evac/sensitivity.ts` now also prints the alert-time curve and the eastern fire alone.
 
 ## Decisions
-- Satellite pace as calibration target, GOES-16 source, matorral at half of forest (→ decisions.md D-024).
+- Satellite pace as calibration target, GOES-16 source, matorral at half of forest (→ decisions.md D-027).
 
 ## Open / blocked
 - The western stall (14:05–16:25) is not reproduced; the pace degrades at wind ×1.1.

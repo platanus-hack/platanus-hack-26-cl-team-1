@@ -133,7 +133,7 @@ shows. The structural change is picked from the diagnosis among three documented
 ### Task 5: Refit, validation, docs
 
 **Files:** `calibrate.ts` (scan grid adds the new knob), `index.ts` defaults, `public/data/validation.json`,
-`web/src/ui/Panel.tsx` (Validación copy), `MODEL.md` §6, `agent-kb/decisions.md` (D-024), session log, backlog.
+`web/src/ui/Panel.tsx` (Validación copy), `MODEL.md` §6, `agent-kb/decisions.md` (D-027), session log, backlog.
 
 - [ ] **Step 1:** `pnpm exec tsx src/engine/fire/calibrate.ts --scan`; pick the top config on the fit objective;
   record the before/after table (fit RMS lag, test lag per pass, Dice, buildings, run ms).
@@ -141,7 +141,7 @@ shows. The structural change is picked from the diagnosis among three documented
 - [ ] **Step 3:** Panel: one paragraph "Ritmo del avance": GOES RMS lag per fire (en muestra) and VIIRS/MODIS lag
   per pass (fuera de muestra), sober wording.
 - [ ] **Step 4:** `make check` PASS. Commit `feat(fire): recalibrate pace against satellite passes`.
-- [ ] **Step 5:** D-024, session log, backlog; commit `docs: …`.
+- [ ] **Step 5:** D-027, session log, backlog; commit `docs: …`.
 
 ### Task 6: PR
 

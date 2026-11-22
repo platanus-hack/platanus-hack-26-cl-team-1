@@ -90,6 +90,17 @@ bearings 90°, 63.4° and 45° are stencil directions; 76.7° and 54° lie betwe
 
 `index.test.ts` checks the 76.7° case. Set `anchorMaxCells = 0` to get the plain spec behaviour.
 
+### Defended cells (firefighters, optional)
+
+`FireInput.defense` (from `src/engine/brigade`, only when "Bomberos" is on) gives each cell a window
+[fromMin, toMin] and an intensity limit maxKwM. When the fire reaches a cell at t inside its window and the
+cell's Byram fireline intensity I = 18,000 kJ/kg · w · R (w the fuel load in kg/m², 4.5 t/ha for grass-model
+fuels; R the head ROS in m/s, `FIRELINE`) is at most maxKwM, the cell does not burn and becomes unburnable for
+the rest of the run (the front passed while it was held). While a cell is held, diagonal and knight moves may
+not pass between it and another held or unburnable cell, so a held line is as watertight as a firebreak.
+Embers still jump it. Without `defense`, or with every fromMin = Infinity, the engine is bit-for-bit the same
+(`index.test.ts`).
+
 ## 5. Spotting
 
 Spotting runs only when `params.spotting` is on. It starts from settled cells whose fuel has `spotSource`

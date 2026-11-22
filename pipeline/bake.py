@@ -14,7 +14,7 @@ import shutil
 import sys
 import time
 
-from steps import buildings, firms, fuel, goes, grid, ignitions, roads, scar, terrain, weather, wui
+from steps import buildings, firms, fuel, goes, grid, ignitions, population, roads, scar, terrain, weather, wui
 
 SOURCES = {
     "Relieve": "Copernicus DEM GLO-30 (ESA / Airbus), tiles S33/S34 W072 vía AWS Open Data "
@@ -36,6 +36,7 @@ SOURCES = {
     "Detecciones de fuego GOES-16 (cada 10 min)": goes.SOURCE,
     "Focos predefinidos": "Ubicaciones aproximadas según primeras detecciones satelitales (NASA FIRMS VIIRS); "
     "hora del foco Las Tablas según reportes de prensa (CIPER, Cooperativa). No son datos oficiales.",
+    "Población por hora": population.SOURCE,
 }
 
 OUTPUTS = [
@@ -49,6 +50,10 @@ OUTPUTS = [
     "firms.json",
     "goes.json",
     "ignitions.json",
+    "population_home.bin",
+    "population_work.bin",
+    "national/population_cl.json",
+    "national/population_cl.bin",
 ]
 
 
@@ -101,6 +106,11 @@ def validate_outputs() -> None:
     for p in json.loads((d / "ignitions.json").read_text()):
         if set(p) != {"id", "label", "lon", "lat", "timeLocal", "source"}:
             raise AssertionError(f"ignitions.json: bad preset {p}")
+    for name in ("population_home.bin", "population_work.bin"):
+        a = raw(name, "<f4", n)
+        if not np.isfinite(a).all() or (a < 0).any():
+            raise AssertionError(f"{name}: negative or non-finite values")
+    population.load_national()  # raises on a missing or inconsistent national product
 
 
 def step(name: str, fn, *args):
@@ -142,6 +152,7 @@ def main() -> int:
     firms_pts, summary["firms"] = step("firms", firms.bake)
     summary["scar"] = step("scar", scar.bake, firms_pts, fuel_codes)
     summary["ignitions"] = step("ignitions", ignitions.bake, firms_pts)
+    summary["population"] = step("population (from the committed national product)", population.bake_domain)
     _, summary["goes"] = step("goes", goes.bake)
 
     step("validate outputs against types.ts", validate_outputs)

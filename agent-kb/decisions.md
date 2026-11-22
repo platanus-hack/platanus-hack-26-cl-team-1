@@ -117,7 +117,61 @@ with a pointer to their replacement; nothing is ever deleted from §3.
   post-merge deployment is verified. D-020's Lint/Test validation and manual squash PR merge policy remain;
   automatic deployment is not automatic PR merging. No `master` branch is created or monitored.
 
-### D-024 — Calibrate the pace against satellite passes; GOES-16 as a source; matorral at half of forest (2026-11-22)
+### D-024 — Population by time of day for all of Chile: two baked layers + a presence model in the browser (2026-11-22)
+- **Context:** to recreate fires anywhere in Chile at any hour, we need to know where people are: at home at
+  night and on weekends, and at work or school on weekdays. The 60 m grid only had buildings, with a fixed 2.9
+  persons per household.
+- **Decision (contract: `types.ts`):**
+  - **Data.** `pipeline/steps/population.py` bakes two layers with the same people:
+    - home: WorldPop 2024 constrained, 100 m;
+    - work: residents sent to GHSL non-residential building **volume** 2025 by an origin-constrained gravity
+      model (exp(-d / 10 km), cut at 30 km), with Argentina, Bolivia and Peru masked out.
+    - Building volume, not footprint: with footprint, Santiago's centre emptied out by day.
+  - **Files.** The national product (30", sparse, 4.1 MB) is committed in `web/public/data/national/`. The grid's
+    `population_home.bin` / `population_work.bin` are refined from it in a mass-conserving way. `make population`
+    re-bakes both; `bake.py` only refines.
+  - **Who is out, and when.** This is `src/engine/population` (`PresenceParams`, `POPULATION_DAY`), applied in the
+    browser:
+    - 50.3 % employed (INE ENE Oct-Dec 2024 / Censo 2024);
+    - 26.7 % students (Mineduc), only in term;
+    - assumed 09-18 h and 08:30-15:30 schedules with ramps;
+    - weekends at home.
+- **Consequences:**
+  - The explorer shows the people present where the fire arrives, each cell at its arrival time, and a
+    "Personas a esta hora" map layer. A day selector (real date / school weekday / weekday without classes /
+    weekend) changes only those, not the evacuation: the evacuation engine still uses 2.9 persons per building.
+  - The page downloads 2 MB more; the national file is not loaded.
+  - Known weakness: old mixed-use centres (Santiago, Concepción) are under-weighted as job centres
+    (`pipeline/population_report.py`).
+
+### D-025 — Cortafuego logo: flame and protective masonry barrier (2026-11-22)
+- **Context:** the user requested a clean, professional, firewall-related SVG and reiterated the README's
+  submission requirement: a 1000×1000 PNG under 500 KB.
+- **Decision:** use an original orange flame above a pale staggered masonry barrier on dark slate, matching
+  the UI palette, with an outlined Cortafuego wordmark. `project-logo.svg` is the vector source;
+  `project-logo.png` is the raster submission asset already referenced by the README.
+- **Consequences:** the logo is self-contained (no linked images or runtime fonts). The PNG is exactly
+  1000×1000 and 58,882 bytes, below even a decimal 500 KB limit. The README itself is unchanged.
+
+### D-026 — Firefighting as an optional two-pass scenario layer (2026-11-22)
+- **Context:** the team wants fire companies, trucks per type and route cuts as scenario variables. No open
+  dataset lists Chile's companies with their trucks, and there is no official count for 2 Feb 2024; the fire
+  calibration (Dice 0.628) already contains, without separating it, whatever suppression happened that day.
+- **Decision (contract: `types.ts`; decided with Anaís in a Q&A, design in
+  `docs/superpowers/specs/2026-11-22-bomberos-design.md`):**
+  - Hand-curated `web/public/data/brigades.json`: the 29 named companies of the four cuerpos in the grid (OSM),
+    trucks per type `[Bomba, Forestal, Aljibe, Escala/rescate]` (1 Bomba "supuesto" where there is no source),
+    dispatch per cuerpo, a Región Metropolitana reinforcement, and the Ruta 68 cut from 17:00.
+  - `src/engine/brigade/`: pass-1 fire → street closures by fire + historical cuts → earliest-arrival routing
+    → greedy sector dispatch → water windows → `FireInput.defense` (Bomba: structures, no limit; Forestal:
+    wildland up to 1,730 kW/m, GTR INT-131) → pass-2 fire → evacuation → rescue by Escala/rescate units.
+  - Off by default; with it on the UI compares against the same scenario without firefighters. "Cerrar calle"
+    affects only the evacuation. Every unsourced number is labelled "supuesto" in code and UI.
+- **Consequences:** the validation number does not change (off by default). Defaults: 79 trucks, −1,191
+  buildings reached and −62 households cut off at an 18:00 alert (`scenarios.ts`). Absolute effects rest on
+  supuestos (tank, flow, radii, rescue rate): present them as comparisons between resource scenarios.
+
+### D-027 — Calibrate the pace against satellite passes; GOES-16 as a source; matorral at half of forest (2026-11-22)
 - **Context:** the validation scored the burn scar at midnight and FIRMS one-sidedly ("detections already
   reached"), which cannot see a fire that is early. A back test against satellite passes showed the western head
   ~1 h early at 16:05 and ~40 min late at 19:05, and the eastern fire early all afternoon.
