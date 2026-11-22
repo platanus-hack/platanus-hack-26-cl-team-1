@@ -332,6 +332,15 @@ function Explorer({
   const [showSources, setShowSources] = useState(false)
   /** Phone layout (styles.css, same width): full-height map, controls in a bottom sheet. */
   const narrow = useMediaQuery(NARROW_QUERY)
+  /** The map notes' height, as --notes-h on the map: on phones an open layers card stops above them (styles.css). */
+  const notesRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = notesRef.current
+    if (!el) return
+    const ro = new ResizeObserver(() => el.parentElement?.style.setProperty('--notes-h', `${el.offsetHeight}px`))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
   const coarse = useMediaQuery(COARSE_QUERY)
   const [sheet, setSheet] = useState<SheetSnap>('peek')
   const [sheetPeekPx, setSheetPeekPx] = useState(0)
@@ -684,7 +693,7 @@ function Explorer({
             padBottom={narrow ? sheetPeekPx : 0}
           />
           <LayersCard layers={effectiveLayers} setLayer={setLayer} showRoutes={showRoutes} hide={hiddenLayers} />
-          <div className="map-notes">
+          <div className="map-notes" ref={notesRef}>
             {hint && (
               <div className="tool-hint" role="status">
                 <span>
