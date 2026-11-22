@@ -48,7 +48,10 @@ export const FIRE_MODEL = {
   fuels: {
     [FUEL.NONE]: { model: SPREAD_MODEL.NONE, loadTHa: 0, factor: 0, spotSource: false, spotTarget: false, spotDistanceFactor: 1 },
     [FUEL.GRASS]: { model: SPREAD_MODEL.CSIRO_GRASS, loadTHa: 0, factor: 1, spotSource: false, spotTarget: true, spotDistanceFactor: 1 },
-    [FUEL.SHRUB]: { model: SPREAD_MODEL.MCARTHUR_FOREST, loadTHa: 12, factor: 1, spotSource: true, spotTarget: true, spotDistanceFactor: 1 },
+    // Matorral spreads at half the McArthur rate of tree cover (x4 below, so x2 net; forest x4). Fitted on the
+    // satellite pace back test (MODEL.md section 6, robust over ERA5 wind x0.9-1.1): with one factor for both,
+    // the head runs too fast through the scrub south of Lago Peñuelas and the eastern fire overburns.
+    [FUEL.SHRUB]: { model: SPREAD_MODEL.MCARTHUR_FOREST, loadTHa: 12, factor: 0.5, spotSource: true, spotTarget: true, spotDistanceFactor: 1 },
     [FUEL.FOREST]: { model: SPREAD_MODEL.MCARTHUR_FOREST, loadTHa: 20, factor: 1, spotSource: true, spotTarget: true, spotDistanceFactor: 1 },
     [FUEL.CROP]: { model: SPREAD_MODEL.CSIRO_GRASS, loadTHa: 0, factor: 0.6, spotSource: false, spotTarget: true, spotDistanceFactor: 1 },
     // Built-up fuels (split in pipeline/steps/wui.py by the pre-fire vegetation within 180 m; MODEL.md section 6):
@@ -61,14 +64,15 @@ export const FIRE_MODEL = {
   } as Record<FuelCode, FuelSpread>,
   /** Calibration per spread model, multiplying every fuel that uses it (on top of params.rosMultiplier).
    *  Fitted against the Sentinel-2 scar with calibrate.ts (see MODEL.md, "Calibration"):
-   *  - McArthur x3: Project Vesta (Cheney et al. 2012) found the Mk5 meter under-predicts summer spread in
-   *    dry eucalypt forest by ~2-3x; the domain's eucalyptus / pine plantations and matorral behave alike.
+   *  - McArthur x4 (x3 before the satellite pace back test of 2026-11-22, which also put matorral at half of
+   *    it: see fuels). Project Vesta (Cheney et al. 2012) found the Mk5 meter under-predicts summer spread in
+   *    dry eucalypt forest by ~2-3x; x4 is above that range and is a fit to this one fire (MODEL.md section 6).
    *  - CSIRO grass x0.25: fitted. The natural-pasture equation is Cheney's fastest pasture type; much of the
    *    domain's WorldCover "grassland" is grazed or sparse herbaceous cover on dry slopes, which spreads
    *    slower (Cheney et al. 1998 grazed pasture; eaten-out pasture slower still). */
   modelFactor: {
     [SPREAD_MODEL.NONE]: 0,
-    [SPREAD_MODEL.MCARTHUR_FOREST]: 3,
+    [SPREAD_MODEL.MCARTHUR_FOREST]: 4,
     [SPREAD_MODEL.CSIRO_GRASS]: 0.25,
   } as Record<SpreadModel, number>,
   /** Equivalent wind per degree of slope, km/h: exp(0.0234 * U_s) = exp(0.069 * slope). */

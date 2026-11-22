@@ -272,6 +272,12 @@ interface Knobs {
    *  the scored arrival is the per-cell median over members. 1 member with sigma 0 = a single run. */
   jitterSigma: number
   members: number
+  /** Per-fuel spread factors (FIRE_MODEL.fuels[...].factor) of grassland and matorral, on top of the model factors. */
+  grassFuelFactor: number
+  shrubFuelFactor: number
+  /** Ember jump time = spotDelayMin + spotTravelMin * d / D_max (FIRE_MODEL). */
+  spotDelayMin: number
+  spotTravelMin: number
   params: Partial<FireParams>
 }
 
@@ -300,6 +306,10 @@ function run(k: Knobs) {
   FIRE_MODEL.spotIntensityExponent = k.spotIntensityExponent
   FIRE_MODEL.spotRefRosMPerMin = k.spotRefRosMPerMin
   FIRE_MODEL.spotJitterSigma = k.jitterSigma
+  FIRE_MODEL.fuels[FUEL.GRASS].factor = k.grassFuelFactor
+  FIRE_MODEL.fuels[FUEL.SHRUB].factor = k.shrubFuelFactor
+  FIRE_MODEL.spotDelayMin = k.spotDelayMin
+  FIRE_MODEL.spotTravelMin = k.spotTravelMin
   const params = { ...DEFAULT_FIRE_PARAMS, ...k.params }
   const w = weather(k.windFactor, k.windDirCorrectionDeg)
   const combined: Float32Array[] = []
@@ -353,6 +363,10 @@ const current: Knobs = {
   spotRefRosMPerMin: FIRE_MODEL.spotRefRosMPerMin,
   jitterSigma: FIRE_MODEL.spotJitterSigma,
   members: 1,
+  grassFuelFactor: FIRE_MODEL.fuels[FUEL.GRASS].factor,
+  shrubFuelFactor: FIRE_MODEL.fuels[FUEL.SHRUB].factor,
+  spotDelayMin: FIRE_MODEL.spotDelayMin,
+  spotTravelMin: FIRE_MODEL.spotTravelMin,
   params: {},
 }
 
@@ -396,12 +410,13 @@ if (!process.argv.includes('--scan')) {
   console.log('wrote public/data/validation.json\n')
   // Before / after: what each change contributes (one at a time from the shipped model).
   const variants: [string, Partial<Knobs>][] = [
+    ['before the pace fit (matorral as forest, McArthur x3)', { shrubFuelFactor: 1, forestShrubFactor: 3 }],
+    ['ember distance x source intensity (exponent 1, 20 m per km/h) on the old fuel factors: best in-sample, knife edge', { shrubFuelFactor: 1, forestShrubFactor: 3, spotIntensityExponent: 1, spotRefRosMPerMin: 30, params: { spotMetresPerKmh: 20 } }],
+    ['the same at wind x1.1', { shrubFuelFactor: 1, forestShrubFactor: 3, spotIntensityExponent: 1, spotRefRosMPerMin: 30, windFactor: 1.1, params: { spotMetresPerKmh: 20 } }],
     ['no wind direction correction', { windDirCorrectionDeg: 0 }],
-    ['embers also ignite consolidated city', { consolidatedEmbers: true }],
-    ['intermix at x0.5 of grass (spec value)', { intermixFactor: 0.5 }],
-    ['wind correction -5 deg', { windDirCorrectionDeg: -5 }],
-    ['wind correction -15 deg', { windDirCorrectionDeg: -15 }],
     ['spotting off', { params: { spotting: false } }],
+    ['wind x0.9', { windFactor: 0.9 }],
+    ['wind x1.1', { windFactor: 1.1 }],
     ['wind x1.5', { windFactor: 1.5 }],
   ]
   for (const [name, v] of variants) {
@@ -412,21 +427,26 @@ if (!process.argv.includes('--scan')) {
   // Pace knobs (MODEL.md section 6): ember distance per km/h, its growth with source intensity, the McArthur
   // factor and the ERA5 direction correction. Urban knobs stay at the values chosen on 2026-11-22 01:30.
   // Robust scan: every configuration is scored at ERA5 wind x0.9, x1 and x1.1 and ranked by the mean objective,
-  // so a set of knobs that only works at one exact wind (a knife edge) does not win.
+  // so a set of knobs that only works at one exact wind (a knife edge) does not win. MODEL.md section 6 quotes it.
   const rows: [number, string][] = []
   const configs: Partial<Knobs>[] = []
-  for (const [jitterSigma, members] of [[0, 1], [0.5, 7], [1, 7]])
-    for (const spotMetresPerKmh of [15, 20, 25, 30])
-      for (const [spotIntensityExponent, spotRefRosMPerMin] of [[0, 30], [1, 30]]) configs.push({ jitterSigma, members, spotIntensityExponent, spotRefRosMPerMin, params: { spotMetresPerKmh } })
+  for (const shrubFuelFactor of [0.35, 0.5, 1])
+    for (const forestShrubFactor of [3, 4])
+      for (const spotMetresPerKmh of [20, 25])
+        for (const [spotIntensityExponent, spotRefRosMPerMin] of [[0, 30], [1, 30]])
+          configs.push({ shrubFuelFactor, forestShrubFactor, spotIntensityExponent, spotRefRosMPerMin, params: { spotMetresPerKmh } })
+  // Ensemble with per-cell ember jitter (median of 7 seeds) and faster ember jumps, on the shipped fuel factors.
+  configs.push({ jitterSigma: 0.5, members: 7, params: { spotMetresPerKmh: 15 } })
+  configs.push({ spotDelayMin: 2, spotTravelMin: 2, params: { spotMetresPerKmh: 12 } })
   for (const cfg of configs) {
     const rs = [0.9, 1, 1.1].map((windFactor) => run({ ...current, ...cfg, windFactor }))
     const m = (f: (r: (typeof rs)[number]) => number) => rs.reduce((x, r) => x + f(r), 0) / rs.length
     const j = (f: (r: (typeof rs)[number]) => number, d = 0) => rs.map((r) => f(r).toFixed(d)).join('/')
     rows.push([
       m((r) => r.objective),
-      `jitter ${cfg.jitterSigma} x${cfg.members}, spotting ${cfg.params?.spotMetresPerKmh}, exponent ${cfg.spotIntensityExponent}: robust objective ${m((r) => r.objective).toFixed(3)} | W RMS ${j((r) => r.pace.fires[0].rmsLagMin)} E RMS ${j((r) => r.pace.fires[1].rmsLagMin)} | test ${j((r) => r.pace.testMeanAbsLagMin)} | Dice ${j((r) => r.end.dice, 2)} | bld ${j((r) => r.bld.inScar)}`,
+      `shrub x${cfg.shrubFuelFactor ?? current.shrubFuelFactor}, McArthur x${cfg.forestShrubFactor ?? current.forestShrubFactor}, spotting ${cfg.params?.spotMetresPerKmh}, intensity exponent ${cfg.spotIntensityExponent ?? 0}, jitter ${cfg.jitterSigma ?? 0} x${cfg.members ?? 1}, ember time ${cfg.spotDelayMin ?? current.spotDelayMin}+${cfg.spotTravelMin ?? current.spotTravelMin}: robust objective ${m((r) => r.objective).toFixed(3)} | W RMS ${j((r) => r.pace.fires[0].rmsLagMin)} E RMS ${j((r) => r.pace.fires[1].rmsLagMin)} | test ${j((r) => r.pace.testMeanAbsLagMin)} | Dice ${j((r) => r.end.dice, 2)} | bld ${j((r) => r.bld.inScar)}`,
     ])
   }
   rows.sort((a, b) => b[0] - a[0])
-  for (const [, line] of rows.slice(0, 12)) console.log(line)
+  for (const [, line] of rows.slice(0, 30)) console.log(line)
 }

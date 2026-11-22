@@ -78,8 +78,8 @@ describe('rate of spread formulas', () => {
     expect(flatRosKmh(FUEL.URBAN_DENSE, w, DEFAULT_FIRE_PARAMS)).toBeCloseTo(0.05 * g)
     expect(flatRosKmh(FUEL.NONE, w, DEFAULT_FIRE_PARAMS)).toBe(0)
     expect(flatRosKmh(FUEL.FOREST, w, { ...DEFAULT_FIRE_PARAMS, rosMultiplier: 2 })).toBeCloseTo(2 * flatRosKmh(FUEL.FOREST, w, DEFAULT_FIRE_PARAMS))
-    // Shrub is the forest meter with 12 t/ha instead of 20.
-    expect(flatRosKmh(FUEL.SHRUB, w, DEFAULT_FIRE_PARAMS) / flatRosKmh(FUEL.FOREST, w, DEFAULT_FIRE_PARAMS)).toBeCloseTo(12 / 20)
+    // Shrub is the forest meter with 12 t/ha instead of 20, at half the rate (fitted on the pace back test).
+    expect(flatRosKmh(FUEL.SHRUB, w, DEFAULT_FIRE_PARAMS) / flatRosKmh(FUEL.FOREST, w, DEFAULT_FIRE_PARAMS)).toBeCloseTo((12 / 20) * 0.5)
   })
 
   it('slope factor doubles per ~10 degrees when wind and slope are aligned', () => {
