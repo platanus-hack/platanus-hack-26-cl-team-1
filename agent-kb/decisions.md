@@ -25,6 +25,8 @@ with a pointer to their replacement; nothing is ever deleted from §3.
 - **Context:** same split as before; the pitch and users are Chilean, tooling and agents work best in English.
 - **Decision:** identifiers, comments, docs and agent-kb in English; every user-visible string and the voice in Spanish.
 - **Consequences:** prompts that generate spoken text must ask for Spanish output.
+- **README exception (2026-11-22):** the user explicitly requested the root `README.md` in Spanish,
+  including headings and command descriptions. Other technical documentation and agent-kb remain in English.
 
 ### D-019 — Pivot to Cortafuego, a wildfire and evacuation scenario simulator (2026-11-21)
 - **Context:** late Saturday the team judged Ojo (the camera supervisor, D-001) weak for the Simulations track:
