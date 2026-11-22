@@ -46,8 +46,8 @@ make validate  # model vs the real burn scar (prints the number used in the pitc
 ## Rules
 
 1. **PRs go straight to `main`**, small, one topic each. No stacked PRs. No direct pushes to `main`. A PR is
-   merged (squash) once `CI OK` is green; there are no agent reviewers (D-020). Open a **draft** while it isn't
-   ready, and make the PR title + body final: they become the commit.
+   merged (squash) by hand once CI's two checks, **Lint** and **Test**, are green (D-020). Open a **draft**
+   while it isn't ready, and make the PR title + body final: they become the commit.
 2. **Log the session in `agent-kb/`** before ending (see [agent-kb/README.md](agent-kb/README.md)).
    Check `agent-kb/decisions.md` before proposing anything that sounds like a decision.
 3. **Contract first.** `web/src/engine/types.ts` is shared by the pipeline, both engines and the UI: change it

@@ -26,6 +26,48 @@ with a pointer to their replacement; nothing is ever deleted from §3.
 - **Decision:** identifiers, comments, docs and agent-kb in English; every user-visible string and the voice in Spanish.
 - **Consequences:** prompts that generate spoken text must ask for Spanish output.
 
+### D-019 — Pivot to Cortafuego, a wildfire and evacuation scenario simulator (2026-11-21)
+- **Context:** late Saturday the team judged Ojo (the camera supervisor, D-001) weak for the Simulations track:
+  the flight simulator was bolted on, and the track was already full of agent/what-if simulators on maps of
+  Chile (the prediction-market favourites Sub50, santiaguito.cl and Agarra la pala are all in it). A research
+  pass (past Platanus winners, the 47 other Santiago repos, Bogotá's Simulations track, simulation startups,
+  Chilean open data) found that nobody at the event simulates physical, interactive phenomena such as fire.
+- **Decision:** replace the whole tree with **Cortafuego**: a static web app that replays the 2 Feb 2024 fire in
+  Viña del Mar / Quilpué / Villa Alemana on real open data (Copernicus DEM, ESA WorldCover, Overture/OSM
+  buildings and streets, Open-Meteo/ERA5 weather, NASA FIRMS, a Sentinel-2 burn scar) and lets the user change
+  wind, humidity, temperature, drought, ignitions, firebreaks, the alert time and evacuation routes.
+  - Fire: McArthur Mk5 forest / CSIRO grassland rate of spread, slope + wind as one vector, elliptical spread,
+    minimum-travel-time propagation on a 60 m grid, ember spotting.
+  - Evacuation: latest-departure search on the street graph per mode (foot/car), lognormal preparation time,
+    free flow (no congestion yet).
+  - Everything runs in the browser (Web Worker); the data is baked once by `pipeline/` into `web/public/data/`.
+  - The shared contract is `web/src/engine/types.ts` (replaces the pydantic `contracts/` package of D-009).
+- **Consequences:** D-001, D-005 and D-008 to D-018 are superseded (moved to §3); D-002 (old code lives in git
+  history, last Ojo commit `a2a871e`), D-003, D-004, D-006 and D-007 stay. The GPU box, vLLM, the WebSocket
+  server and the box CD (`cd-demo.yml`) are gone; the public link must be a static host. Tone rule in CLAUDE.md:
+  prevention framing, no claims about the official alert without a source.
+
+### D-020 — CI is just Lint + Test; no agent reviewers, no auto-merge (2026-11-22)
+- **Context:** the Cortafuego PR (#48) replaced the whole tree, and GitHub refuses the diff of a PR over 300
+  files, so both reviewer jobs failed before reviewing anything. `main` has no branch protection or required
+  checks, so `auto-merge.yml` never armed a PR either (it only arms a PR GitHub reports as BLOCKED). With hours
+  left, the team wants the classic setup.
+- **Decision:** `.github/workflows/ci.yml` has two jobs:
+  - **Lint:** ruff on `pipeline/`, `tsc` on `web/`.
+  - **Test:** pytest on `pipeline/`, vitest and the production build on `web/`.
+  Removed: `code-review.yml`, its helpers (`scripts/ci/`), `docs/PR_REVIEW_FOCUS.md`, `auto-merge.yml`, the
+  `CI OK` aggregate and the actionlint job. This supersedes D-006 and D-007 (moved to §3).
+- **Consequences:** PRs are merged by hand once Lint and Test are green. Nothing checks workflow files any more.
+
+## §2 Open
+
+- **D-?? Public deploy target** for the static site (`web/dist`): Vercel or Render (both event sponsors) from
+  a personal mirror, or GitHub Pages (needs a repo admin to enable Pages).
+
+## §3 Superseded
+
+_Moved here by D-019 (pivot to Cortafuego): D-001, D-005, D-008 to D-018. Moved by D-020: D-006, D-007._
+
 ### D-006 — CI with one aggregate check, and two agent reviewers on every PR (2026-11-21)
 - **Context:** several people and agents push PRs in parallel overnight; nobody has time to review everything,
   and the owner wants review automated from the start. A private repo already runs this setup.
@@ -52,46 +94,6 @@ with a pointer to their replacement; nothing is ever deleted from §3.
   the merge. Drafts are how to hold a PR. Needs a repo admin to enable "Allow auto-merge" and set the protection
   (until then the workflow refuses to arm). Merges made with `GITHUB_TOKEN` trigger no `push` run, so CI on `main`
   only runs on the next PR or by hand (`workflow_dispatch`). Workflow changes take effect only once merged.
-
-### D-019 — Pivot to Cortafuego, a wildfire and evacuation scenario simulator (2026-11-21)
-- **Context:** late Saturday the team judged Ojo (the camera supervisor, D-001) weak for the Simulations track:
-  the flight simulator was bolted on, and the track was already full of agent/what-if simulators on maps of
-  Chile (the prediction-market favourites Sub50, santiaguito.cl and Agarra la pala are all in it). A research
-  pass (past Platanus winners, the 47 other Santiago repos, Bogotá's Simulations track, simulation startups,
-  Chilean open data) found that nobody at the event simulates physical, interactive phenomena such as fire.
-- **Decision:** replace the whole tree with **Cortafuego**: a static web app that replays the 2 Feb 2024 fire in
-  Viña del Mar / Quilpué / Villa Alemana on real open data (Copernicus DEM, ESA WorldCover, Overture/OSM
-  buildings and streets, Open-Meteo/ERA5 weather, NASA FIRMS, a Sentinel-2 burn scar) and lets the user change
-  wind, humidity, temperature, drought, ignitions, firebreaks, the alert time and evacuation routes.
-  - Fire: McArthur Mk5 forest / CSIRO grassland rate of spread, slope + wind as one vector, elliptical spread,
-    minimum-travel-time propagation on a 60 m grid, ember spotting.
-  - Evacuation: latest-departure search on the street graph per mode (foot/car), lognormal preparation time,
-    free flow (no congestion yet).
-  - Everything runs in the browser (Web Worker); the data is baked once by `pipeline/` into `web/public/data/`.
-  - The shared contract is `web/src/engine/types.ts` (replaces the pydantic `contracts/` package of D-009).
-- **Consequences:** D-001, D-005 and D-008 to D-018 are superseded (moved to §3); D-002 (old code lives in git
-  history, last Ojo commit `a2a871e`), D-003, D-004, D-006 and D-007 stay. The GPU box, vLLM, the WebSocket
-  server and the box CD (`cd-demo.yml`) are gone; the public link must be a static host. Tone rule in CLAUDE.md:
-  prevention framing, no claims about the official alert without a source.
-
-### D-020 — No agent reviewers; PRs merge on `CI OK` (2026-11-22)
-- **Context:** the Cortafuego PR (#48) replaced the whole tree, and GitHub refuses the diff of a PR over 300
-  files, so both reviewer jobs failed before reviewing anything. With hours left, the team prefers speed.
-- **Decision:** remove `.github/workflows/code-review.yml`, its helpers (`scripts/ci/`) and
-  `docs/PR_REVIEW_FOCUS.md`. A PR is merged once `CI OK` is green. This supersedes the reviewer half of D-006
-  and the "agent-approved" part of D-007 (the aggregate `CI OK` check and `auto-merge.yml` stay).
-- **Consequences:** `main` has no branch protection and no required checks, so `auto-merge.yml` never arms
-  (it only arms a PR GitHub reports as BLOCKED) and PRs are merged by hand. A repo admin can make `CI OK`
-  required on `main` to bring auto-merge back.
-
-## §2 Open
-
-- **D-?? Public deploy target** for the static site (`web/dist`): Vercel or Render (both event sponsors) from
-  a personal mirror, or GitHub Pages (needs a repo admin to enable Pages).
-
-## §3 Superseded
-
-_Moved here by D-019 (pivot to Cortafuego): D-001, D-005, D-008 to D-018._
 
 ### D-001 — Pivot to a general step-by-step task supervisor (2026-11-21)
 - **Context:** Circuito Vivo's Modo Armado was already a supervisor for one task (wiring a circuit). The

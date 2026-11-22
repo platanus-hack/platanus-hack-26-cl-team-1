@@ -30,7 +30,8 @@
 
 ## Decisions
 - D-019: pivot to Cortafuego; D-001, D-005, D-008 to D-018 moved to §3.
-- D-020: agent reviewers removed (the #48 diff was over GitHub's 300-file limit); PRs merge on `CI OK`.
+- D-020: CI is just Lint + Test; agent reviewers (the #48 diff was over GitHub's 300-file limit), auto-merge,
+  actionlint and the `CI OK` aggregate removed; D-006 and D-007 moved to §3.
 
 ## Open / next
 - The model reaches ~21k buildings by midnight, but only ~1.9k of the 6,505 inside the real scar: where it
