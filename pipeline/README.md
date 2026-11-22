@@ -38,6 +38,7 @@ Clock origin `t0 = 2024-02-02T12:00:00-03:00`.
 | `weather.json` | `WeatherFile`, hourly 2-3 Feb 2024 | Open-Meteo archive (ERA5-based) |
 | `scar.bin` | Uint8 per cell: 1 burned, 0 not, 255 no data | Sentinel-2 L2A dNBR |
 | `firms.json` | `FirmsPoint[]`, 2-4 Feb 2024 local | NASA FIRMS (VIIRS, MODIS) |
+| `goes.json` | `FirmsPoint[]`, GOES-16 fire pixels every 10 min, 2 Feb 12:00 - 3 Feb 04:00 local (scoring only, not loaded by the app) | NOAA GOES-16 ABI L2 FDC |
 | `ignitions.json` | `IgnitionPreset[]` | FIRMS first detections + press reports |
 
 Binary files are little-endian, `rows * cols` values (except `buildings.bin`).
@@ -124,6 +125,20 @@ The post-fire scene is 10 days later, so the scar is the final footprint of the 
 downloaded once into `.cache/firms/`. Points in the grid with local date 2-4 Feb 2024, local time =
 UTC - 3 h (Chile summer time).
 
+**goes.json (`steps/goes.py`).** GOES-16 ABI L2 Fire Detection and Characterization, full disk
+(`ABI-L2-FDCF`, mode 6: one scan every 10 min, ~2 km pixel at nadir, ~2.5-3 km over central Chile), from the
+public NOAA bucket `s3://noaa-goes16` read over HTTPS (no key), 96 files (~3.2 MB each) from 2 Feb 15:00 UTC to
+3 Feb 06:59 UTC, cached in `.cache/goes/`. The bake stops if any hour lists fewer than 6 scans. Each pixel's
+centre is converted from the ABI fixed grid (GDAL transform in metres / perspective point height = scan angle in
+radians) to geodetic lon / lat with the GOES-R PUG vol. 3 §5.1.2.8.1 formulas (checked against the PUG worked
+example in `tests/test_steps.py`); pixels whose centre is outside the grid are dropped. Fire = `Mask` codes
+10-14 and 30-34 (good, saturated, cloud-contaminated, high and medium probability, plain and temporally
+filtered); low probability (15, 35) is left out. `timeLocal` = scan start + 5 min (middle of the full-disk
+scan), UTC - 3 h. `frp` = `Power` (MW); the algorithm leaves it unset (fill -9) on some fire pixels
+(saturated or cloud-contaminated), recorded as 0: the pacing score uses the location only. Same record shape as
+`firms.json` (`satellite` = "GOES-16 ABI"). It is used only by `web/src/engine/fire/calibrate.ts` to score the
+pace of the simulated fire (`web/src/engine/fire/MODEL.md` section 6); the browser app does not load it.
+
 **ignitions.json.** Documented facts are thin on exact points. Las Tablas / Lago Peñuelas: press reports
 (CIPER; Cooperativa, 2 Feb 2024) say a CONAF lookout tower detected it at about 12:06 and that it began
 around noon at Fundo Las Tablas, next to the reserve; the point is the upwind (southern) end of the first
@@ -142,6 +157,7 @@ first VIIRS pass, start 30 min before that detection (14:17). Both are labelled 
 - Open-Meteo: CC BY 4.0; ERA5 © ECMWF / Copernicus Climate Change Service. https://open-meteo.com/
 - Sentinel-2 L2A: contains modified Copernicus Sentinel data (2024). Earth Search by Element 84.
 - NASA FIRMS: NASA open data, attribution requested. https://firms.modaps.eosdis.nasa.gov/
+- NOAA GOES-16 ABI L2 FDC: NOAA open data (public domain), NOAA Open Data Dissemination on AWS. https://registry.opendata.aws/noaa-goes/
 
 ## Known limitations
 

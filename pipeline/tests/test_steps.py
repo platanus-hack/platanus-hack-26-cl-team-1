@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from steps import fuel, grid, roads, scar, wui
+from steps import fuel, goes, grid, roads, scar, wui
 
 
 def test_cell_index_corners_and_outside():
@@ -200,3 +200,25 @@ def test_split_runs_clips_ways_to_the_grid():
     assert roads.split_runs([1, 2, 3, 4, 5, 6, 7, 8], keep) == [[1, 2, 3], [7, 8]]  # lone 5 is dropped
     assert roads.split_runs([4, 6], keep) == []
     assert roads.split_runs([1, 2], keep) == [[1, 2]]
+
+
+def test_goes_fixed_grid_pug_example():
+    # GOES-R PUG vol. 3, section 5.1.2.8.1 worked example (x, y in radians -> geodetic lat, lon).
+    lon, lat = goes.fixed_grid_to_lonlat(
+        np.array([-0.024052]), np.array([0.095340]), -75.0, 35786023.0, 6378137.0, 6356752.31414
+    )
+    assert lat[0] == pytest.approx(33.846162, abs=1e-4)
+    assert lon[0] == pytest.approx(-84.690932, abs=1e-4)
+
+
+def test_goes_mask_codes_keep_fire_categories_but_not_low_probability():
+    for code in (10, 11, 12, 13, 14, 30, 31, 32, 33, 34):
+        assert code in goes.FIRE_MASK_CODES
+    for code in (0, 15, 35, 40, 100):
+        assert code not in goes.FIRE_MASK_CODES
+
+
+def test_goes_scan_time_is_mid_scan_local():
+    name = "OR_ABI-L2-FDCF-M6_G16_s20240332100208_e20240332109516_c20240332113362.nc"
+    # Scan start 2024 day 033 21:00:20.8 UTC = 2 Feb 18:00 local; +5 min to mid-scan.
+    assert goes.scan_time_local(name) == "2024-02-02T18:05"
