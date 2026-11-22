@@ -61,7 +61,7 @@ function validateParams(p: EvacParams) {
 }
 
 /** min over each cell and its 8 neighbours (separable 3x3 min filter). Throws on NaN and -Infinity. */
-function dilateMin3x3(a: Float32Array, rows: number, cols: number): { dil: Float32Array; maxFinite: number } {
+export function dilateMin3x3(a: Float32Array, rows: number, cols: number): { dil: Float32Array; maxFinite: number } {
   const tmp = new Float32Array(a.length)
   let maxFinite = -Infinity
   for (let r = 0; r < rows; r++) {
