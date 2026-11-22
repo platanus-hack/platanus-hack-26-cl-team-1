@@ -108,9 +108,12 @@ export interface IgnitionPreset {
  *    its own baked files in public/data/eaton-2025/ (another territory: src/data/events.ts).
  *  - TALCA: a hypothetical fire around Talca (Maule region) on a hot reference day (ERA5 weather of
  *    8 Feb 2025, 12:00-24:00) with one hypothetical ignition point; its own baked files in public/data/talca/.
- *    No fire was observed there: no scar (scar.bin is all "no data"), no FIRMS, no validation. */
+ *    No fire was observed there: no scar (scar.bin is all "no data"), no FIRMS, no validation.
+ *  - TODAY_TALCA: Talca's territory (public/data/talca/) today, 00:00 to 24:00, with today's forecast for Talca's
+ *    weather.json point, and no ignitions: the user places every fire start. src/data/timeline.ts builds it. */
 export const TIMELINE = {
   TODAY: 'hoy',
+  TODAY_TALCA: 'hoy-talca',
   VINA_2024: 'vina-2024',
   EATON_2025: 'eaton-2025',
   TALCA: 'talca',

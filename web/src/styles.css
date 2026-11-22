@@ -1581,6 +1581,9 @@ input[type='range']:focus-visible {
   font-size: 11.5px;
   margin-top: 4px;
 }
+.pp-action {
+  margin-top: 6px;
+}
 
 /* Bomberos section */
 .swatch.brig {

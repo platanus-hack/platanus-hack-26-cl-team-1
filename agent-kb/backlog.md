@@ -24,6 +24,8 @@ Owner in brackets once someone takes an item. Project: Cortafuego (D-019). The O
   - The site now opens on today's forecast (D-028): open the demo at `https://cortafuego.app/?escenario=vina-2024`.
   - Hypothetical Maule demo (D-032): `https://cortafuego.app/?escenario=talca` (Talca, 8 Feb 2025 weather,
     one hypothetical ignition at 14:00). [Anaís + agent]
+  - Today in Talca, blank (D-036): `https://cortafuego.app/?escenario=hoy-talca` (today's forecast, no fire starts;
+    click a fire start on the map to remove it). [Anaís + agent]
 
 ## Next
 - [ ] Maule (Talca box): the preset start sits in the box's south fifth, so a strong-wind fire reaches the north edge

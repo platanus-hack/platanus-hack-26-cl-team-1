@@ -9,7 +9,18 @@ import type { Dataset } from './data/load'
 import { loadRealDataset } from './data/load'
 import { makeMockDataset } from './data/mock'
 import { fetchForecast, santiagoDate, type Forecast } from './data/forecast'
-import { EATON_2025_CHOICE, isTimelineId, TALCA_CHOICE, TIMELINE_OPTIONS, timelineDataset, VINA_2024_CHOICE, type TimelineChoice } from './data/timeline'
+import {
+  EATON_2025_CHOICE,
+  isTimelineId,
+  isTodayTimeline,
+  TALCA_CHOICE,
+  TIMELINE_OPTIONS,
+  timelineDataset,
+  TODAY_DEFS,
+  VINA_2024_CHOICE,
+  type TimelineChoice,
+  type TodayTimelineId,
+} from './data/timeline'
 import { checkEvent, EVENTS, eventOfTimeline, type EventDef, type EventId } from './data/events'
 import { localToMin, minToDateLabel, minToHHMM, wallClockMin } from './data/time'
 import { SimClient } from './worker/client'
@@ -146,6 +157,7 @@ function subtitleFor(data: Dataset | null, timeline: TimelineId): string {
   if (timeline === TIMELINE.EATON_2025) return 'Explorador de escenarios del incendio Eaton del 7 de enero de 2025 · Altadena y Pasadena, California'
   if (timeline === TIMELINE.TALCA) return 'Escenario hipotético en Talca (Maule) con el tiempo de un día caluroso de referencia, 8 de febrero de 2025'
   const day = data ? ` (${minToDateLabel(data.grid.t0, 0)}, ${windowLabel(data)})` : ''
+  if (timeline === TIMELINE.TODAY_TALCA) return `Escenario de hoy en Talca (Maule)${day} con el pronóstico del tiempo, sin focos: agrégalos en el mapa`
   return `Escenario de hoy${day} con el pronóstico del tiempo`
 }
 
@@ -159,8 +171,13 @@ export default function App() {
   const [loadAttempt, setLoadAttempt] = useState(0)
   const [timeline, setTimeline] = useState<TimelineId>(initialTimeline)
   const [badParam, setBadParam] = useState<string | null>(unknownTimelineParam)
-  /** null until the today timeline is first shown (and again after "Reintentar"). */
-  const [forecast, setForecast] = useState<ForecastState | null>(null)
+  /** Today's forecast per today timeline (each has its own point): missing until that timeline is first shown, and
+   *  again after "Reintentar". */
+  const [forecasts, setForecasts] = useState<Partial<Record<TodayTimelineId, ForecastState>>>({})
+  const forecast = isTodayTimeline(timeline) ? (forecasts[timeline] ?? null) : null
+  const resetForecast = useCallback(() => {
+    if (isTodayTimeline(timeline)) setForecasts((f) => ({ ...f, [timeline]: undefined }))
+  }, [timeline])
   const eventId = eventOfTimeline(timeline)
   const base = bases[eventId] ?? null
   useEffect(() => {
@@ -186,16 +203,17 @@ export default function App() {
       live = false
     }
   }, [eventId, bases, loadAttempt])
-  // The forecast is downloaded the first time the today timeline is shown, and again if it is shown on a later
+  // The forecast is downloaded the first time a today timeline is shown, and again if it is shown on a later
   // date than the one downloaded (a tab left open past midnight).
   useEffect(() => {
-    if (timeline !== TIMELINE.TODAY) return
+    if (!isTodayTimeline(timeline)) return
     const stale = forecast?.status === 'ok' && forecast.forecast.date !== santiagoDate(new Date())
     if (forecast !== null && !stale) return
-    setForecast({ status: 'loading' })
-    fetchForecast()
-      .then((f) => setForecast({ status: 'ok', forecast: f }))
-      .catch((e: unknown) => setForecast({ status: 'error', message: e instanceof Error ? e.message : String(e) }))
+    const set = (st: ForecastState) => setForecasts((f) => ({ ...f, [timeline]: st }))
+    set({ status: 'loading' })
+    fetchForecast(TODAY_DEFS[timeline].point)
+      .then((f) => set({ status: 'ok', forecast: f }))
+      .catch((e: unknown) => set({ status: 'error', message: e instanceof Error ? e.message : String(e) }))
   }, [timeline, forecast])
   const pickTimeline = useCallback((t: TimelineId) => {
     setFatal(null)
@@ -216,7 +234,7 @@ export default function App() {
     if (timeline === TIMELINE.VINA_2024) return VINA_2024_CHOICE
     if (timeline === TIMELINE.EATON_2025) return EATON_2025_CHOICE
     if (timeline === TIMELINE.TALCA) return TALCA_CHOICE
-    return okForecast ? { id: TIMELINE.TODAY, forecast: okForecast } : null
+    return okForecast ? { id: timeline, forecast: okForecast } : null
   }, [timeline, okForecast])
   const view = useMemo(() => {
     if (!base || !choice) return null
@@ -271,7 +289,7 @@ export default function App() {
             <>
               <div className="alert error">No se pudo preparar el escenario desde hoy: {error}</div>
               <div className="row">
-                <button type="button" className="btn" onClick={() => setForecast(null)}>
+                <button type="button" className="btn" onClick={resetForecast}>
                   Reintentar
                 </button>
                 <button type="button" className="btn ghost" onClick={() => pickTimeline(TIMELINE.VINA_2024)}>
@@ -558,6 +576,12 @@ function Explorer({
     },
     [data, onNote],
   )
+  const onRemoveIgnition = useCallback((id: string) => {
+    setScenario((s) => ({ ...s, userIgnitions: s.userIgnitions.filter((u) => u.id !== id) }))
+  }, [])
+  const onTogglePresetIgnition = useCallback((id: string, on: boolean) => {
+    setScenario((s) => ({ ...s, presetIgnitions: on ? [...s.presetIgnitions.filter((x) => x !== id), id] : s.presetIgnitions.filter((x) => x !== id) }))
+  }, [])
   const onFirebreak = useCallback(
     (points: [number, number][]) => {
       const fb = { id: newId('fb'), points, widthM: widthRef.current }
@@ -683,6 +707,8 @@ function Explorer({
             scenario={scenario}
             tool={tool}
             onAddIgnition={onAddIgnition}
+            onRemoveIgnition={onRemoveIgnition}
+            onTogglePresetIgnition={onTogglePresetIgnition}
             onFirebreak={onFirebreak}
             onToggleEdge={onToggleEdge}
             onAddLink={onAddLink}

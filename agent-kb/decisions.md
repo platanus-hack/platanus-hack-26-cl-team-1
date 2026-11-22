@@ -366,6 +366,20 @@ D-026 to D-028 were taken by #54, #53 and the today scenario._
 - **Consequences:** a demo cannot be stopped by where the presenter clicks. Not fixed: firebreaks have no build time,
   households are coloured by the final result during playback, and a fire added at the end of the window barely burns.
 
+### D-036 — Today in Talca, starting blank: a second "today" timeline with no fire starts (2026-11-22)
+- **Context:** for the live demo the user asked for a scenario of today, in Talca, that opens with no fire starts,
+  and for a way to delete fire starts, not only add them.
+- **Decision (contract: `types.ts` `TIMELINE.TODAY_TALCA`, `?escenario=hoy-talca`):**
+  - "Today" is now a family (`TODAY_TIMELINES`, `TODAY_DEFS` in `src/data/timeline.ts`): each shows a baked territory
+    (`eventOfTimeline`) with today's Open-Meteo forecast at that territory's weather.json point
+    (`VINA_FORECAST_POINT`, `TALCA_FORECAST_POINT`), and says whether the base day's preset ignitions move to today
+    (Viña, as in D-028) or not (Talca: none, the presenter places every fire start). D-028's Viña timeline is unchanged.
+  - Picker option "Hoy · Talca (pronóstico)". Alert 17:00 (D-032's assumption, same time of day); no firefighters.
+  - With no tool on, a click on a fire start opens a popup: "Quitar foco" for an added one, "Desactivar / Activar
+    foco" for a preset. The Fuego section adds "Quitar todas" (two or more added) and says how to remove one.
+- **Consequences:** the default landing is still Viña's today (D-028); the demo opens `?escenario=hoy-talca`. Needs
+  the forecast API, like D-028 (offline mode disables both today options).
+
 ## §2 Open
 
 - Viña's scar (`scar.bin`) applies a −0.1 reflectance offset that the Earth Search COGs do not need (15.6 % / 19.6 %
