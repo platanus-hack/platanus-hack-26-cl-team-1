@@ -1,5 +1,6 @@
 // Clock helpers. Engine time is "minutes since GridMeta.t0"; data files carry local ISO times without offset.
-// We compare local wall-clock times directly (America/Santiago was UTC-3 all of Feb 2024, no DST change).
+// We compare local wall-clock times directly: no event window crosses a DST change (America/Santiago was UTC-3 all
+// of Feb 2024; America/Los_Angeles was UTC-8 all of Jan 2025).
 
 const LOCAL_RE = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/
 

@@ -7,19 +7,18 @@ import numpy as np
 
 from . import grid, raster
 
-# 1x1 degree tiles named by their lower-left corner; verified by reading their bounds:
-# S34_00_W072 covers lat -34..-33, S33_00_W072 covers lat -33..-32 (both lon -72..-71).
-TILES = ["S34_00_W072_00", "S33_00_W072_00"]
+# 1x1 degree tiles named by their lower-left corner (per event: grid.EVENT.dem_tiles); verified by reading
+# their bounds, e.g. S34_00_W072 covers lat -34..-33, S33_00_W072 covers lat -33..-32 (both lon -72..-71).
 URL = "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_{t}_DEM/Copernicus_DSM_COG_10_{t}_DEM.tif"
 
 
 def bake() -> dict:
     total = np.zeros(grid.N_CELLS)
     count = np.zeros(grid.N_CELLS)
-    for t in TILES:
+    for t in grid.EVENT.dem_tiles:
         res = raster.read_bbox_4326(URL.format(t=t), f"dem_{t}")
         if res is None:
-            raise RuntimeError(f"DEM tile {t} does not overlap the grid: fix TILES")
+            raise RuntimeError(f"DEM tile {t} does not overlap the grid: fix the event's dem_tiles")
         a, lat, lon = res
         idx = raster.pixel_cells(lat, lon).ravel()
         v = a.astype(np.float64).ravel()

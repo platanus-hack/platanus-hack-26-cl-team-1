@@ -34,8 +34,7 @@ WORLDCOVER_TO_FUEL = {
 }
 WC_CLASSES = sorted(WORLDCOVER_TO_FUEL)  # nodata (0) is not a class: it never wins the majority
 
-# 3x3 degree tiles named by their lower-left corner; the grid straddles lat -33.
-TILES = ["S36W072", "S33W072"]
+# 3x3 degree tiles named by their lower-left corner (per event: grid.EVENT.worldcover_tiles).
 URL = "https://esa-worldcover.s3.eu-central-1.amazonaws.com/v200/2021/map/ESA_WorldCover_10m_2021_v200_{t}_Map.tif"
 
 DENSE_URBAN_COVERAGE = 0.15  # built-up cell with >= 15% roof coverage -> URBAN_DENSE, else URBAN_LOW
@@ -50,10 +49,10 @@ def class_counts() -> np.ndarray:
         lut[c] = i
     k = len(WC_CLASSES)
     counts = np.zeros(grid.N_CELLS * k, dtype=np.int64)
-    for t in TILES:
+    for t in grid.EVENT.worldcover_tiles:
         res = raster.read_bbox_4326(URL.format(t=t), f"worldcover_{t}")
         if res is None:
-            raise RuntimeError(f"WorldCover tile {t} does not overlap the grid: fix TILES")
+            raise RuntimeError(f"WorldCover tile {t} does not overlap the grid: fix the event's worldcover_tiles")
         a, lat, lon = res
         idx = raster.pixel_cells(lat, lon).ravel()
         cls = lut[a.ravel()]

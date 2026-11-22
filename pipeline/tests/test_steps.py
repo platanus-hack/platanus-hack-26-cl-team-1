@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from steps import fuel, goes, grid, roads, scar, wui
+from steps import events, fuel, goes, grid, perimeter, roads, scar, wui
 
 
 def test_cell_index_corners_and_outside():
@@ -224,11 +224,86 @@ def test_goes_scan_time_is_mid_scan_local():
     assert goes.scan_time_local(name) == "2024-02-02T18:05"
 
 
-def test_committed_grid_json_credits_every_bake_source():
-    # The "Fuentes" panel reads grid.json; a source added to bake.SOURCES must reach the committed file.
+@pytest.fixture
+def restore_default_event():
+    yield
+    grid.select(events.DEFAULT)
+
+
+@pytest.mark.parametrize("event_id", sorted(events.EVENTS))
+def test_committed_grid_json_matches_the_event(event_id, restore_default_event):
+    # The "Fuentes" panel reads grid.json; a source added to an event must reach the committed file, and the
+    # committed grid must be the one the event defines.
     import json
 
     import bake
 
+    ev = grid.select(event_id)
     meta = json.loads((grid.OUT_DIR / "grid.json").read_text())
-    assert meta["sources"] == bake.SOURCES
+    assert meta["sources"] == bake.sources(ev)
+    assert {k: meta[k] for k in ("rows", "cols", "latMax", "lonMin", "dLat", "dLon", "t0")} == {
+        "rows": grid.ROWS,
+        "cols": grid.COLS,
+        "latMax": grid.LAT_MAX,
+        "lonMin": grid.LON_MIN,
+        "dLat": grid.D_LAT,
+        "dLon": grid.D_LON,
+        "t0": grid.T0,
+    }
+
+
+def test_default_event_is_the_vina_grid():
+    assert events.DEFAULT == "vina-2024"
+    assert grid.EVENT.id == "vina-2024"
+    assert grid.OUT_DIR == grid.DATA_ROOT and grid.CACHE_DIR == grid.CACHE_ROOT
+
+
+@pytest.mark.parametrize("event_id", sorted(events.EVENTS))
+def test_event_definitions_are_consistent(event_id, restore_default_event):
+    from datetime import datetime, timedelta
+    from zoneinfo import ZoneInfo
+
+    ev = grid.select(event_id)
+    assert grid.N_CELLS <= grid.MAX_CELLS
+    # dLon uses the centre latitude of the grid.
+    assert abs(ev.ref_lat - abs(grid.LAT_MAX - grid.ROWS * grid.D_LAT / 2)) < 0.01
+    # The fixed UTC offset holds over the whole baked window, and t0 carries it.
+    tz = ZoneInfo(ev.timezone)
+    assert datetime.fromisoformat(ev.t0).utcoffset() == timedelta(hours=ev.utc_offset_h)
+    for day in (ev.firms_first, ev.firms_last, ev.weather_first_day, ev.weather_last_day):
+        assert datetime.fromisoformat(day).replace(tzinfo=tz).utcoffset() == timedelta(hours=ev.utc_offset_h)
+    for t in (ev.goes_first_utc, ev.goes_last_utc):
+        assert t.replace(tzinfo=ZoneInfo("UTC")).astimezone(tz).utcoffset() == timedelta(hours=ev.utc_offset_h)
+    # Every fixed ignition preset is in the grid and has the ignitions.json shape.
+    for p in ev.ignitions or ():
+        assert set(p) == {"id", "label", "lon", "lat", "timeLocal", "source"}
+        assert grid.cell_index(p["lon"], p["lat"]) >= 0
+    assert ev.s2_pre.split("_")[1] == ev.s2_post.split("_")[1]  # same MGRS tile: same pixel grid
+
+
+def test_unknown_event_raises():
+    with pytest.raises(ValueError, match="unknown event"):
+        grid.select("nope")
+
+
+def test_scene_url_from_the_scene_id():
+    assert scar._url("S2B_19HBD_20240118_0_L2A", "B12") == (
+        "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/19/H/BD/2024/1/S2B_19HBD_20240118_0_L2A/B12.tif"
+    )
+    assert scar._url("S2C_11SLT_20250221_0_L2A", "SCL") == (
+        "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/11/S/LT/2025/2/S2C_11SLT_20250221_0_L2A/SCL.tif"
+    )
+
+
+def test_perimeter_rasterises_cell_centres(restore_default_event):
+    grid.select("eaton-2025")
+    # A square covering exactly cells (r, c) for r in 10..12 and c in 20..23 (edges on cell boundaries, so only
+    # those cell centres are inside).
+    w, e = grid.LON_MIN + 20 * grid.D_LON, grid.LON_MIN + 24 * grid.D_LON
+    n, s = grid.LAT_MAX - 10 * grid.D_LAT, grid.LAT_MAX - 13 * grid.D_LAT
+    sq = {"type": "Polygon", "coordinates": [[[w, s], [e, s], [e, n], [w, n], [w, s]]]}
+    got = perimeter.rasterize(sq).reshape(grid.ROWS, grid.COLS)
+    assert got.sum() == 12
+    assert got[10:13, 20:24].all()
+    with pytest.raises(RuntimeError, match="Polygon"):
+        perimeter.rasterize({"type": "Point", "coordinates": [w, n]})

@@ -8,12 +8,13 @@ import type { Dataset } from './data/load'
 import { loadRealDataset } from './data/load'
 import { makeMockDataset } from './data/mock'
 import { fetchForecast, santiagoDate, type Forecast } from './data/forecast'
-import { isTimelineId, TIMELINE_OPTIONS, timelineDataset, VINA_2024_CHOICE, type TimelineChoice } from './data/timeline'
+import { EATON_2025_CHOICE, isTimelineId, TIMELINE_OPTIONS, timelineDataset, VINA_2024_CHOICE, type TimelineChoice } from './data/timeline'
+import { checkEvent, EVENTS, eventOfTimeline, type EventDef, type EventId } from './data/events'
 import { localToMin, minToDateLabel, minToHHMM, wallClockMin } from './data/time'
 import { SimClient } from './worker/client'
 import type { BrigadesOut, EvacOut, FireOut } from './worker/protocol'
 import type { FirebreakWidth, Scenario, WeatherSettings } from './worker/scenario'
-import { buildWeatherSeries, countAtOrBefore, defaultBrigades, sampleAt, sortedArrivals } from './worker/scenario'
+import { buildWeatherSeries, countAtOrBefore, defaultBrigades, noBrigades, sampleAt, sortedArrivals } from './worker/scenario'
 import { MapView } from './ui/MapView'
 import type { LayerToggles, Tool } from './ui/MapView'
 import { Panel } from './ui/Panel'
@@ -58,10 +59,10 @@ function defaultScenario(data: Dataset): Scenario {
     cueShare: DEFAULT_EVAC_PARAMS.cueShare,
     cueRadiusM: DEFAULT_EVAC_PARAMS.cueRadiusM,
     prepMedianMin: DEFAULT_EVAC_PARAMS.prepMedianMin,
-    footShare: DEFAULT_EVAC_PARAMS.footShare,
+    footShare: data.event.evac.footShare.value,
     closedEdges: [],
     addedLinks: [],
-    brigades: defaultBrigades(data.brigades, data.grid.t0),
+    brigades: data.brigades ? defaultBrigades(data.brigades, data.grid.t0) : noBrigades(),
   }
 }
 
@@ -124,6 +125,7 @@ function windowLabel(data: Dataset): string {
 
 function subtitleFor(data: Dataset | null, timeline: TimelineId): string {
   if (timeline === TIMELINE.VINA_2024) return 'Explorador de escenarios del incendio del 2 de febrero de 2024'
+  if (timeline === TIMELINE.EATON_2025) return 'Explorador de escenarios del incendio Eaton del 7 de enero de 2025 · Altadena y Pasadena, California'
   const day = data ? ` (${minToDateLabel(data.grid.t0, 0)}, ${windowLabel(data)})` : ''
   return `Escenario de hoy${day} con el pronóstico del tiempo`
 }
@@ -131,21 +133,38 @@ function subtitleFor(data: Dataset | null, timeline: TimelineId): string {
 type ForecastState = { status: 'loading' } | { status: 'ok'; forecast: Forecast } | { status: 'error'; message: string }
 
 export default function App() {
-  const [base, setBase] = useState<Dataset | null>(null)
+  /** Baked datasets by event, each loaded the first time a timeline needs it (src/data/events.ts). */
+  const [bases, setBases] = useState<Partial<Record<EventId, Dataset>>>({})
   const [fatal, setFatal] = useState<string | null>(null)
   const [timeline, setTimeline] = useState<TimelineId>(initialTimeline)
   const [badParam, setBadParam] = useState<string | null>(unknownTimelineParam)
   /** null until the today timeline is first shown (and again after "Reintentar"). */
   const [forecast, setForecast] = useState<ForecastState | null>(null)
+  const eventId = eventOfTimeline(timeline)
+  const base = bases[eventId] ?? null
   useEffect(() => {
+    if (bases[eventId]) return
     const forceMock = new URLSearchParams(window.location.search).has('mock')
-    ;(forceMock ? Promise.resolve(null) : loadRealDataset())
+    let event: EventDef
+    try {
+      event = checkEvent(EVENTS[eventId])
+    } catch (e) {
+      setFatal(e instanceof Error ? e.message : String(e))
+      return
+    }
+    let live = true
+    ;(forceMock ? Promise.resolve(null) : loadRealDataset(event))
       .then((real) => {
         performance.mark('cf:data')
-        setBase(real ?? makeMockDataset())
+        // The synthetic set stands in for Viña's files only; another event without data is an error.
+        if (!real && !forceMock && event.id !== TIMELINE.VINA_2024) throw new Error(`no están los datos de "${event.id}" en /data/${event.dir} (grid.json)`)
+        if (live) setBases((b) => ({ ...b, [eventId]: real ?? makeMockDataset() }))
       })
-      .catch((e: unknown) => setFatal(e instanceof Error ? e.message : String(e)))
-  }, [])
+      .catch((e: unknown) => live && setFatal(e instanceof Error ? e.message : String(e)))
+    return () => {
+      live = false
+    }
+  }, [eventId, bases])
   // The forecast is downloaded the first time the today timeline is shown, and again if it is shown on a later
   // date than the one downloaded (a tab left open past midnight).
   useEffect(() => {
@@ -173,6 +192,7 @@ export default function App() {
   const okForecast = forecast?.status === 'ok' ? forecast.forecast : null
   const choice = useMemo<TimelineChoice | null>(() => {
     if (timeline === TIMELINE.VINA_2024) return VINA_2024_CHOICE
+    if (timeline === TIMELINE.EATON_2025) return EATON_2025_CHOICE
     return okForecast ? { id: TIMELINE.TODAY, forecast: okForecast } : null
   }, [timeline, okForecast])
   const view = useMemo(() => {
@@ -360,18 +380,18 @@ function Explorer({
   // Where people are, by time of day (src/engine/population): each burned cell counted at its arrival time.
   const wall0 = useMemo(() => wallClockMin(t0), [t0])
   const people = useMemo(
-    () => (fire ? peopleInBurnedArea(fire.arrivalMin, data.populationHome, data.populationWork, wall0, DEFAULT_PRESENCE_PARAMS, populationDay) : null),
+    () => (fire && data.population ? peopleInBurnedArea(fire.arrivalMin, data.population.home, data.population.work, wall0, DEFAULT_PRESENCE_PARAMS, populationDay) : null),
     [fire, data, wall0, populationDay],
   )
   const awayNow = awayShare(wall0 + Math.floor(clock), DEFAULT_PRESENCE_PARAMS, populationDay)
   const summary: Summary | null =
-    fire && evac && people
+    fire && evac && (people || !data.population)
       ? {
           burnedHaEnd: fire.burnedCells * cellHa,
           buildingsReached: evac.buildingsReached,
           trappedHouseholds: Math.round(evac.expectedTrappedHouseholds),
           trappedPeople: Math.round(evac.expectedTrappedPeople),
-          peopleReached: Math.round(people.present),
+          peopleReached: people ? Math.round(people.present) : null,
         }
       : null
   const firmsShown = useMemo(() => data.firms.filter((f) => localToMin(t0, f.timeLocal) <= clock).length, [data, t0, clock])
@@ -421,6 +441,16 @@ function Explorer({
   }, [])
   useEffect(() => onNote('tool', null), [tool, onNote])
 
+  // Layers this scenario has no data for: FIRMS in the today timeline, population and firefighters where the
+  // event does not ship them (EventDef.layers).
+  const hiddenLayers = useMemo(
+    () => [
+      ...(data.firms.length === 0 ? (['firms'] as const) : []),
+      ...(data.population ? [] : (['poblacion'] as const)),
+      ...(data.brigades ? [] : (['bomberos'] as const)),
+    ],
+    [data],
+  )
   const effectiveLayers = useMemo(
     // the street tools and the evacuation routes need the street layer on
     () => (tool === 'closeRoad' || tool === 'link' || showRoutes ? { ...layers, calles: true } : layers),
@@ -528,7 +558,7 @@ function Explorer({
             onLinkStart={setLinkStart}
             onNote={onNote}
           />
-          <LayersCard layers={effectiveLayers} setLayer={setLayer} showRoutes={showRoutes} hide={data.firms.length === 0 ? ['firms'] : []} />
+          <LayersCard layers={effectiveLayers} setLayer={setLayer} showRoutes={showRoutes} hide={hiddenLayers} />
           <div className="map-notes">
             {hint && (
               <div className="tool-hint" role="status">

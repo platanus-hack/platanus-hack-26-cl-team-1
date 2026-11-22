@@ -1,11 +1,13 @@
 // Shared contract between the data pipeline (pipeline/), the engines (src/engine/fire, src/engine/evac)
 // and the UI. Change it only together with every consumer.
 //
-// Units: metres, minutes, km/h, degrees, percent. Engine time is "minutes since GridMeta.t0" (local time
-// America/Santiago, UTC-3 in February). Infinity means "never" (e.g. a cell the fire does not reach).
+// Units: metres, minutes, km/h, degrees, percent. Engine time is "minutes since GridMeta.t0", in the event's
+// local wall-clock time (Viña: America/Santiago, UTC-3 in February; Eaton: America/Los_Angeles, UTC-8 in
+// January; neither window crosses a DST change). Infinity means "never" (e.g. a cell the fire does not reach).
 
 // ---------------------------------------------------------------------------------------------------------
-// Data files in web/public/data/ (written by pipeline/, read by src/data/load.ts)
+// Data files in web/public/data/<event dir>/ (written by pipeline/, read by src/data/load.ts; Viña's at the root,
+// the others in their own folder: src/data/events.ts)
 // ---------------------------------------------------------------------------------------------------------
 
 /** grid.json. Row 0 is the NORTH edge, col 0 the WEST edge, row-major (index = r * cols + c).
@@ -19,7 +21,7 @@ export interface GridMeta {
   dLat: number
   dLon: number
   cellM: number
-  /** Simulation clock origin, ISO with offset, e.g. "2024-02-02T12:00:00-03:00". */
+  /** Simulation clock origin, ISO with offset, e.g. "2024-02-02T12:00:00-03:00" (Viña), "2025-01-07T18:00:00-08:00" (Eaton). */
   t0: string
   /** Dataset name -> citation / URL, shown on the "Fuentes" panel. */
   sources: Record<string, string>
@@ -101,10 +103,13 @@ export interface IgnitionPreset {
  *    FIRMS detections and the Sentinel-2 scar to score against), over their validated window (12:00-24:00).
  *  - TODAY: the same territory today, 00:00 to 24:00, with today's hourly forecast for the weather.json point
  *    (fetched in the browser, src/data/forecast.ts), the 2024 ignition points at the same time of day, and no
- *    satellite detections. src/data/timeline.ts builds it. */
+ *    satellite detections. src/data/timeline.ts builds it.
+ *  - EATON_2025: the Eaton fire (Altadena / Pasadena, California, 7 Jan 2025 18:00 to 8 Jan 12:00 Pacific time),
+ *    its own baked files in public/data/eaton-2025/ (another territory: src/data/events.ts). */
 export const TIMELINE = {
   TODAY: 'hoy',
   VINA_2024: 'vina-2024',
+  EATON_2025: 'eaton-2025',
 } as const
 export type TimelineId = (typeof TIMELINE)[keyof typeof TIMELINE]
 

@@ -11,8 +11,8 @@ eucalyptus quebradas and a consolidated, paved city block with the same roof cov
 In the 2024 fire the first kind burned and the second mostly did not. This layer splits built-up cells by
 how much vegetation surrounds them instead: intermix (URBAN_LOW, burns) vs consolidated (URBAN_DENSE).
 
-Inputs are PRE-FIRE only: ESA WorldCover 2021 (10 m), Overture buildings, Sentinel-2 L2A of 2024-01-18
-(15 days before the fire: B04/B08 at 10 m, SCL at 20 m) and the Copernicus GLO-30 elevation. The burn
+Inputs are PRE-FIRE only: ESA WorldCover 2021 (10 m), Overture buildings, the event's pre-fire Sentinel-2 L2A
+scene (grid.EVENT.s2_pre; Viña: 2024-01-18, 15 days before the fire: B04/B08 at 10 m, SCL at 20 m) and the Copernicus GLO-30 elevation. The burn
 scar and the FIRMS detections are never read here (they are used only to score the result).
 
 Rule (classify_wui; every threshold is a constant below):
@@ -44,14 +44,13 @@ rate of spread (x2 per 10 deg), so putting it in the fuel class too would count 
 
 from __future__ import annotations
 
-import json
 
 import numpy as np
 from scipy import ndimage
 
 from . import fuel as fuel_step
 from . import grid
-from .scar import SCENES, SCL_INVALID, _lonlat_of_pixels, _read_scene, _url
+from .scar import SCL_INVALID, _lonlat_of_pixels, _read_scene, _url, boa_offset
 
 # --- Rule parameters (one place; documented in pipeline/README.md) -------------------------------------------
 VEG_WC_CLASSES = (10, 20, 30, 40, 90, 95, 100)  # tree, shrub, grass, crop, wetland, mangrove, moss/lichen
@@ -60,38 +59,8 @@ GREEN_RADIUS_CELLS = 3  # neighbourhood disk radius: 3 cells = 180 m (29 cells)
 INTERMIX_GREEN = 0.40  # built-up cell with neighbourhood green >= 40 % -> URBAN_LOW (intermix)
 VEG_TO_URBAN_COVERAGE = fuel_step.VEG_TO_DENSE_COVERAGE  # vegetation cell with >= 25 % roofs counts as built-up
 
-STAC_ITEM = "https://earth-search.aws.element84.com/v1/collections/sentinel-2-l2a/items/{id}"
 S2_SCALE = 0.0001
 MAX_NEGATIVE_REFLECTANCE_SHARE = 0.01  # sanity check on the BOA offset (see ndvi_features)
-
-
-def _boa_offset(scene_id: str) -> float:
-    """Additive offset to apply after DN * S2_SCALE, read from the scene's STAC item (cached).
-
-    Processing baseline >= 04.00 stores DN = 10000 * reflectance + 1000 (BOA_ADD_OFFSET, see
-    https://sentinels.copernicus.eu/-/copernicus-sentinel-2-major-products-upgrade-upcoming); Earth Search
-    re-writes those COGs without the +1000 and says so with `earthsearch:boa_offset_applied: true`. Applying
-    -0.1 again to such a COG gives negative red reflectance over vegetation (NDVI > 1), so the item is
-    checked, not assumed, and ndvi_features re-checks the result on the pixels."""
-    cache = grid.CACHE_DIR / f"stac_{scene_id}.json"
-    if cache.exists():
-        props = json.loads(cache.read_text())
-    else:
-        import requests
-
-        r = requests.get(STAC_ITEM.format(id=scene_id), timeout=60)
-        r.raise_for_status()
-        props = r.json()["properties"]
-        cache.write_text(json.dumps(props, indent=1))
-    baseline = props.get("s2:processing_baseline")
-    applied = props.get("earthsearch:boa_offset_applied")
-    if baseline is None:
-        raise RuntimeError(f"{scene_id}: STAC item has no s2:processing_baseline")
-    if baseline < "04.00" or applied is True:
-        return 0.0
-    if applied is False:
-        return -0.1
-    raise RuntimeError(f"{scene_id}: baseline {baseline} but earthsearch:boa_offset_applied is {applied!r}")
 
 
 def _read_10m(scene_id: str) -> dict[str, np.ndarray]:
@@ -131,7 +100,7 @@ def ndvi_features(scene_id: str) -> tuple[np.ndarray, np.ndarray]:
     no data in B04/B08."""
     s10 = _read_10m(scene_id)
     s20 = _read_scene(scene_id)
-    off = _boa_offset(scene_id)
+    off = boa_offset(scene_id)
     red = s10["b04"].astype(np.float64) * S2_SCALE + off
     nir = s10["b08"].astype(np.float64) * S2_SCALE + off
     with np.errstate(invalid="ignore", divide="ignore"):
@@ -201,7 +170,7 @@ def bake(counts: np.ndarray, bld: np.ndarray, fuel_codes: np.ndarray) -> tuple[n
         raise RuntimeError("wui: buildings outside the grid (buildings.load() should have dropped them)")
     bcount = np.bincount(bidx, minlength=grid.N_CELLS)
     coverage = np.bincount(bidx, weights=bld[:, 2], minlength=grid.N_CELLS) / (grid.CELL_M * grid.CELL_M)
-    ndvi_mean, ndvi_green = ndvi_features(SCENES["pre"])
+    ndvi_mean, ndvi_green = ndvi_features(grid.EVENT.s2_pre)
     elev = np.fromfile(grid.OUT_DIR / "elevation.bin", dtype="<f4")
     if elev.size != grid.N_CELLS:
         raise RuntimeError(f"elevation.bin has {elev.size} values, expected {grid.N_CELLS}: run the terrain step")

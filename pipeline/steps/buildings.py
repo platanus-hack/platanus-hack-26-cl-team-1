@@ -13,11 +13,9 @@ import time
 import numpy as np
 
 from . import grid, overpass
+from .events import OVERTURE_RELEASE
 
-OVERTURE_RELEASE = "2026-11-18.0"
 OVERTURE_URL = f"s3://overturemaps-us-west-2/release/{OVERTURE_RELEASE}/theme=buildings/type=building/*"
-CACHE = grid.CACHE_DIR / f"buildings_overture_{OVERTURE_RELEASE}.npy"
-CACHE_OSM = grid.CACHE_DIR / "buildings_osm.npy"
 
 M_PER_DEG_LAT = 111320.0
 
@@ -73,19 +71,21 @@ def _fetch_osm() -> np.ndarray:
 def load() -> tuple[np.ndarray, str]:
     """(n, 3) float64 array [lon, lat, areaM2] for buildings with centroid inside the grid, and the
     source label actually used."""
-    if CACHE.exists():
-        arr, src = np.load(CACHE), "overture"
-    elif CACHE_OSM.exists():
-        arr, src = np.load(CACHE_OSM), "osm"
+    cache = grid.CACHE_DIR / f"buildings_overture_{OVERTURE_RELEASE}.npy"
+    cache_osm = grid.CACHE_DIR / "buildings_osm.npy"
+    if cache.exists():
+        arr, src = np.load(cache), "overture"
+    elif cache_osm.exists():
+        arr, src = np.load(cache_osm), "osm"
     else:
         try:
             arr = _fetch_overture()
-            np.save(CACHE, arr)
+            np.save(cache, arr)
             src = "overture"
         except Exception as exc:  # noqa: BLE001 - the fallback is reported loudly in the summary
             print(f"  !! Overture failed ({type(exc).__name__}: {exc}); falling back to OSM Overpass")
             arr = _fetch_osm()
-            np.save(CACHE_OSM, arr)
+            np.save(cache_osm, arr)
             src = "osm"
     inside = grid.cell_index(arr[:, 0], arr[:, 1]) >= 0
     arr = arr[inside]

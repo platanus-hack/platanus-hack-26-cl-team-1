@@ -43,11 +43,12 @@ Needs `uv` and Node 24 + `pnpm`.
 ```bash
 make install   # web deps (+ pipeline deps)
 make dev       # web on :5173 → http://localhost:5173
-make data      # re-bake web/public/data from the open sources (slow: downloads)
+make data      # re-bake web/public/data from the open sources (slow: downloads; Eaton: cd pipeline && uv run python bake.py --event eaton-2025)
 make population  # re-bake where people are by time of day (all of Chile + the grid)
 make test      # every test suite
 make check     # what CI runs: typecheck, tests, build
 make validate  # model vs the real burn scar (prints the number used in the pitch)
+make validate-eaton  # out of sample: the Viña-calibrated model on the Eaton fire (California, 2025)
 ```
 
 ## Rules
