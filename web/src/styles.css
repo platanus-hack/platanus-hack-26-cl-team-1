@@ -83,18 +83,19 @@ input {
   min-width: 0;
 }
 .brand h1 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 19px;
   color: var(--text);
 }
 .brand h1::before {
   content: '';
-  display: inline-block;
-  width: 9px;
-  height: 9px;
-  border-radius: 2px;
-  background: var(--accent);
-  margin-right: 9px;
-  vertical-align: 2px;
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  border-radius: 7px;
+  background: var(--bg) url('/favicon.svg') center / contain no-repeat;
 }
 .brand p {
   margin: 1px 0 0;
