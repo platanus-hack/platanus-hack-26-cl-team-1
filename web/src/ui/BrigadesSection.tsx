@@ -29,15 +29,16 @@ const STATUS_ES: Record<UnitStatus, string> = {
   idle: 'sin sector amenazado',
 }
 
+/** A value's source: on hover (title) and on tap or click (touch screens show no title). */
 function Supuesto({ source }: { source: string | null }) {
-  return source === null ? (
-    <span className="tag warn" title="Sin fuente: valor supuesto, editable">
-      supuesto
-    </span>
-  ) : (
-    <span className="tag" title={source}>
-      fuente
-    </span>
+  const text = source ?? 'Sin fuente: valor supuesto, editable'
+  return (
+    <details className="src-tag">
+      <summary className={source === null ? 'tag warn' : 'tag'} title={text}>
+        {source === null ? 'supuesto' : 'fuente'}
+      </summary>
+      <div className="src-pop">{text}</div>
+    </details>
   )
 }
 
@@ -46,6 +47,7 @@ function Stepper({ value, onChange, label }: { value: number; onChange: (v: numb
     <input
       className="stepper"
       type="number"
+      inputMode="numeric"
       min={0}
       max={MAX_UNITS}
       step={1}
@@ -167,14 +169,16 @@ function BrigadesBody(p: Props & { file: BrigadesFile }) {
           </div>
 
           {file.cuts.map((c) => (
-            <Toggle
-              key={c.id}
-              label={`Corte histórico: ${c.label} desde las ${c.fromLocal.slice(11, 16)}`}
-              checked={b.historicalCuts}
-              onChange={(v) => set({ historicalCuts: v })}
-              title={c.source}
-              sub={c.toLocal === null ? 'Sin hora de reapertura con fuente: se deja cortada hasta el final.' : undefined}
-            />
+            // the source chip sits outside the toggle's <label>: tapping it must not flip the switch
+            <div key={c.id} className="row cut-row">
+              <Toggle
+                label={`Corte histórico: ${c.label} desde las ${c.fromLocal.slice(11, 16)}`}
+                checked={b.historicalCuts}
+                onChange={(v) => set({ historicalCuts: v })}
+                sub={c.toLocal === null ? 'Sin hora de reapertura con fuente: se deja cortada hasta el final.' : undefined}
+              />
+              <Supuesto source={c.source} />
+            </div>
           ))}
 
           <div className="muted small">
@@ -200,34 +204,36 @@ function BrigadesBody(p: Props & { file: BrigadesFile }) {
                   onChange={(v) => set({ dispatchMin: { ...b.dispatchMin, [d.cuerpo]: v } })}
                   extra={<Supuesto source={d.source} />}
                 />
-                <table className="brig-table">
-                  <thead>
-                    <tr>
-                      <th />
-                      {TYPES.map((k) => (
-                        <th key={k} title={UNIT_LABEL_ES[k]}>
-                          {UNIT_SHORT_ES[k]}
-                        </th>
-                      ))}
-                      <th />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {st.map((s) => (
-                      <tr key={s.id}>
-                        <td title={s.locationSource}>{s.company}</td>
+                <div className="table-scroll">
+                  <table className="brig-table">
+                    <thead>
+                      <tr>
+                        <th />
                         {TYPES.map((k) => (
-                          <td key={k}>
-                            <Stepper value={b.units[s.id][k]} label={`${s.company} de ${s.cuerpo}: ${UNIT_LABEL_ES[k]}`} onChange={(v) => setUnit(s.id, k, v)} />
-                          </td>
+                          <th key={k} title={UNIT_LABEL_ES[k]}>
+                            {UNIT_SHORT_ES[k]}
+                          </th>
                         ))}
-                        <td>
-                          <Supuesto source={s.unitsSource} />
-                        </td>
+                        <th />
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {st.map((s) => (
+                        <tr key={s.id}>
+                          <td title={s.locationSource}>{s.company}</td>
+                          {TYPES.map((k) => (
+                            <td key={k}>
+                              <Stepper value={b.units[s.id][k]} label={`${s.company} de ${s.cuerpo}: ${UNIT_LABEL_ES[k]}`} onChange={(v) => setUnit(s.id, k, v)} />
+                            </td>
+                          ))}
+                          <td>
+                            <Supuesto source={s.unitsSource} />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </details>
             )
           })}
@@ -250,21 +256,23 @@ function BrigadesBody(p: Props & { file: BrigadesFile }) {
                 onChange={(v) => set({ reinforcementMin: { ...b.reinforcementMin, [r.id]: v } })}
                 extra={<Supuesto source={r.arrivalSource} />}
               />
-              <table className="brig-table">
-                <tbody>
-                  <tr>
-                    {TYPES.map((k) => (
-                      <td key={k}>
-                        <span className="muted small">{UNIT_SHORT_ES[k]} </span>
-                        <Stepper value={b.reinforcementUnits[r.id][k]} label={`${r.label}: ${UNIT_LABEL_ES[k]}`} onChange={(v) => setReinf(r.id, k, v)} />
+              <div className="table-scroll">
+                <table className="brig-table">
+                  <tbody>
+                    <tr>
+                      {TYPES.map((k) => (
+                        <td key={k}>
+                          <span className="muted small">{UNIT_SHORT_ES[k]} </span>
+                          <Stepper value={b.reinforcementUnits[r.id][k]} label={`${r.label}: ${UNIT_LABEL_ES[k]}`} onChange={(v) => setReinf(r.id, k, v)} />
+                        </td>
+                      ))}
+                      <td>
+                        <Supuesto source={r.source} />
                       </td>
-                    ))}
-                    <td>
-                      <Supuesto source={r.source} />
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
               <div className="hint">
                 Entran por: {r.entries.map((e) => `${e.label}${e.delayMin > 0 ? ` (+${e.delayMin} min, supuesto)` : ''}`).join('; ')}.
               </div>

@@ -34,10 +34,10 @@ export function SourcesModal({ data, onClose }: { data: Dataset; onClose: () => 
   }
   const weatherListed = Object.values(data.grid.sources).includes(data.weather.source)
   return (
-    <dialog ref={ref} className="modal" onClose={onClose} onClick={(e) => e.target === ref.current && ref.current?.close()}>
+    <dialog ref={ref} className="modal" aria-labelledby="sources-title" onClose={onClose} onClick={(e) => e.target === ref.current && ref.current?.close()}>
       <div className="modal-body">
         <div className="modal-head">
-          <h2>Fuentes y supuestos</h2>
+          <h2 id="sources-title">Fuentes y supuestos</h2>
           <button type="button" className="btn small ghost" onClick={() => ref.current?.close()}>
             Cerrar
           </button>

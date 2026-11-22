@@ -3,6 +3,7 @@ import { FUEL_LABEL_ES } from '../engine/types'
 import type { FuelCode } from '../engine/types'
 import type { LayerToggles } from './MapView'
 import { FUEL_COLOURS, POPULATION_FULL_AT } from './overlays'
+import { NARROW_QUERY } from './useMediaQuery'
 
 const ITEMS: { key: keyof LayerToggles; label: string; swatch: string }[] = [
   { key: 'fuego', label: 'Fuego', swatch: 'fire' },
@@ -30,7 +31,8 @@ export function LayersCard({
   /** Layers this timeline has no data for (e.g. FIRMS detections from today, population where the event has none). */
   hide?: readonly (keyof LayerToggles)[]
 }) {
-  const [open, setOpen] = useState(() => window.matchMedia('(min-width: 900px)').matches)
+  // Open on wide screens; on phones the card would cover most of the map.
+  const [open, setOpen] = useState(() => !window.matchMedia(NARROW_QUERY).matches)
   return (
     <div className={`layers-card${open ? ' open' : ''}`}>
       <button type="button" className="layers-head" aria-expanded={open} onClick={() => setOpen(!open)}>

@@ -12,9 +12,10 @@
 - Fixed the demo-breakers (D-035): clicks outside the area refused with a note; fire starts on water, bare ground or
   a firebreak moved to the nearest vegetation with a note (`snapIgnitions`, tests); the worker keeps the last good
   fire input after a failed run; data load retries in the worker and a "Reintentar" screen with the picker;
-  "Fijar como escenario base" disabled while busy or on error; the hint's button saves the firebreak.
+  "Fijar como escenario base" disabled while busy or on error. (The hint's button that discarded a firebreak was
+  fixed on main meanwhile by the UI audit; this branch takes main's version.)
 - Checked in the browser on Talca: outside click (note, no error), river click (moved 85 m, note), line over the
-  preset start (no error), hint button (line saved), base button (disabled right after a change), failed load of
+  preset start (no error), base button (disabled right after a change), failed load of
   Eaton and Viña (error, "Reintentar", loads once the file is back).
 
 ## Decisions

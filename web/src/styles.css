@@ -15,6 +15,8 @@
   --ok: #4ade80;
   --radius: 10px;
   --panel-w: 380px;
+  /* range thumb width (bigger for touch): the time bar's alert tick is placed with it */
+  --thumb: 16px;
   color-scheme: dark;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   font-size: 14px;
@@ -197,9 +199,12 @@ input {
   transition: background 0.12s, border-color 0.12s;
   white-space: nowrap;
 }
-.btn:hover:not(:disabled) {
-  background: #253042;
-  border-color: #33415a;
+/* hover only where there is one: touch browsers keep :hover on the last tapped element */
+@media (hover: hover) {
+  .btn:hover:not(:disabled) {
+    background: #253042;
+    border-color: #33415a;
+  }
 }
 .btn:disabled {
   opacity: 0.45;
@@ -211,6 +216,18 @@ input {
 }
 .btn.ghost {
   background: transparent;
+}
+.btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #1a0f08;
+  font-weight: 600;
+}
+@media (hover: hover) {
+  .btn.primary:hover:not(:disabled) {
+    background: #f39a5e;
+    border-color: #f39a5e;
+  }
 }
 .btn.active,
 .btn.tool.active {
@@ -375,8 +392,10 @@ select {
 .section > summary::-webkit-details-marker {
   display: none;
 }
-.section > summary:hover {
-  color: var(--text);
+@media (hover: hover) {
+  .section > summary:hover {
+    color: var(--text);
+  }
 }
 .chev {
   width: 12px;
@@ -618,7 +637,7 @@ input[type='range']:focus-visible {
   color: var(--text-2);
 }
 .timeline-note {
-  margin-bottom: 12px;
+  margin: 12px 16px;
   line-height: 1.45;
 }
 
@@ -862,9 +881,11 @@ input[type='range']:focus-visible {
 .map-notes {
   position: absolute;
   top: 12px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(560px, calc(100% - 320px));
+  /* between the layers card (12 + 248 px) and the zoom buttons, centred there: never over the open card */
+  left: 272px;
+  right: 56px;
+  max-width: 560px;
+  margin-inline: auto;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -876,8 +897,9 @@ input[type='range']:focus-visible {
 }
 .tool-hint {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: 8px 12px;
   justify-content: space-between;
   padding: 9px 12px;
   border-radius: var(--radius);
@@ -886,6 +908,16 @@ input[type='range']:focus-visible {
   border-left-width: 4px;
   color: var(--text);
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+}
+.tool-hint > span:first-child {
+  flex: 1 1 220px;
+}
+/* the buttons drop under the text when the hint is narrow */
+.tool-hint-actions {
+  display: flex;
+  gap: 8px;
+  flex: none;
+  margin-left: auto;
 }
 .map-note {
   padding: 8px 12px;
@@ -904,7 +936,8 @@ input[type='range']:focus-visible {
   position: absolute;
   left: 12px;
   right: 12px;
-  bottom: 30px;
+  /* clear of MapLibre's scale bar and attribution under it */
+  bottom: 40px;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -1073,13 +1106,126 @@ input[type='range']:focus-visible {
   border-color: var(--text-2) !important;
 }
 
-/* ------------------------------------------------------------------ narrow screens: bottom sheet */
-@media (max-width: 899px) {
+/* Wide layout on a phone or tablet with insets (landscape iPhone Pro Max is 926-956 px wide; iPad standalone):
+   keep the app clear of the notch and the home indicator. env() is 0 on desktops. */
+@media (min-width: 900px) {
+  .app {
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+}
+
+/* Laptop-height windows: the fixed results block left the controls a 170-240 px strip. The whole panel
+   scrolls as one column instead, results first (tall screens keep the results fixed). */
+@media (min-width: 900px) and (max-height: 900px) {
+  .panel {
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--line) transparent;
+  }
+  .panel-scroll {
+    flex: none;
+    overflow: visible;
+  }
+}
+
+/* ------------------------------------------------------------------ touch and narrow screens */
+/* Copy that differs by pointer ("Haz clic" / "Toca"). */
+.coarse-only {
+  display: none;
+}
+@media (pointer: coarse) {
+  .fine-only {
+    display: none;
+  }
+  .coarse-only {
+    display: inline;
+  }
+}
+
+/* Touch as the main pointer (phones, tablets, also in the wide layout): fingers need bigger targets. */
+@media (pointer: coarse) {
   :root {
+    --thumb: 24px;
+  }
+  input[type='range'] {
+    height: 32px;
+  }
+  input[type='range']::-webkit-slider-thumb {
+    width: 24px;
+    height: 24px;
+    margin-top: -10px;
+  }
+  input[type='range']::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+  }
+  .seg button {
+    min-height: 36px;
+  }
+  .btn.small {
+    min-height: 34px;
+    padding-inline: 11px;
+  }
+  .section > summary {
+    padding: 14px 16px;
+  }
+  .layers-head {
+    padding: 11px 12px;
+  }
+  .layer-row {
+    padding: 7px 0;
     font-size: 14px;
   }
+  .layer-row input {
+    width: 18px;
+    height: 18px;
+  }
+  .toggle {
+    padding: 3px 0;
+  }
+  .switch {
+    width: 40px;
+    height: 24px;
+    border-radius: 12px;
+  }
+  .switch::after {
+    top: 3px;
+    left: 3px;
+    width: 18px;
+    height: 18px;
+  }
+  .toggle input:checked + .switch::after {
+    transform: translateX(16px);
+  }
+  /* under 16 px iOS zooms the page when a field gets focus (the steppers: end of file) */
+  select {
+    font-size: 16px;
+    min-height: 34px;
+  }
+}
+
+/* The scenario picker as a native select: phones only (see the narrow block). */
+.timeline-select {
+  display: none;
+}
+
+/* Phones (below 900 px, the same width as NARROW_QUERY in ui/useMediaQuery.ts): the map fills the screen under a
+   one-row top bar, and the results, the time bar and every control live in a sheet over the bottom of the map. */
+@media (max-width: 899px) {
   .topbar {
-    padding: 8px 16px;
+    gap: 10px;
+    padding: max(8px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 8px max(12px, env(safe-area-inset-left));
+  }
+  .brand {
+    flex: none;
+  }
+  .brand h1 {
+    font-size: 17px;
+  }
+  .brand h1::before {
+    flex-basis: 28px;
+    width: 28px;
+    height: 28px;
   }
   .brand p {
     display: none;
@@ -1090,81 +1236,287 @@ input[type='range']:focus-visible {
   .topbar .short {
     display: inline;
   }
-  .topbar {
-    flex-wrap: wrap;
-    row-gap: 6px;
-  }
   .topbar-end {
+    flex: 1 1 auto;
     min-width: 0;
-    /* four scenarios + Fuentes do not fit in one row at 375 px: Fuentes wraps under the picker */
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .timeline-pick {
+    display: none;
+  }
+  .timeline-select {
+    display: block;
+    flex: 0 1 auto;
+    min-width: 0;
     max-width: 100%;
-    flex-wrap: wrap;
-    row-gap: 6px;
+    height: 36px;
+    padding: 0 30px 0 10px;
+    border-radius: 8px;
+    font-size: 16px;
+    text-overflow: ellipsis;
+    -webkit-appearance: none;
+    appearance: none;
+    background: var(--panel-3) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5l3 3 3-3' fill='none' stroke='%238a94a6' stroke-width='1.5'/%3E%3C/svg%3E") right 9px center / 12px no-repeat;
   }
   .topbar-end > .btn {
-    padding-inline: 10px;
+    height: 36px;
+    padding: 0 10px;
   }
-  .timeline-pick button {
-    padding: 6px 6px;
-    font-size: 12px;
+  .banner {
+    padding: 6px 12px;
   }
-  .main {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr) 46dvh;
-  }
-  .panel {
-    border-left: 0;
-    border-top: 1px solid var(--line);
-    border-radius: 14px 14px 0 0;
-    overflow-y: auto;
-    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.4);
-  }
-  .panel::before {
-    content: '';
+
+  .main.narrow {
     display: block;
+    position: relative;
+    min-height: 0;
+  }
+  .main.narrow .mapwrap {
+    position: absolute;
+    inset: 0;
+  }
+
+  .sheet {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 4;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding-bottom: env(safe-area-inset-bottom);
+    background: var(--panel);
+    border-top: 1px solid var(--line);
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.45);
+    transition: height 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .sheet.dragging {
+    transition: none;
+  }
+  .sheet-top {
+    flex: none;
+    border-bottom: 1px solid var(--line);
+  }
+  .sheet-grab {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 20px max(16px, env(safe-area-inset-right)) 4px max(16px, env(safe-area-inset-left));
+    border: 0;
+    background: transparent;
+    color: var(--text);
+    text-align: left;
+    cursor: grab;
+    /* the sheet follows the finger: the page must not scroll or zoom under it */
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .sheet.dragging .sheet-grab {
+    cursor: grabbing;
+  }
+  .sheet-grab:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: -2px;
+    border-radius: 16px 16px 0 0;
+  }
+  .sheet-handle {
+    position: absolute;
+    top: 8px;
+    left: 50%;
     width: 40px;
     height: 4px;
+    margin-left: -20px;
     border-radius: 2px;
-    background: var(--line);
-    margin: 8px auto 0;
-    flex: none;
+    background: #3a475b;
   }
-  .panel-scroll {
+  .sheet-summary {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .sheet-stat {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .sheet-stat b {
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 1.15;
+    font-variant-numeric: tabular-nums;
+  }
+  .sheet-stat.strong b {
+    color: #fca5a5;
+  }
+  .sheet-stat > span {
+    font-size: 11.5px;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .sheet-busy {
+    flex: none;
+    color: var(--accent);
+  }
+  .sheet-grab .chev {
+    flex: none;
+    width: 14px;
+    height: 14px;
+  }
+  .sheet[data-snap='half'] .sheet-grab .chev,
+  .sheet[data-snap='full'] .sheet-grab .chev {
+    transform: rotate(180deg);
+  }
+
+  .timebar.docked {
+    position: static;
+    max-width: none;
+    margin: 0;
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      'play clock . speed d3'
+      'scrub scrub scrub scrub scrub';
+    align-items: center;
+    column-gap: 10px;
+    row-gap: 16px;
+    padding: 4px max(16px, env(safe-area-inset-right)) 12px max(16px, env(safe-area-inset-left));
+    background: transparent;
+    backdrop-filter: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .timebar.docked .play {
+    grid-area: play;
+    width: 44px;
+    height: 44px;
+  }
+  .timebar.docked .clock {
+    grid-area: clock;
+    min-width: 0;
+  }
+  .timebar.docked .hhmm {
+    font-size: 20px;
+  }
+  .timebar.docked .scrub {
+    grid-area: scrub;
+  }
+  .timebar.docked .speed {
+    grid-area: speed;
+    height: 36px;
+    font-size: 16px;
+  }
+  .timebar.docked .d3 {
+    grid-area: d3;
+    height: 36px;
+  }
+
+  .sheet-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--line) transparent;
+  }
+  .sheet-body .panel-scroll {
     overflow: visible;
     flex: none;
   }
-  .results {
-    padding: 10px 16px;
+  .sheet .results {
+    padding: 12px 16px;
+  }
+  /* the result that matters most comes first */
+  .sheet .stat.strong {
+    order: -1;
   }
   .stat-value {
     font-size: 19px;
   }
+
+  /* map overlays: clear of the top bar's corner controls and of the sheet */
   .layers-card {
-    width: auto;
-    max-width: calc(100% - 70px);
     top: 8px;
-    left: 8px;
+    left: max(8px, env(safe-area-inset-left));
+    width: auto;
+    max-width: calc(100% - 64px);
+    max-height: calc(100% - var(--sheet-h, 0px) - 24px);
   }
   .map-notes {
-    width: calc(100% - 16px);
-    top: auto;
-    bottom: 96px;
+    top: 52px;
+    bottom: auto;
+    left: max(8px, env(safe-area-inset-left));
+    right: calc(48px + env(safe-area-inset-right));
+    width: auto;
+    transform: none;
   }
-  .timebar {
-    left: 8px;
-    right: 8px;
-    bottom: 26px;
-    gap: 8px;
-    padding: 15px 8px 6px;
+  .main.narrow .maplibregl-ctrl-bottom-left,
+  .main.narrow .maplibregl-ctrl-bottom-right {
+    bottom: var(--sheet-h, 0px);
+    transition: bottom 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
   }
-  .hhmm {
-    font-size: 18px;
+  .main.narrow .maplibregl-ctrl-top-right {
+    right: env(safe-area-inset-right);
   }
-  .clock {
-    min-width: 54px;
+  .main.narrow .maplibregl-ctrl-bottom-left {
+    left: env(safe-area-inset-left);
+  }
+  .sheet-body {
+    padding-inline: env(safe-area-inset-left) env(safe-area-inset-right);
+  }
+  .main.narrow:has(.sheet.dragging) .maplibregl-ctrl-bottom-left,
+  .main.narrow:has(.sheet.dragging) .maplibregl-ctrl-bottom-right {
+    transition: none;
+  }
+
+  .modal {
+    width: min(720px, calc(100vw - 16px - env(safe-area-inset-left) - env(safe-area-inset-right)));
+    max-height: calc(100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  }
+  /* the dialog scrolls: keep "Cerrar" in reach (phones have no Esc) */
+  .modal-head {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    margin: -16px -16px 12px;
+    padding: 12px 16px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+  }
+  .modal-body {
+    padding: 16px;
   }
   .sources div {
     grid-template-columns: 1fr;
+    gap: 0;
+  }
+}
+
+/* Landscape phones and portrait tablets: the time bar fits in one row, which leaves more of the map visible. */
+@media (min-width: 600px) and (max-width: 899px) {
+  .timebar.docked {
+    grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+    grid-template-areas: 'play clock scrub speed d3';
+    column-gap: 14px;
+    /* room above the scrubber for the alert label */
+    padding-top: 16px;
+  }
+}
+
+/* The narrowest phones: the logo alone names the app, the scenario picker gets the room. */
+@media (max-width: 419px) {
+  .brand h1 {
+    font-size: 0;
     gap: 0;
   }
 }
@@ -1224,7 +1576,44 @@ input[type='range']:focus-visible {
   border: 1px solid var(--line);
   color: var(--muted);
   white-space: nowrap;
-  cursor: help;
+  cursor: pointer;
+}
+/* the source chip opens a note under it, across the section (it is positioned against .section-body) */
+.section-body {
+  position: relative;
+}
+.src-tag {
+  display: inline-block;
+}
+.src-tag > summary {
+  list-style: none;
+}
+.src-tag > summary::-webkit-details-marker {
+  display: none;
+}
+.src-pop {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  z-index: 5;
+  margin-top: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-3);
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+}
+.cut-row > .toggle {
+  flex: 1;
+}
+.table-scroll {
+  overflow-x: auto;
 }
 .tag.warn {
   border-color: rgba(251, 191, 36, 0.5);
@@ -1260,6 +1649,19 @@ input[type='range']:focus-visible {
   cursor: pointer;
   list-style: none;
   flex-wrap: wrap;
+}
+/* a flex summary draws no marker: show that these rows open */
+.brig-cuerpo > summary > span:first-child::before {
+  content: '▸';
+  display: inline-block;
+  width: 1em;
+  color: var(--muted);
+}
+.brig-cuerpo[open] > summary > span:first-child::before {
+  content: '▾';
+}
+.brig-cuerpo > summary:hover > span:first-child {
+  color: var(--accent);
 }
 .brig-table {
   width: 100%;
@@ -1317,4 +1719,43 @@ input[type='range']:focus-visible {
   margin-top: -4px;
   padding: 4px 10px;
   border-left: 2px solid var(--line);
+}
+
+/* Touch, after every base rule it overrides (same specificity, so it must come later in the file). */
+@media (pointer: coarse) {
+  .stepper {
+    font-size: 16px;
+    min-height: 34px;
+  }
+  .brig-cuerpo > summary {
+    min-height: 40px;
+    align-items: center;
+  }
+  .brig-stranded > summary {
+    padding-block: 10px;
+  }
+  .maplibregl-ctrl-group button {
+    width: 36px;
+    height: 36px;
+  }
+  .household-popup .maplibregl-popup-close-button {
+    top: 0;
+    right: 0;
+    width: 36px;
+    height: 36px;
+    font-size: 20px;
+  }
+  .household-popup .maplibregl-popup-content {
+    padding-right: 38px;
+  }
+  .src-tag > summary.tag {
+    padding: 6px 8px;
+  }
+}
+
+/* Phones: station names wrap so the truck tables fit a 360 px screen (after the base nowrap rule). */
+@media (max-width: 899px) {
+  .brig-table td:first-child {
+    white-space: normal;
+  }
 }

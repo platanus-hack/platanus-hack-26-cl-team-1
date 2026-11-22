@@ -25,6 +25,8 @@ with a pointer to their replacement; nothing is ever deleted from §3.
 - **Context:** same split as before; the pitch and users are Chilean, tooling and agents work best in English.
 - **Decision:** identifiers, comments, docs and agent-kb in English; every user-visible string and the voice in Spanish.
 - **Consequences:** prompts that generate spoken text must ask for Spanish output.
+- **README exception (2026-11-22):** the user explicitly requested the root `README.md` in Spanish,
+  including headings and command descriptions. Other technical documentation and agent-kb remain in English.
 
 ### D-019 — Pivot to Cortafuego, a wildfire and evacuation scenario simulator (2026-11-21)
 - **Context:** late Saturday the team judged Ojo (the camera supervisor, D-001) weak for the Simulations track:
@@ -332,8 +334,7 @@ D-026 to D-028 were taken by #54, #53 and the today scenario._
   presenter could stop the simulation with one click: a fire start outside the simulated area (the base map extends
   beyond it), on water or bare ground, under a drawn firebreak, and any failed run leaving the worker's cached input
   from the failed attempt (which then broke the firefighters' pass). It also found that a failed scenario load was a
-  dead end, that "Fijar como escenario base" could save the previous result, and that the hint's "Terminar (Esc)"
-  threw away the firebreak being drawn.
+  dead end, and that "Fijar como escenario base" could save the previous result.
 - **Decision (no contract change):**
   - A fire start or a firebreak entirely outside the area is not added; the map says so and the tool stays on.
   - A fire start on a cell that cannot burn (no fuel, a drawn firebreak or the plan's belt) moves to the nearest
@@ -341,8 +342,8 @@ D-026 to D-028 were taken by #54, #53 and the today scenario._
     with no vegetation that close it is left out, also with a note. This is a visible fallback, not a silent one.
   - The worker updates its fire cache and notes only after the fire succeeds; its data load retries after 1, 2 and
     4 s. A failed load keeps the scenario picker and offers "Reintentar".
-  - "Fijar como escenario base" is disabled while a change is being simulated or an error shows. The firebreak hint
-    button saves the line ("Guardar y salir (Enter)").
+  - "Fijar como escenario base" is disabled while a change is being simulated or an error shows. (The hint's button
+    that discarded the line was fixed on main by the UI audit: "Guardar" and "Cancelar".)
   - Copy: firebreaks exist from the start of the run and are at least one cell wide; house colours are the whole
     scenario's result, not the hour shown; Bomberos exists for Viña and Eaton.
 - **Consequences:** a demo cannot be stopped by where the presenter clicks. Not fixed: firebreaks have no build time,

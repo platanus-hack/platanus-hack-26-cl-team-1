@@ -36,6 +36,13 @@ export function minToDateLabel(t0: string, min: number): string {
   return `${d.getUTCDate()} ${MONTHS_ES[d.getUTCMonth()]} ${d.getUTCFullYear()}`
 }
 
+/** The end of a timeline with its day: "24:00 del 2 feb 2024" (an end at midnight belongs to the day before),
+ *  "12:00 del 8 ene 2025". */
+export function minToEndLabel(t0: string, min: number): string {
+  const hhmm = minToHHMM(t0, min)
+  return hhmm === '00:00' ? `24:00 del ${minToDateLabel(t0, min - 1)}` : `${hhmm} del ${minToDateLabel(t0, min)}`
+}
+
 /** Local ISO without offset ("2024-02-02T14:30") at `min` minutes after t0. */
 export function minToLocalIso(t0: string, min: number): string {
   const d = wallClockDate(t0, Math.round(min))
