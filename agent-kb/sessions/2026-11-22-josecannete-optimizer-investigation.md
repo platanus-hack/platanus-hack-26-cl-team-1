@@ -31,13 +31,17 @@
   Chilean cortafuego plans and the Ley de Incendios status.
 
 - **Planning (proactive) version, at the team's request:** measures chosen before any fire, over an ensemble of
-  plausible fires (ignitions in wildland 400 m-3 km from inhabited land, never within 2 km of the 2 Feb
-  ignitions), tested on held-out fires and then on 2 Feb. A greedy plan built on 30 fires overfits (280 ha: 18 %
-  train, 5 % unseen, 1 % on 2 Feb), and the plan tuned to 2 Feb saves 0 % on other fires. A ranking of single
-  belt tiles learned on 80 or more fires carries over (1,000 ha: about 24 % on unseen fires, against 6.5 % for
-  random tiles) but barely helps on 2 Feb (2-4 %). Choosing the neighbourhoods for a community preparation
-  programme (20,000 households) carries over to 2 Feb: 17-19 % of its exposure, against 3.7 % for random
-  sectors. Scripts: `proactive.ts`, `proactive2.ts`.
+  plausible fires (240 ignitions in wildland 400 m-3 km from inhabited land, never within 2 km of the 2 Feb
+  ignitions, all under 2 Feb's weather), tested on 80 held-out fires and then on 2 Feb. An independent check
+  reproduced every number; corrected reading:
+  - Belt tiles (1,000 ha) ranked on 30-160 sampled fires: 23-25 % on held-out fires, about 2.5-3.5x random tiles. On
+    2 Feb, no better than random tiles (real member 0.0-0.2 %). Only the belt everywhere (10,477 ha) helps on 2 Feb:
+    27.6 % on the real member.
+  - Community programme in 20,000 households, sectors ranked on sampled fires: on held-out fires 5-6 %, close to random
+    (median 3.2 %, max 5.0 % over 30 draws). On 2 Feb 15-20 % (real member 21-25 %), against a median of 2.7 % and a
+    max of 11.6 % for random sectors. Why it transfers to 2 Feb is not established.
+  - A plan tuned to 2 Feb saves 0 % on other fires (partly by construction).
+  - Scripts: `proactive.ts`, `proactive2.ts`; check logs `zz-verify-proactive-*.log`.
 
 ## Decisions
 - None recorded. Proposal (not decided): if the app gets an optimizer, it optimises over a weather ensemble,
