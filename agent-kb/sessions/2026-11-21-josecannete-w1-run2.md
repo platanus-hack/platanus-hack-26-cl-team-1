@@ -1,7 +1,7 @@
 # 2026-11-21 — w1-run2
 
 - **Who:** josecannete (+ agent, workspace W1)
-- **Branch / PRs:** `josecannete/water-cues-confirm` (PR link in backlog)
+- **Branch / PRs:** https://github.com/platanus-hack/platanus-hack-26-cl-team-1/pull/46
 - **Goal:** second live run (iPhone in Safari, pipelined calls): find out why it was still unreliable, and fix it.
 
 ## Done
