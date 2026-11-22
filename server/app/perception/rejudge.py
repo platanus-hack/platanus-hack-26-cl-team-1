@@ -18,6 +18,7 @@ import argparse
 import asyncio
 import json
 import shutil
+from functools import partial
 from pathlib import Path
 
 from contracts import Frame, Source
@@ -63,7 +64,7 @@ async def rejudge(
         record_dir=out,
         session=session.id,
     )
-    controller = RulesController()
+    controller = RulesController(confirm=settings.controller_confirm)
     decision = controller.start(session.task)
     history = recorded_frames(run_dir, session)
     for call in session.calls:
@@ -99,10 +100,11 @@ def main() -> None:
         shutil.rmtree(args.out)
     args.out.mkdir(parents=True)
     asyncio.run(rejudge(args.run_dir, session, args.out, settings, args.frames, args.span_ms))
-    labels = Review(args.run_dir, library, RulesController).labels()
+    controller = partial(RulesController, confirm=settings.controller_confirm)  # as the live server runs it
+    labels = Review(args.run_dir, library, controller).labels()
     (args.out / "labels.json").write_text(json.dumps(labels, indent=1, sort_keys=True))
     rejudged = next(s for s in load_sessions(args.out, library) if s.id == args.session)
-    print("\n" + report(analyse(rejudged, labels, RulesController)))
+    print("\n" + report(analyse(rejudged, labels, controller)))
 
 
 if __name__ == "__main__":

@@ -112,3 +112,38 @@ def test_fast_sightings_need_the_minimum_span_before_inferring(task):
     fast = [at("rub_palms", t) for t in (1000, 1250, 1500, 1750, 2000, 2250)]
     assert all(d.event is not Event.STEP_DONE for d in fast)
     assert at("rub_palms", 3000).event is Event.STEP_DONE
+
+
+def test_a_single_flicker_does_nothing_with_two_of_three(task):
+    """One stray answer neither completes a step nor triggers a spoken warning; two agreeing ones do."""
+    _, decisions = run(
+        task, ["wet_hands", "wet_hands", "rinse_hands", "wet_hands", "apply_soap", "apply_soap"], confirm=2
+    )
+    assert [d.event for d in decisions] == [
+        Event.NONE,
+        Event.STEP_DONE,
+        Event.NONE,
+        Event.NONE,
+        Event.NONE,
+        Event.STEP_DONE,
+    ]
+
+
+def test_agreement_counts_within_the_last_three_answers(task):
+    _, decisions = run(task, ["wet_hands", None, "wet_hands"], confirm=2)
+    assert decisions[-1].event is Event.STEP_DONE
+    _, decisions = run(task, ["wet_hands", None, None, "wet_hands"], confirm=2)
+    assert decisions[-1].event is Event.NONE
+
+
+def test_the_live_server_confirms_only_real_model_answers(tmp_path):
+    from app.controller.factory import make_controller_factory
+    from app.settings import PerceptionMode, Settings, VoiceMode
+
+    library = TaskLibrary.load(TASKS_DIR)
+    base = dict(tasks_dir=TASKS_DIR, scripted_every_ms=0, scripted_mistake=None, voice=VoiceMode.BROWSER,
+                cors_origins=())  # fmt: skip
+    vlm = Settings(perception=PerceptionMode.VLM, vlm_base_url="http://x/v1", **base)
+    scripted = Settings(perception=PerceptionMode.SCRIPTED, **base)
+    assert make_controller_factory(vlm, library)().confirm == 2
+    assert make_controller_factory(scripted, library)().confirm == 1

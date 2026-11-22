@@ -37,3 +37,23 @@ call, so it picked the same frames and its accuracy was identical. It is **not**
   were tuned on this same run. The real test is a fresh labelled run of the demo task.
 - **3 frames can't be judged offline:** the recording kept about 2 frames per call. Live sessions now send
   3 frames over 1.1 s, with a call every 0.75 s. The next labelled live run will tell.
+
+## Run 2: pipelined calls, iPhone on a stand (D-019)
+
+**Data:** hand washing at a sink, 2026-11-21: one session, 320 calls (~3 per second, 3 frames each), labelled
+from the frames. The person lathers **under the running water**. With the labels as perception, the steps
+complete at wet 4.7 s, soap 10.4 s, palms 11.9 s, backs 13.3 s, rinse 19.7 s. There is a bare-hand faucet
+mistake at 28 s, and the task is done at 46 s.
+
+| Variant | Calls right | Spoken warnings (false) | wet / soap / palms / rinse at | Bare faucet / done | p50 |
+|---|---|---|---|---|---|
+| live (old cues, 1 answer acts) | 76% | 7 (6) | 4.4 / 7.1 / 8.4 / 14.1 s | flagged / 43.7 s | 0.84 s |
+| water-aware cues | 76% | 11 (10) | 4.0 / 9.7 / 11.9 / 21.8 s | flagged / 45.7 s | 0.71 s |
+| **cues + 2 of 3 answers agree** | **77%** | **4 (4)** | **4.7 / 10.1 / 14.5 / 21.8 s** | missed / missed | 0.70 s |
+
+The same settings on run 1 (138 calls, recorded at one call every 1.5 s): 60% of calls right (62% before).
+Its single soap call can't be confirmed even with the labels, an artifact of that recording's slow cadence.
+
+**Takeaways:** agreement removes most false warnings and early completions. The price is that very brief
+actions now need about a second on camera (≈ 3 answers live). Per-call accuracy doesn't change; the cues move
+*where* the errors fall.

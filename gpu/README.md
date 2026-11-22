@@ -60,6 +60,7 @@ holds `SUP_VLM_API_KEY` and optionally `VLM_MODEL`, `VLM_SERVED`, `VLM_GPU_UTIL`
 | `SUP_VLM_API_KEY` | — | the key from `~/sup/env` |
 | `SUP_VLM_MODEL` | `qwen3-vl-8b-fp8` | vLLM served name; recorded in every `Observation.model` |
 | `SUP_VLM_MIN_INTERVAL_MS` | `250` | minimum time between call starts |
+| `SUP_CONTROLLER_CONFIRM` | `2` | rules controller: act once this many of the last 3 answers agree (VLM only, D-019) |
 | `SUP_VLM_MAX_IN_FLIGHT` | `3` | pipelined calls per session; vLLM batches them at about the latency of one (D-018) |
 | `SUP_VLM_TIMEOUT_S` | `10` | slower = failure (raises; the session reports an `error`) |
 | `SUP_VLM_MAX_SIDE_PX` | `640` | frames are downscaled to this longest side |

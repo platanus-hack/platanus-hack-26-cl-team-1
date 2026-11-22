@@ -30,7 +30,7 @@
       "object": "hands",
       "target": "faucet",
       "label_es": "mojar las manos",
-      "visual_cue": "hands held under running water from the faucet"
+      "visual_cue": "clean hands with no soap or foam on them held under the running water, before any soap"
     },
     {
       "id": "apply_soap",
@@ -38,21 +38,21 @@
       "object": "soap",
       "target": "hands",
       "label_es": "aplicar jabón",
-      "visual_cue": "one hand presses the soap dispenser or holds the soap; a blob of soap or fresh lather sits in one palm"
+      "visual_cue": "one hand presses the soap dispenser or takes the soap bar; a blob of soap or fresh lather sits in one palm"
     },
     {
       "id": "rub_palms",
       "verb": "rub",
       "object": "hands",
       "label_es": "frotar las palmas",
-      "visual_cue": "both palms pressed flat against each other, rubbing back and forth or in circles; the backs of both hands face outward"
+      "visual_cue": "both palms pressed flat against each other, rubbing back and forth or in circles, lather building up; it can happen under or away from the running water"
     },
     {
       "id": "rub_backs",
       "verb": "rub",
       "object": "hands",
       "label_es": "frotar el dorso",
-      "visual_cue": "the palm or fingers of one hand slide over the BACK of the other hand (its knuckles and back face the camera), then the hands swap"
+      "visual_cue": "the palm or fingers of one hand slide over the BACK of the other hand (its knuckles and back face the camera), then the hands swap; under or away from the water"
     },
     {
       "id": "rinse_hands",
@@ -60,7 +60,7 @@
       "object": "hands",
       "target": "faucet",
       "label_es": "enjuagar las manos",
-      "visual_cue": "soapy hands under running water until the foam is gone"
+      "visual_cue": "hands held still or turned under the stream while the foam is visibly washing off, after the rubbing is done; little or no rubbing"
     },
     {
       "id": "dry_hands",

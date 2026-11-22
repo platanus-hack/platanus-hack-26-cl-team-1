@@ -93,7 +93,8 @@ def test_prompt_carries_the_task_and_the_frames(task, ontology):
     assert len(images) == 2  # newest + one ~1 s older
     assert images[0]["image_url"]["url"].startswith("data:image/jpeg;base64,")
     text = content[-1]["text"]
-    assert "wet_hands: hands held under running water from the faucet (mojar las manos)" in text
+    wet = next(a for a in ontology.actions if a.id == "wet_hands")
+    assert f"wet_hands: {wet.visual_cue} (mojar las manos)" in text
     assert "paper_towel" in text
     assert "Expected next" in text and "wet_hands: done when both hands are wet" in text
     assert "action touch_faucet_bare: a clean bare hand turns the faucet off" in text  # wrong_action
@@ -239,8 +240,11 @@ def test_session_runs_on_the_vlm(monkeypatch):
         hello["debug"] = True
         ws.send_text(json.dumps(hello))
         assert ws.receive_json()["type"] == "ready"
-        ws.send_bytes(pack_frame(0, 0, jpeg()))
         seen = []
+        for seq in range(2):  # the step completes once 2 answers agree (D-019)
+            ws.send_bytes(pack_frame(seq, seq * 200, jpeg()))
+            while not any(m["type"] == "debug" and m.get("observation") and m["seq"] == seq for m in seen):
+                seen.append(ws.receive_json())
         while not any(m["type"] == "state" and m["statuses"]["wet"] == "done" for m in seen):
             seen.append(ws.receive_json())
         observations = [m["observation"] for m in seen if m["type"] == "debug" and m.get("observation")]

@@ -25,6 +25,7 @@ import webbrowser
 from collections import Counter, defaultdict
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from functools import partial
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote
@@ -33,7 +34,7 @@ from contracts import Controller, Event, Observation, Quality, Source, Task, Vlm
 
 from ..controller.rules import RulesController
 from ..library.store import TaskLibrary
-from ..settings import REPO_ROOT
+from ..settings import REPO_ROOT, Settings
 
 NONE = "none"  # label: nothing from the task is happening
 
@@ -329,9 +330,14 @@ def main() -> None:
     parser.add_argument("--report", action="store_true", help="print the text report and exit")
     parser.add_argument("--min-calls", type=int, default=10, help="report only sessions this long")
     parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument(
+        "--confirm", type=int, help="answers that must agree (of 3); default: the live setting"
+    )
     parser.add_argument("--tasks-dir", type=Path, default=REPO_ROOT / "tasks")
     args = parser.parse_args()
-    review = Review(args.run_dir, TaskLibrary.load(args.tasks_dir), RulesController)
+    confirm = args.confirm if args.confirm is not None else Settings.from_env().controller_confirm
+    controller = partial(RulesController, confirm=confirm)  # as the live server runs it
+    review = Review(args.run_dir, TaskLibrary.load(args.tasks_dir), controller)
     if args.report:
         data = review.data()
         for analysis in data["sessions"]:

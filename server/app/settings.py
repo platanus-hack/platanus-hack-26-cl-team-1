@@ -41,6 +41,7 @@ class Settings:
     vlm_base_url: str | None = None  # OpenAI-compatible base URL, e.g. https://<tunnel>/v1
     vlm_model: str = "qwen3-vl-8b-fp8"  # served model name in vLLM; also recorded in every Observation
     vlm_api_key: str | None = None  # vLLM --api-key; never commit it (gpu/README.md)
+    controller_confirm: int = 2  # rules: act on an action once 2 of the last 3 answers agree (D-019)
     vlm_max_in_flight: int = 3  # pipelined calls per session; vLLM batches them (D-018)
     vlm_min_interval_ms: int = 250  # minimum time between two VLM calls, so we don't hammer the GPU
     vlm_timeout_s: float = 10.0  # a slower answer is a real failure (raises)
@@ -74,6 +75,7 @@ class Settings:
             vlm_base_url=os.environ.get("SUP_VLM_BASE_URL") or None,
             vlm_model=os.environ.get("SUP_VLM_MODEL", cls.vlm_model),
             vlm_api_key=os.environ.get("SUP_VLM_API_KEY") or None,
+            controller_confirm=int(os.environ.get("SUP_CONTROLLER_CONFIRM", cls.controller_confirm)),
             vlm_max_in_flight=int(os.environ.get("SUP_VLM_MAX_IN_FLIGHT", cls.vlm_max_in_flight)),
             vlm_min_interval_ms=int(os.environ.get("SUP_VLM_MIN_INTERVAL_MS", cls.vlm_min_interval_ms)),
             vlm_timeout_s=float(os.environ.get("SUP_VLM_TIMEOUT_S", cls.vlm_timeout_s)),

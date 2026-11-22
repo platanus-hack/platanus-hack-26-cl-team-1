@@ -8,14 +8,16 @@ from functools import partial
 from contracts import Controller
 
 from ..library.store import TaskLibrary
-from ..settings import ControllerMode, Settings
+from ..settings import ControllerMode, PerceptionMode, Settings
 from .learned import LearnedController, LearnedWeights
 from .rules import RulesController
 
 
 def make_controller_factory(settings: Settings, library: TaskLibrary) -> Callable[[], Controller]:
     if settings.controller is ControllerMode.RULES:
-        return RulesController
+        # Agreement guards against a model's flickering answers; the scripted fake reports each action once.
+        confirm = settings.controller_confirm if settings.perception is PerceptionMode.VLM else 1
+        return partial(RulesController, confirm=confirm)
     if settings.controller is ControllerMode.LEARNED:
         # Fail at startup, not mid-session: every task in the library needs matching weights.
         for summary in library.summaries():

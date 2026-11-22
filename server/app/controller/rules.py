@@ -7,6 +7,8 @@ must emit the same `Decision`s so the two can be compared.
 
 from __future__ import annotations
 
+from collections import deque
+
 from contracts import (
     Decision,
     Event,
@@ -27,6 +29,8 @@ REMIND_AFTER_MS = 20_000
 # taken as proof that the prerequisite happened unseen (a brief action between two perception calls, like
 # taking soap). The out-of-order warning is still said on the first sighting.
 INFER_AFTER = 4  # 3 skipped a real step on a run where the model hallucinated 3 early rinses
+CONFIRM = 1  # an action acts only when this many of the last CONFIRM_WINDOW answers agree; live: 2 (D-019)
+CONFIRM_WINDOW = 3
 INFER_MIN_MS = 2000  # …spanning at least this long, so faster perception doesn't infer sooner (D-018)
 
 
@@ -37,7 +41,13 @@ class RulesController:
         remind_after_ms: int = REMIND_AFTER_MS,
         infer_after: int = INFER_AFTER,
         infer_min_ms: int = INFER_MIN_MS,
+        confirm: int = CONFIRM,
+        confirm_window: int = CONFIRM_WINDOW,
     ) -> None:
+        if not 1 <= confirm <= confirm_window:
+            raise ValueError(f"need 1 <= confirm ({confirm}) <= confirm_window ({confirm_window})")
+        self.confirm = confirm
+        self.confirm_window = confirm_window
         self.min_confidence = min_confidence
         self.remind_after_ms = remind_after_ms
         self.infer_after = infer_after
@@ -57,6 +67,7 @@ class RulesController:
         self.streak: tuple[str, int, int] | None = (
             None  # (action, consecutive out-of-order sightings, first t)
         )
+        self.recent: deque[str | None] = deque(maxlen=self.confirm_window)
         first = self.task.step(self.automaton.legal_next(self.done)[0])
         # The greeting is a reminder of the first step.
         greeting = SayRequest(text=f"Vamos con: {task.title_es}. {first.instruction_es}")
@@ -67,8 +78,12 @@ class RulesController:
         out = observation.output
         if self.automaton.is_complete(self.done):
             return self._decision(Event.NONE)  # task finished: nothing left to supervise
-        if out.action is None or out.confidence < self.min_confidence:
+        confident = out.action is not None and out.confidence >= self.min_confidence
+        self.recent.append(out.action if confident else None)
+        if not confident:
             return self._decision(Event.NONE)
+        if sum(a == out.action for a in self.recent) < self.confirm:
+            return self._decision(Event.NONE)  # a single answer is too flaky to act on (D-019)
 
         transition = self.automaton.apply(self.done, out.action)
         if transition.outcome is not Outcome.MISTAKE and out.quality is Quality.BAD:

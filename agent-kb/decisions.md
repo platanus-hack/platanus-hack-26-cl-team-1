@@ -237,6 +237,23 @@ with a pointer to their replacement; nothing is ever deleted from §3.
   Overlapping windows mean each brief action is seen by several calls. Accuracy per call is unchanged (same
   prompt); whether it catches more of the real actions needs a labelled live run.
 
+### D-019 — Act on an action only when 2 of the last 3 answers agree; water-aware hand-washing cues (2026-11-21)
+- **Context:** the second labelled live run (hand washing, iPhone on a stand, pipelined calls, 320 calls) showed
+  steps completed early from single stray answers, and 11 spoken "out of order" warnings. The user lathers under
+  the running water; the cues said rubbing happens away from it, so rubbing was read as rinsing or wetting.
+- **Decision:**
+  - The rules controller acts on an action (progress or mistake) only when `SUP_CONTROLLER_CONFIRM=2` of the
+    last 3 answers agree. It applies only with `SUP_PERCEPTION=vlm`: the scripted fake reports each action once.
+  - Hand-washing cues: rubbing can happen under the water; wetting is "before any soap"; rinsing is "foam
+    washing off after the rubbing".
+  - `review` and `rejudge` replay with the live setting (`--confirm` overrides).
+- **Measured** on that run, re-judged (`training/results/perception.md`): with the labels as perception the
+  steps land at wet 4.7 s, soap 10.4 s, palms 11.9 s, rinse 19.7 s; before, the supervisor said 4.4 / 7.1 /
+  8.4 / 14.1 s with 11 warnings; now it says 4.7 / 10.1 / 14.5 / 21.8 s with 4.
+- **Consequences:** an action seen by one answer only is ignored. The bare-hand faucet (28 s) and the towel close
+  (46 s) were each one answer on that run, so they're missed now. They need the camera to see them for ≥ 1 s.
+  Live runs give ~3 answers/s, so a 1 s action gets about 3.
+
 ## §2 Open (decide in block 1, see docs/VISION.md)
 
 - **D-?? Demo scenario.** Direction: physical assembly in robotics (a contact who assembles robots will give a
