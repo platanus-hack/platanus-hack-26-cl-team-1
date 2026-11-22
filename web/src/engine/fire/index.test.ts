@@ -4,8 +4,14 @@ import { DEFAULT_FIRE_PARAMS, FIRE_MODEL, nearestBurnableCell, simulateFire } fr
 import { eccentricity, flatRosKmh, lengthToBreadth } from './model'
 
 const ANCHOR_DEFAULT = FIRE_MODEL.anchorMaxCells
+const SPOT_EXP_DEFAULT = FIRE_MODEL.spotIntensityExponent
+const SPOT_REF_DEFAULT = FIRE_MODEL.spotRefRosMPerMin
 afterEach(() => {
   FIRE_MODEL.anchorMaxCells = ANCHOR_DEFAULT
+  FIRE_MODEL.spotIntensityExponent = SPOT_EXP_DEFAULT
+  FIRE_MODEL.spotRefRosMPerMin = SPOT_REF_DEFAULT
+  FIRE_MODEL.spotJitterSigma = 0
+  FIRE_MODEL.spotJitterSeed = 0
 })
 
 interface Opts {
@@ -291,6 +297,39 @@ describe('firebreaks and spotting', () => {
     const a = simulateFire(wide).arrivalMin
     for (let r = 0; r < 61; r++) for (let c = 34; c < 81; c++) if (Number.isFinite(at(wide, a, r, c))) k++
     expect(k).toBe(0)
+  })
+
+  it('embers fly farther from a more intense source when spotIntensityExponent > 0, capped at spotMaxScale', () => {
+    // 8-cell (240 m) break; D_max = 4 m/(km/h) * 45 km/h = 180 m at exponent 0: cannot cross.
+    const wide = { ...base, firebreak: (_r: number, c: number) => c >= 30 && c <= 37, params: { spotting: true, spotMetresPerKmh: 4, horizonMin: 600 } }
+    const neutral = makeInput(wide)
+    expect(FIRE_MODEL.spotIntensityExponent).toBe(0)
+    expect(eastBurned(neutral, simulateFire(neutral).arrivalMin)).toBe(0)
+    // Exponent 0.5 with a 1 m/min reference: the scale hits the cap (x3 -> 540 m) and embers clear the break.
+    FIRE_MODEL.spotIntensityExponent = 0.5
+    FIRE_MODEL.spotRefRosMPerMin = 1
+    const intense = makeInput(wide)
+    expect(eastBurned(intense, simulateFire(intense).arrivalMin)).toBeGreaterThan(500)
+    // Same exponent with a reference above the source ROS shortens the jump: no crossing.
+    FIRE_MODEL.spotRefRosMPerMin = 1e6
+    const weak = makeInput({ ...wide, params: { ...wide.params, spotMetresPerKmh: 12 } })
+    expect(eastBurned(weak, simulateFire(weak).arrivalMin)).toBe(0)
+  })
+
+  it('per-cell ember jitter: sigma 0 is off, a seed is deterministic and different seeds differ', () => {
+    const inp = () => makeInput({ ...base, params: { spotting: true, spotMetresPerKmh: 12, horizonMin: 600 } })
+    const plain = simulateFire(inp()).arrivalMin
+    expect(FIRE_MODEL.spotJitterSigma).toBe(0)
+    FIRE_MODEL.spotJitterSigma = 0.5
+    FIRE_MODEL.spotJitterSeed = 1
+    const a1 = simulateFire(inp()).arrivalMin
+    const a1again = simulateFire(inp()).arrivalMin
+    FIRE_MODEL.spotJitterSeed = 2
+    const a2 = simulateFire(inp()).arrivalMin
+    expect(Array.from(a1again)).toEqual(Array.from(a1))
+    const differs = (x: Float32Array, y: Float32Array) => x.some((v, i) => v !== y[i])
+    expect(differs(a1, a2)).toBe(true)
+    expect(differs(a1, plain)).toBe(true)
   })
 
   it('a cool, slow fire does not spot even in strong wind (source ROS gate)', () => {

@@ -83,6 +83,21 @@ export const FIRE_MODEL = {
    *  without this gate a cool night-time fire would keep spotting as long as the wind blows (see MODEL.md,
    *  "Spotting"). 0 turns the gate off. */
   spotMinSourceRosMPerMin: 15,
+  /** Spotting: ember distance grows with the intensity of the source fire. D_max is multiplied by
+   *  (source head ROS / spotRefRosMPerMin) ^ spotIntensityExponent, at most spotMaxScale. For one fuel, fireline
+   *  intensity is proportional to ROS (Byram), and the height embers are lofted to grows with intensity
+   *  (Albini 1979), so a fast head in steep forest throws embers farther than a slow one in grass and scattered
+   *  trees. 0 turns it off (D_max = spotMetresPerKmh * wind, as before). See MODEL.md, "Spotting". */
+  spotIntensityExponent: 0,
+  spotRefRosMPerMin: 30,
+  /** Physical cap on that multiplier: eucalyptus spotting of 0.5-2 km is common, i.e. up to ~3x the
+   *  ~700 m D_max of the afternoon wind. */
+  spotMaxScale: 3,
+  /** Ensemble spotting (MODEL.md, "Spotting"): each source cell's D_max is multiplied by a lognormal factor
+   *  with mean 1 and this log-standard deviation, drawn from a hash of (cell, spotJitterSeed), so a run is
+   *  deterministic for a seed and members of an ensemble differ cell by cell. 0 turns it off. */
+  spotJitterSigma: 0,
+  spotJitterSeed: 0,
   /** Spotting: nearest landing distance, in cells (closer than that is ordinary spread). */
   spotMinCells: 3,
   /** Spotting: travel time = spotDelayMin + spotTravelMin * (d / D_max). */

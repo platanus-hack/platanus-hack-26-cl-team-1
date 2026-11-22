@@ -13,7 +13,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { lonLatToCell } from '../../data/grid'
 import { parseBuildings, parseElevation, parseFirms, parseFuel, parseGoes, parseGrid, parseIgnitions, parseScar, parseWeather } from '../../data/load'
-import { localToMin } from '../../data/time'
+import { localToMin, minToHHMM } from '../../data/time'
 import type { FireParams, WeatherSeries } from '../types'
 import { FUEL } from '../types'
 import { DEFAULT_FIRE_PARAMS, ERA5_WIND_DIR_CORRECTION_DEG, FIRE_MODEL, SPREAD_MODEL, simulateFire } from './index'
@@ -113,7 +113,7 @@ function anchorTimes(arrival: Float32Array) {
     return { name: a.name, observed: a.observed.slice(11), satelliteMin: sat, modelMin: t, deltaMin: t - obs }
   })
 }
-const hhmm = (tMin: number) => (Number.isFinite(tMin) ? `${String(Math.floor(12 + tMin / 60) % 24).padStart(2, '0')}:${String(Math.round(tMin % 60)).padStart(2, '0')}` : 'never')
+const hhmm = (tMin: number) => (Number.isFinite(tMin) ? minToHHMM(grid.t0, tMin) : 'never')
 
 /** Combined objective (higher is better): mean of the GOES-16 pace score (1 when the RMS front lag is 0, 0 at 2 h,
  *  averaged over both fires), Dice vs the scar and building F1. Press times are not in it (satellite is the
@@ -266,7 +266,27 @@ interface Knobs {
   windDirCorrectionDeg: number
   intermixFactor: number
   consolidatedEmbers: boolean
+  spotIntensityExponent: number
+  spotRefRosMPerMin: number
+  /** Ensemble: per-cell ember jitter (FIRE_MODEL.spotJitterSigma) and number of members (seeds 1..members);
+   *  the scored arrival is the per-cell median over members. 1 member with sigma 0 = a single run. */
+  jitterSigma: number
+  members: number
   params: Partial<FireParams>
+}
+
+/** Per-cell median of several arrival grids (Infinity counts as the largest value). */
+function medianArrival(runs: Float32Array[]): Float32Array {
+  if (runs.length === 1) return runs[0]
+  const out = new Float32Array(runs[0].length)
+  const v = new Float64Array(runs.length)
+  for (let i = 0; i < out.length; i++) {
+    for (let k = 0; k < runs.length; k++) v[k] = runs[k][i]
+    v.sort()
+    const m = runs.length >> 1
+    out[i] = runs.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2
+  }
+  return out
 }
 
 function run(k: Knobs) {
@@ -277,10 +297,23 @@ function run(k: Knobs) {
   FIRE_MODEL.spotMinSourceRosMPerMin = k.spotMinSourceRosMPerMin
   FIRE_MODEL.fuels[FUEL.URBAN_LOW].factor = k.intermixFactor
   FIRE_MODEL.fuels[FUEL.URBAN_DENSE].spotTarget = k.consolidatedEmbers
+  FIRE_MODEL.spotIntensityExponent = k.spotIntensityExponent
+  FIRE_MODEL.spotRefRosMPerMin = k.spotRefRosMPerMin
+  FIRE_MODEL.spotJitterSigma = k.jitterSigma
   const params = { ...DEFAULT_FIRE_PARAMS, ...k.params }
   const w = weather(k.windFactor, k.windDirCorrectionDeg)
-  const res = simulateFire({ grid, elevation, fuel, firebreak, ignitions, weather: w, params })
-  const perFire = ignitions.map((ig) => simulateFire({ grid, elevation, fuel, firebreak, ignitions: [ig], weather: w, params }).arrivalMin)
+  const combined: Float32Array[] = []
+  const single: Float32Array[][] = ignitions.map(() => [])
+  let elapsedMs = 0
+  for (let m = 1; m <= k.members; m++) {
+    FIRE_MODEL.spotJitterSeed = m
+    const one = simulateFire({ grid, elevation, fuel, firebreak, ignitions, weather: w, params })
+    elapsedMs += one.elapsedMs
+    combined.push(one.arrivalMin)
+    ignitions.forEach((ig, i) => single[i].push(simulateFire({ grid, elevation, fuel, firebreak, ignitions: [ig], weather: w, params }).arrivalMin))
+  }
+  const res = { arrivalMin: medianArrival(combined), elapsedMs }
+  const perFire = single.map(medianArrival)
   Object.assign(FIRE_MODEL, JSON.parse(saved))
   const end = score(res.arrivalMin, params.horizonMin)
   const bld = buildingScore(res.arrivalMin, params.horizonMin)
@@ -316,6 +349,10 @@ const current: Knobs = {
   windDirCorrectionDeg: ERA5_WIND_DIR_CORRECTION_DEG,
   intermixFactor: FIRE_MODEL.fuels[FUEL.URBAN_LOW].factor,
   consolidatedEmbers: FIRE_MODEL.fuels[FUEL.URBAN_DENSE].spotTarget,
+  spotIntensityExponent: FIRE_MODEL.spotIntensityExponent,
+  spotRefRosMPerMin: FIRE_MODEL.spotRefRosMPerMin,
+  jitterSigma: FIRE_MODEL.spotJitterSigma,
+  members: 1,
   params: {},
 }
 
@@ -372,17 +409,24 @@ if (!process.argv.includes('--scan')) {
     console.log(`${name}: ${r.res.elapsedMs.toFixed(0)} ms\n   ${fmtFull(r)}`)
   }
 } else {
+  // Pace knobs (MODEL.md section 6): ember distance per km/h, its growth with source intensity, the McArthur
+  // factor and the ERA5 direction correction. Urban knobs stay at the values chosen on 2026-11-22 01:30.
+  // Robust scan: every configuration is scored at ERA5 wind x0.9, x1 and x1.1 and ranked by the mean objective,
+  // so a set of knobs that only works at one exact wind (a knife edge) does not win.
   const rows: [number, string][] = []
-  for (const windDirCorrectionDeg of [0, -5, -10, -15, -20])
-    for (const intermixFactor of [0.25, 0.5, 1])
-      for (const consolidatedEmbers of [true, false])
-        for (const forestShrubFactor of [2, 3, 4]) {
-          const r = run({ ...current, windDirCorrectionDeg, intermixFactor, consolidatedEmbers, forestShrubFactor })
-          rows.push([
-            r.objective,
-            `wind dir ${windDirCorrectionDeg} deg, intermix x${intermixFactor}, embers on consolidated ${consolidatedEmbers ? 'yes' : 'no'}, forest/shrub x${forestShrubFactor}:\n   ${fmtFull(r)}`,
-          ])
-        }
+  const configs: Partial<Knobs>[] = []
+  for (const [jitterSigma, members] of [[0, 1], [0.5, 7], [1, 7]])
+    for (const spotMetresPerKmh of [15, 20, 25, 30])
+      for (const [spotIntensityExponent, spotRefRosMPerMin] of [[0, 30], [1, 30]]) configs.push({ jitterSigma, members, spotIntensityExponent, spotRefRosMPerMin, params: { spotMetresPerKmh } })
+  for (const cfg of configs) {
+    const rs = [0.9, 1, 1.1].map((windFactor) => run({ ...current, ...cfg, windFactor }))
+    const m = (f: (r: (typeof rs)[number]) => number) => rs.reduce((x, r) => x + f(r), 0) / rs.length
+    const j = (f: (r: (typeof rs)[number]) => number, d = 0) => rs.map((r) => f(r).toFixed(d)).join('/')
+    rows.push([
+      m((r) => r.objective),
+      `jitter ${cfg.jitterSigma} x${cfg.members}, spotting ${cfg.params?.spotMetresPerKmh}, exponent ${cfg.spotIntensityExponent}: robust objective ${m((r) => r.objective).toFixed(3)} | W RMS ${j((r) => r.pace.fires[0].rmsLagMin)} E RMS ${j((r) => r.pace.fires[1].rmsLagMin)} | test ${j((r) => r.pace.testMeanAbsLagMin)} | Dice ${j((r) => r.end.dice, 2)} | bld ${j((r) => r.bld.inScar)}`,
+    ])
+  }
   rows.sort((a, b) => b[0] - a[0])
   for (const [, line] of rows.slice(0, 12)) console.log(line)
 }

@@ -29,6 +29,23 @@ export {
   weatherAt,
 } from './model'
 
+/** Deterministic uniform in (0, 1) from (cell, seed, stream): 32-bit integer hash (Wellons' lowbias32). */
+function hashUnit(cell: number, seed: number, stream: number): number {
+  let x = (Math.imul(cell, 0x9e3779b1) ^ Math.imul(seed + 1, 0x85ebca77) ^ Math.imul(stream + 1, 0xc2b2ae3d)) >>> 0
+  x ^= x >>> 16
+  x = Math.imul(x, 0x7feb352d) >>> 0
+  x ^= x >>> 15
+  x = Math.imul(x, 0x846ca68b) >>> 0
+  x ^= x >>> 16
+  return ((x >>> 0) + 0.5) / 4294967296
+}
+
+/** Lognormal factor with mean 1 and log-standard deviation sigma for one cell and seed (Box-Muller). */
+function lognormalMeanOne(cell: number, seed: number, sigma: number): number {
+  const z = Math.sqrt(-2 * Math.log(hashUnit(cell, seed, 0))) * Math.cos(2 * Math.PI * hashUnit(cell, seed, 1))
+  return Math.exp(sigma * z - (sigma * sigma) / 2)
+}
+
 export const DEFAULT_FIRE_PARAMS: FireParams = {
   droughtFactor: 10,
   curingPct: 100,
@@ -168,6 +185,12 @@ export function simulateFire(input: FireInput): FireResult {
   const anchorCosTurn = Math.cos(M.anchorMaxTurnDeg * DEG)
   const spotOn = params.spotting
   const spotMinCells = M.spotMinCells
+  const spotExp = M.spotIntensityExponent
+  const spotSigma = M.spotJitterSigma
+  if (!(spotSigma >= 0) || !Number.isFinite(spotSigma)) throw new Error(`simulateFire: FIRE_MODEL.spotJitterSigma must be >= 0 (got ${spotSigma})`)
+  if (!(spotExp >= 0) || !Number.isFinite(spotExp)) throw new Error(`simulateFire: FIRE_MODEL.spotIntensityExponent must be >= 0 (got ${spotExp})`)
+  if (!(M.spotRefRosMPerMin > 0)) throw new Error(`simulateFire: FIRE_MODEL.spotRefRosMPerMin must be > 0 (got ${M.spotRefRosMPerMin})`)
+  if (!(M.spotMaxScale >= 1)) throw new Error(`simulateFire: FIRE_MODEL.spotMaxScale must be >= 1 (got ${M.spotMaxScale})`)
   let burned = 0
 
   while (heap.size > 0) {
@@ -276,7 +299,9 @@ export function simulateFire(input: FireInput): FireResult {
 
     // Ember spotting: jump edges downwind (+-1 cell sideways) from 3 cells up to D_max, from intense fires only.
     if (spotOn && fuelSpot[f] && V >= M.spotMinWindKmh && Rh >= M.spotMinSourceRosMPerMin) {
-      const dMax = params.spotMetresPerKmh * V * fuelSpotDist[f] // metres
+      const scale = spotExp > 0 ? Math.min(M.spotMaxScale, (Rh / M.spotRefRosMPerMin) ** spotExp) : 1
+      const jitter = spotSigma > 0 ? lognormalMeanOne(i, M.spotJitterSeed, spotSigma) : 1
+      const dMax = params.spotMetresPerKmh * V * fuelSpotDist[f] * scale * jitter // metres
       const kMax = Math.floor(dMax / cellM)
       const minD = spotMinCells * cellM
       for (let s = spotMinCells; s <= kMax; s++) {
