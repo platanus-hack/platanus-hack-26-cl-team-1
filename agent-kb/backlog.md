@@ -37,6 +37,8 @@ Owner in brackets once someone takes an item. Project: Cortafuego (D-019). The O
   instead of a fixed 2.9 per household; offices and schools as origins on weekdays.
 - [ ] Better job proxy for old mixed-use centres (business POIs, the origin-destination surveys, SII employment by
   comuna); public holidays and February vacations in the presence model.
+- [ ] Measures optimizer (investigated 2026-11-22, see the session log): geofenced alert mode, then a links
+  optimizer and fuel tiles over a weather ensemble. Scripts live outside the repo until a PR adds them.
 - [ ] Congestion on evacuation routes (today free flow).
 - [ ] Ensemble (perturbed wind and spotting) for a burn-probability map and a range on the counts.
 - [ ] **Fit on both fires** (Viña + Eaton, D-030): out of sample the Viña calibration overburns Eaton ~2.6×; tune
