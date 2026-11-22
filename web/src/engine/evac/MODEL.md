@@ -128,30 +128,31 @@ no firebreaks), real data. Every number in this section comes from
 
 | cueShare \ cueRadiusM | 300 m | 600 m | 900 m | 1,200 m | 1,500 m | 2,000 m | 3,000 m |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 0 (alert only) | 6,433 | 6,433 | 6,433 | 6,433 | 6,433 | 6,433 | 6,433 |
-| 0.5 | 6,134 | 5,849 | 5,141 | 4,608 | 4,220 | 3,910 | 3,408 |
-| 0.65 (default) | 6,045 | 5,674 | **4,753** | 4,060 | 3,556 | 3,153 | 2,500 |
-| 0.8 | 5,955 | 5,499 | 4,366 | 3,513 | 2,892 | 2,396 | 1,593 |
-| 1 | 5,836 | 5,266 | 3,849 | 2,783 | 2,007 | 1,387 | 383 |
+| 0 (alert only) | 5,399 | 5,399 | 5,399 | 5,399 | 5,399 | 5,399 | 5,399 |
+| 0.5 | 5,273 | 5,022 | 4,370 | 3,915 | 3,548 | 3,268 | 2,872 |
+| 0.65 (default) | 5,236 | 4,909 | **4,061** | 3,470 | 2,993 | 2,629 | 2,114 |
+| 0.8 | 5,198 | 4,796 | 3,752 | 3,024 | 2,438 | 1,990 | 1,356 |
+| 1 | 5,148 | 4,646 | 3,340 | 2,430 | 1,698 | 1,137 | 345 |
 
 With the fire engine before its urban fix (2026-11-22, see `../fire/MODEL.md` section 6) the default cell
-read 6,592 and the alert-only row 9,719. Default-cue curve (`riskByAlert`, households, alert at the full
-hour): 16:00 1,072 · 17:00 2,395 · **18:00 4,753** · 19:00 9,954 · 20:00 13,720 · 22:00 16,751 · 00:00 17,758.
+read 6,592 and the alert-only row 9,719; before the satellite pace fit of the same day (McArthur x3, matorral
+spreading like forest) it read 4,753 and 6,433. Default-cue curve (households, alert at the full hour):
+16:00 431 · 17:00 1,771 · **18:00 4,061** · 19:00 8,758 · 20:00 13,315 · 22:00 16,813 · 00:00 18,274.
 It is flat until the fire reaches the first neighbourhoods (~16:00, the eastern fire) and steepest from 18:00
 to 20:00, when the western head crosses El Olivar and Villa Independencia; each hour of delay in that window
 adds about 4,000-5,000 households.
 
 Why the count is still large:
 
-- **The eastern fire.** Run alone it accounts for 2,566 of the 4,753 (its neighbourhoods burn from 16:00,
-  two hours before an 18:00 alert, and it overburns sideways: 357 of its 4,756 reached buildings are in the
-  scar). The real Villa Alemana alert was at 16:35-16:40 (CIPER, above); one global alert time cannot
+- **The eastern fire.** Run alone it accounts for 2,152 of the 4,061 (its neighbourhoods burn from 16:00,
+  two hours before an 18:00 alert, and it keeps spreading after ~19:30, when GOES-16 shows the real fire had
+  stopped advancing: `../fire/MODEL.md` section 6). The real Villa Alemana alert was at 16:35-16:40 (CIPER, above); one global alert time cannot
   represent that.
-- **The households that wait for the alert set a floor**: (1 - cueShare) x 6,433, about 2,250.
-- **Lead time:** from "fire within R" to "fire at the house", 10th percentile 14, 22, 35 and 68 min for
-  R = 600, 900, 1,500 and 3,000 m over the 28,119 buildings the fire reaches.
-- **Where:** scored against the Sentinel-2 scar (scoring only, not an input), 967 of the 4,753 are in
-  buildings inside the scar and 3,787 outside it (alert only: 1,289 / 5,143). Many "outside" buildings are
+- **The households that wait for the alert set a floor**: (1 - cueShare) x 5,399, about 1,890.
+- **Lead time:** from "fire within R" to "fire at the house", 10th percentile 14, 22, 36 and 69 min for
+  R = 600, 900, 1,500 and 3,000 m over the 29,209 buildings the fire reaches.
+- **Where:** scored against the Sentinel-2 scar (scoring only, not an input), 897 of the 4,061 are in
+  buildings inside the scar and 3,164 outside it (alert only: 1,216 / 4,183). Many "outside" buildings are
   within 120 m of the scar, which misses houses in built-up cells. For reference, MINVU's preliminary count
   was 6,019 homes with non-repairable damage (21 Feb 2024,
   https://www.minvu.gob.cl/noticia/ministro-montes-presenta-primeros-lineamientos-de-la-estrategia-de-reconstruccion-para-las-comunas-afectadas-por-los-incendios-en-la-region-de-valparaiso/)

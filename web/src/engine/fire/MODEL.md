@@ -112,6 +112,15 @@ Spotting runs only when `params.spotting` is on. It starts from settled cells wh
 - On the real domain, the ungated version burned 52,969 ha against a 9,467 ha scar.
 - Set the gate to 0 to get the spec behaviour.
 
+**Two knobs that are in the engine but off (tested in section 6, "Pace against satellite passes"):**
+
+- `spotIntensityExponent` (0 as shipped): D_max × (source head ROS / `spotRefRosMPerMin`)^exponent, at most
+  × `spotMaxScale` (3). For one fuel, fireline intensity is proportional to ROS (Byram) and ember lofting grows
+  with intensity (Albini 1979). Its best in-sample setting is a knife edge (section 6), so it stays at 0.
+- `spotJitterSigma` (0 as shipped): a lognormal factor (mean 1) on each source cell's D_max, from a hash of
+  (cell, `spotJitterSeed`), for ensembles. The median of an ensemble overburns (the fastest path wins), so it
+  stays at 0.
+
 ## 6. Calibration (`calibrate.ts`)
 
 Run `pnpm exec tsx src/engine/fire/calibrate.ts`, or add `--scan` for a grid search. It uses the baked
@@ -127,7 +136,8 @@ Numbers measured on 2026-11-22 00:25 (scar 9,467 ha; Dice = F1 = 2·IoU/(1+IoU))
 | McArthur ×3, grass ×0.25, gate 15 m/min, spotting 12 m per km/h, wind ×1 | 0.46 | 0.30 | 9,057 ha |
 | Spotting 25 m per km/h, urban as spec (×0.5 / ×0.35, urban embers on) | 0.52 | 0.35 | 20,226 ha |
 | Spotting 25, URBAN_LOW ×0.25, URBAN_DENSE ×0.05, no embers from urban cells, scored at 00:00 (before the urban fix below) | 0.57 | 0.40 | 15,576 ha |
-| **Shipped:** the above + WUI fuel split, no embers on consolidated city, ERA5 direction −10°, scored at **00:00** | **0.63** | 0.46 | 18,043 ha (by 00:00) |
+| The above + WUI fuel split, no embers on consolidated city, ERA5 direction −10°, scored at **00:00** | 0.63 | 0.46 | 18,043 ha (by 00:00) |
+| **Shipped:** the above + McArthur ×4 and matorral at half of it (pace fit, below) | **0.64** | 0.47 | 17,934 ha (by 00:00) |
 
 - **Spotting 25 m per km/h** (≈ 700 m at the afternoon's 28 km/h): with 12 m per km/h the western front was
   still ~9 km south of Viña del Mar at 18:30, while the real fire was in Villa Independencia around then
@@ -178,7 +188,7 @@ Numbers measured on 2026-11-22 00:25 (scar 9,467 ha; Dice = F1 = 2·IoU/(1+IoU))
 | Before (roof split, embers everywhere, ERA5 as is) | 0.571 | 15,576 | 21,339 | 1,875 (0.29) | 0.09 (–) | 203/237 | 20:26 / 18:07 / never / never | – |
 | Only the wind correction removed (0°) | 0.575 | 15,408 | 15,768 | 1,875 (0.29) | 0.12 (0.39) | 203/237 | 20:26 / 18:12 / never / never | 0.461 |
 | Only embers allowed back on consolidated | 0.626 | 18,187 | 32,725 | 5,914 (0.91) | 0.18 (0.49) | 206/237 | 18:23 / 18:04 / 19:14 / 19:36 | 0.595 |
-| **Shipped** | **0.628** | 18,043 | **28,119** | **5,423 (0.83)** | **0.19 (0.52)** | 206/237 | 18:23 / 18:04 / 19:14 / 19:36 | **0.599** |
+| Shipped until the pace fit (below) | 0.628 | 18,043 | 28,119 | 5,423 (0.83) | 0.19 (0.52) | 206/237 | 18:23 / 18:04 / 19:14 / 19:36 | 0.599 |
 | Reported (press, CIGIDEN) | – | 9,467 | – | 6,505 | – | – | ~17:00 / 18:10 / < 18:30 / ~18:30 | – |
 
 "Objective" = mean of Dice, building F1, FIRMS share and a timing score (1 at the reported time, 0 at 2 h off).
@@ -202,12 +212,82 @@ so the "≤ 120 m" column is the fairer reading.
   6,000 homes destroyed (MINVU's preliminary count, 21 Feb 2024: 6,019 homes with non-repairable damage,
   https://www.minvu.gob.cl/noticia/ministro-montes-presenta-primeros-lineamientos-de-la-estrategia-de-reconstruccion-para-las-comunas-afectadas-por-los-incendios-en-la-region-de-valparaiso/).
 
-- **McArthur ×3:** Project Vesta (Cheney et al. 2012) found that the Mk5 meter under-predicts summer
-  spread in dry eucalypt forest by about 2–3×.
+- **McArthur ×4, matorral ×0.5 of it** (×3 for both until the pace fit below): Project Vesta (Cheney et al.
+  2012) found that the Mk5 meter under-predicts summer spread in dry eucalypt forest by about 2–3×; ×4 is
+  above that range and is a fit to this fire.
 - **Grass ×0.25:** fitted to the scar. Much of the domain's WorldCover "grassland" is grazed or sparse
   cover, which spreads slower than Cheney's natural pasture.
 - **Scope of the scores:** these IoUs measure agreement with one historical event under one reanalysis
   weather series. They are not an accuracy figure for predictions.
+
+### Pace against satellite passes (2026-11-22, 02:30)
+
+**Why.** The FIRMS score above ("detections already reached at detection time") only catches a model that is
+late: a fire that burned everything at once would score 237/237. The pace back test scores both directions.
+
+**Data.** GOES-16 ABI fire pixels every 10 min (`goes.json`, `pipeline/steps/goes.py`, ~2.5 km pixels) fill
+the 16:27–23:18 gap between polar passes, exactly when the fire reached Viña del Mar. VIIRS (375 m) and MODIS
+(1 km) passes from `firms.json` are the test set.
+
+**Method (`pacing.ts`, run by `calibrate.ts`).**
+
+- Each preset fire gets its own detections: a pixel belongs to it if it lies within 4 km of the ignition or
+  of a detection of that fire seen at the same time or earlier, linking through all three sensors
+  (`fireCluster`). This drops a third, unrelated fire at −71.286, −32.984 (15:25–16:55).
+- Observed front at t = farthest detection of that fire seen by t. Each fire is also run alone, so its model
+  front is measured without the other fire.
+- **Front lag** = minutes the model is late (+) or early (−) at reaching the observed front. It is 0 within
+  half a pixel (GOES 1 km, VIIRS 0.19 km, MODIS 0.5 km) and capped at ±180 min.
+- **Overrun** = model area burned farther than one footprint (750 m VIIRS, 1.5 km MODIS) from every detection.
+- **Fit:** RMS lag over the GOES frames 12:00–24:00 per fire. Objective = mean of the pace score
+  (1 − RMS/120, both fires), Dice and building F1; the press times are printed, not scored.
+- **Robust scan** (`calibrate.ts --scan`): each configuration is run at ERA5 wind ×0.9, ×1 and ×1.1 and
+  ranked by the mean, so a setting that only works at one exact wind does not win.
+
+**What the satellites show.**
+
+- The western head stalled at 5.2–5.7 km from Las Tablas from 14:05 to 16:25. GOES saw it there, and VIIRS
+  at 16:27 drew a straight east–west front at lat −33.145. Then it ran at ~100 m/min, reaching 21.1 km by
+  19:05, and stopped there.
+- The eastern fire also began its run at ~16:30. Both fires are 20 km apart and of different ages, which
+  points to a regional cause.
+- GOES puts the Jardín Botánico at ~17:55, not 17:00 as reported by the press. El Olivar and Villa
+  Independencia (~18:25) agree with the press (~18:30).
+
+**What was tried (wind ×0.9 / ×1 / ×1.1; RMS lag west, east; VIIRS/MODIS mean |lag|).**
+
+| Setup | Robust objective | GOES RMS west (min) | GOES RMS east (min) | Test \|lag\| (min) | Dice | Buildings in scar |
+|---|---|---|---|---|---|---|
+| Before (McArthur ×3, matorral as forest) | 0.372 | 121 / 47 / 83 | 87 / 110 / 116 | 56 / 62 / 67 | 0.63 / 0.63 / 0.61 | 2,311 / 5,423 / 5,865 |
+| Embers × source intensity (exp. 1, 20 m per km/h), old fuels | 0.353 | 131 / **28** / 117 | 128 / **22** / 113 | 48 / 44 / 79 | 0.53 / 0.64 / 0.60 | 391 / 2,673 / 5,436 |
+| Ensemble, per-cell ember jitter σ 0.5, median of 7 (15 m per km/h) | 0.430 | 22 / 99 / 114 | 95 / 28 / 112 | 34 / 53 / 63 | 0.67 / 0.67 / 0.63 | 2,370 / 5,025 / 5,845 |
+| Faster ember jumps (2 + 2 min, 12 m per km/h) | 0.444 | 22 / 63 / 103 | 133 / 19 / 87 | 23 / 49 / 70 | 0.65 / 0.66 / 0.64 | 1,802 / 3,533 / 5,770 |
+| **Shipped: McArthur ×4, matorral ×0.5** | **0.470** | 34 / 55 / 83 | 24 / 76 / 98 | 27 / 55 / 62 | 0.65 / 0.64 / 0.62 | 3,004 / 5,784 / 5,971 |
+
+- **Intensity-scaled embers** gave the best single run (28 / 22 min at wind ×1) but are a knife edge: at
+  19 or 21 m per km/h, or ±10 % wind, the lag goes back to 100–130 min (deterministic spotting has a
+  percolation threshold, and with ERA5's near-constant afternoon the time it is crossed is arbitrary).
+- **Concón airport METAR (SCVM)** shows a NNW sea breeze until ~14:30, then SSW wind with 33–35 °C and 25–30 %
+  RH (ERA5: 28–30 °C, 37–43 %). Blending it in made things worse: with its direction the western head never
+  reaches Viña (Dice 0.28); with only its temperature and humidity, Dice 0.56 and objective 0.386 (vs 0.429).
+  A coastal station 25 km north does not stand for the fire area. Seven other models (IFS, ICON, GFS, ARPEGE,
+  GEM, JMA, UKMO; Open-Meteo historical forecast API) show smooth S–SSW afternoons with peak fire weather at
+  13–15 h, none with a change at 16:30.
+- **Lago Peñuelas:** 206 of its 524 water cells (Sentinel-2, Feb 2024) are CROP in WorldCover 2021 (dry lake
+  bed). Making them unburnable changes no score; left as is.
+- **The fuel split** (matorral half of forest) is the only change that is better at all three winds. It
+  mainly fixes the eastern fire: its advance is on time with GOES from 16:05 to 18:05 and VIIRS tests at
+  +21 / −3 / +4 min (before: −4 / −38 / −25).
+
+**Shipped at wind ×1** (`pnpm validate`): GOES RMS lag west 55 min (was 47), east 76 (was 110); VIIRS/MODIS
+mean |lag| 55 min (was 62); Dice 0.639 (0.628); buildings in the scar 5,784 / 6,505 (5,423); FIRMS reached
+193/237 (206: the one-sided score drops because the eastern fire is no longer early); households cut off at an
+18:00 alert 4,061 (4,753, `../evac/MODEL.md`).
+
+**Still wrong.** The western stall from 14:05 to 16:25 is not reproduced (the model is ~1 h early at 16:05 and
+~40 min late at 19:05), and both fires keep spreading after ~19:30 when the real ones stopped (no suppression).
+The pace grows worse with wind ×1.1 (RMS 83 / 98 min). Everything here is in-sample except the VIIRS/MODIS
+test, and the test passes all fall before 16:30 except one.
 
 ## 7. Performance (`bench.ts`)
 
@@ -236,6 +316,8 @@ On the real dataset a run takes 20–130 ms.
   clips the corner of a firebreak or NONE cell. The topology is never affected.
 - Slope makes the fire very elongated upslope, with LB up to about 7 at 20°, so fire backs down slopes very
   slowly.
+- The pace is fitted to one fire with one reanalysis point; the western stall of 14:05–16:25 (satellite) is
+  not reproduced and the result degrades with +10 % wind (section 6, "Pace against satellite passes").
 
 ## References
 
