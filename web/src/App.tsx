@@ -24,6 +24,9 @@ import { LayersCard } from './ui/LayersCard'
 import { SourcesModal } from './ui/SourcesModal'
 import { Topbar } from './ui/Topbar'
 import { StartupSplash } from './ui/StartupSplash'
+import { MobileSheet, type SheetSnap } from './ui/MobileSheet'
+import { COARSE_QUERY, NARROW_QUERY, useMediaQuery } from './ui/useMediaQuery'
+import { fmtInt } from './ui/controls'
 
 const NEUTRAL_WEATHER: WeatherSettings = {
   mode: 'real',
@@ -84,9 +87,17 @@ const DEFAULT_LAYERS: LayerToggles = {
 
 const TOOL_HINT: Record<Exclude<Tool, 'none'>, string> = {
   ignition: 'Haz clic en el mapa para agregar una ignición a las {t}.',
-  firebreak: 'Haz clic para marcar puntos del cortafuego; doble clic o Enter para terminar.',
+  firebreak: 'Haz clic para marcar puntos del cortafuego; doble clic, Enter o «Guardar» para terminar.',
   closeRoad: 'Haz clic sobre una calle para cerrarla o volver a abrirla.',
   link: 'Haz clic en el primer punto de la red de calles y luego en el segundo para unirlos.',
+}
+
+/** The same hints for touch screens (no double click, no keyboard). */
+const TOOL_HINT_TOUCH: Record<Exclude<Tool, 'none'>, string> = {
+  ignition: 'Toca el mapa para agregar una ignición a las {t}.',
+  firebreak: 'Toca el mapa para marcar los puntos del cortafuego y luego «Guardar».',
+  closeRoad: 'Toca una calle para cerrarla o volver a abrirla (acerca el mapa si hace falta).',
+  link: 'Toca el primer punto de la red de calles y luego el segundo para unirlos.',
 }
 
 let uid = 0
@@ -297,6 +308,14 @@ function Explorer({
   const [linkStart, setLinkStart] = useState<number | null>(null)
   const [notes, setNotes] = useState<Record<string, string>>({})
   const [showSources, setShowSources] = useState(false)
+  /** Phone layout (styles.css, same width): full-height map, controls in a bottom sheet. */
+  const narrow = useMediaQuery(NARROW_QUERY)
+  const coarse = useMediaQuery(COARSE_QUERY)
+  const [sheet, setSheet] = useState<SheetSnap>('peek')
+  const [sheetPeekPx, setSheetPeekPx] = useState(0)
+  /** Points of the firebreak being drawn, and the counter that asks the map to save it. */
+  const [draftPoints, setDraftPoints] = useState(0)
+  const [finishFirebreak, setFinishFirebreak] = useState(0)
 
   const [fire, setFire] = useState<FireOut | null>(null)
   const [evac, setEvac] = useState<EvacOut | null>(null)
@@ -451,6 +470,10 @@ function Explorer({
     return () => window.removeEventListener('keydown', onKey)
   }, [])
   useEffect(() => onNote('tool', null), [tool, onNote])
+  // A map tool needs the map: close the sheet when one starts (phone layout).
+  useEffect(() => {
+    if (tool !== 'none') setSheet('peek')
+  }, [tool])
 
   const effectiveLayers = useMemo(
     // the street tools and the evacuation routes need the street layer on
@@ -491,8 +514,14 @@ function Explorer({
     setScenario((s) => ({ ...s, addedLinks: [...s.addedLinks, { u, v }] }))
   }, [])
 
-  const hint = tool === 'none' ? null : TOOL_HINT[tool].replace('{t}', minToHHMM(t0, clock))
+  const hint = tool === 'none' ? null : (coarse ? TOOL_HINT_TOUCH : TOOL_HINT)[tool].replace('{t}', minToHHMM(t0, clock))
   const linkHint = tool === 'link' && linkStart !== null ? ' Primer punto elegido: ahora el segundo.' : ''
+  const draftHint = tool === 'firebreak' && draftPoints > 0 ? ` ${draftPoints} ${draftPoints === 1 ? 'punto' : 'puntos'}.` : ''
+  const saveFirebreak = () => {
+    // MapView saves the draft before it sees the tool change (which discards a draft).
+    setFinishFirebreak((n) => n + 1)
+    setTool('none')
+  }
 
   const resetScenario = useCallback(() => {
     setScenario(defaultScenario(data))
@@ -536,6 +565,24 @@ function Explorer({
     setPopulationDay,
   }
 
+  const timebar = (
+    <Timebar
+      t0={t0}
+      clock={clock}
+      setClock={setClock}
+      playing={playing}
+      setPlaying={setPlaying}
+      speed={speed}
+      setSpeed={setSpeed}
+      terrain3d={terrain3d}
+      setTerrain3d={setTerrain3d}
+      terrainAvailable={!OFFLINE}
+      alertMin={scenario.alertMin}
+      horizonMin={horizon}
+      docked={narrow}
+    />
+  )
+
   return (
     <div className="app">
       {topbar(() => setShowSources(true))}
@@ -550,7 +597,7 @@ function Explorer({
           {notice}
         </div>
       )}
-      <main className="main">
+      <main className={`main${narrow ? ' narrow' : ''}`}>
         <div className={`mapwrap${tool !== 'none' ? ' tool-on' : ''}`}>
           <MapView
             data={data}
@@ -572,6 +619,9 @@ function Explorer({
             onAddLink={onAddLink}
             onLinkStart={setLinkStart}
             onNote={onNote}
+            onDraft={setDraftPoints}
+            finishFirebreak={finishFirebreak}
+            padBottom={narrow ? sheetPeekPx : 0}
           />
           <LayersCard layers={effectiveLayers} setLayer={setLayer} showRoutes={showRoutes} hide={hiddenLayers} />
           <div className="map-notes">
@@ -580,10 +630,19 @@ function Explorer({
                 <span>
                   {hint}
                   {linkHint}
+                  {draftHint}
                 </span>
-                <button type="button" className="btn small" onClick={() => setTool('none')}>
-                  Terminar (Esc)
-                </button>
+                <span className="tool-hint-actions">
+                  {tool === 'firebreak' && (
+                    <button type="button" className="btn small primary" disabled={draftPoints < 2} onClick={saveFirebreak}>
+                      Guardar
+                    </button>
+                  )}
+                  <button type="button" className="btn small" onClick={() => setTool('none')}>
+                    {tool === 'firebreak' ? 'Cancelar' : 'Terminar'}
+                    {coarse ? '' : ' (Esc)'}
+                  </button>
+                </span>
               </div>
             )}
             {Object.entries(notes).map(([k, n]) => (
@@ -592,26 +651,42 @@ function Explorer({
               </div>
             ))}
           </div>
-          <Timebar
-            t0={t0}
-            clock={clock}
-            setClock={setClock}
-            playing={playing}
-            setPlaying={setPlaying}
-            speed={speed}
-            setSpeed={setSpeed}
-            terrain3d={terrain3d}
-            setTerrain3d={setTerrain3d}
-            terrainAvailable={!OFFLINE}
-            alertMin={scenario.alertMin}
-            horizonMin={horizon}
-          />
+          {!narrow && timebar}
         </div>
-        <aside className="panel" aria-label="Controles del escenario">
-          <Panel {...panelProps} />
-        </aside>
+        {narrow ? (
+          <MobileSheet
+            snap={sheet}
+            setSnap={setSheet}
+            onPeekHeight={setSheetPeekPx}
+            summary={<SheetSummary summary={summary} busy={busy} burnedHaNow={burnedHaNow} hhmm={minToHHMM(t0, clock)} />}
+            toolbar={timebar}
+          >
+            <Panel {...panelProps} />
+          </MobileSheet>
+        ) : (
+          <aside className="panel" aria-label="Controles del escenario">
+            <Panel {...panelProps} />
+          </aside>
+        )}
       </main>
       {showSources && <SourcesModal data={data} onClose={() => setShowSources(false)} />}
     </div>
+  )
+}
+
+/** The closed sheet's title line (phone layout): the two results that matter most, the rest is one tap away. */
+function SheetSummary({ summary, busy, burnedHaNow, hhmm }: { summary: Summary | null; busy: boolean; burnedHaNow: number; hhmm: string }) {
+  return (
+    <>
+      <span className="sheet-stat strong">
+        <b>{summary ? fmtInt(summary.trappedHouseholds) : '—'}</b>
+        <span>hogares con salida cortada</span>
+      </span>
+      <span className="sheet-stat">
+        <b>{summary ? fmtInt(burnedHaNow) : '—'}</b>
+        <span>ha quemadas a las {hhmm}</span>
+      </span>
+      {busy && <span className="spinner sheet-busy" role="status" aria-label="Simulando" />}
+    </>
   )
 }

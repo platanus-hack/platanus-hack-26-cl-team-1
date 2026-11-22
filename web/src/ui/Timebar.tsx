@@ -18,14 +18,17 @@ export function Timebar(props: {
   alertMin: number
   /** End of the timeline (minutes since t0). */
   horizonMin: number
+  /** Phone layout: part of the bottom sheet (two rows, no floating card) instead of floating over the map. */
+  docked?: boolean
 }) {
   const { t0, clock } = props
   return (
-    <div className="timebar">
+    <div className={`timebar${props.docked ? ' docked' : ''}`}>
       <button
         type="button"
         className="play"
         aria-label={props.playing ? 'Pausar' : 'Reproducir'}
+        title={props.playing ? 'Pausar (barra espaciadora)' : 'Reproducir (barra espaciadora)'}
         onClick={() => props.setPlaying(!props.playing)}
       >
         {props.playing ? (
@@ -53,16 +56,16 @@ export function Timebar(props: {
           aria-label="Hora de la simulación"
           onChange={(e) => props.setClock(Number(e.target.value))}
         />
-        {/* the thumb is 16 px wide, so the track spans 8 px .. width - 8 px */}
+        {/* the thumb is --thumb wide (styles.css), so the track spans half a thumb in from each end */}
         <span
           className="alert-tick"
-          style={{ left: `calc(8px + (100% - 16px) * ${props.alertMin / props.horizonMin})` }}
+          style={{ left: `calc(var(--thumb) / 2 + (100% - var(--thumb)) * ${props.alertMin / props.horizonMin})` }}
           title={`Alerta de evacuación: ${minToHHMM(t0, props.alertMin)}`}
         >
           <span>Alerta {minToHHMM(t0, props.alertMin)}</span>
         </span>
       </div>
-      <select aria-label="Velocidad de reproducción" value={props.speed} onChange={(e) => props.setSpeed(Number(e.target.value))}>
+      <select className="speed" aria-label="Velocidad de reproducción" value={props.speed} onChange={(e) => props.setSpeed(Number(e.target.value))}>
         {SPEEDS.map((s) => (
           <option key={s} value={s}>
             {s} min/s
@@ -71,7 +74,7 @@ export function Timebar(props: {
       </select>
       <button
         type="button"
-        className={`btn small${props.terrain3d ? ' active' : ''}`}
+        className={`btn small d3${props.terrain3d ? ' active' : ''}`}
         aria-pressed={props.terrain3d}
         disabled={!props.terrainAvailable}
         title={props.terrainAvailable ? 'Relieve en 3D' : 'El 3D necesita conexión (AWS Terrain Tiles)'}
