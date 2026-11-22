@@ -14,7 +14,7 @@ import { loadRealDataset } from '../data/load'
 import { makeMockDataset } from '../data/mock'
 import { timelineDataset, type TimelineChoice } from '../data/timeline'
 import { checkEvent, EVENTS, eventOfTimeline } from '../data/events'
-import { brigadeKey, buildIgnitions, buildWeatherSeries, fireKey, rasteriseFirebreaks, safeNodes, wildlandDistanceM } from './scenario'
+import { brigadeKey, buildIgnitions, buildWeatherSeries, fireKey, rasteriseFirebreaks, safeNodes, snapIgnitions, wildlandDistanceM } from './scenario'
 
 const ctx = self as unknown as DedicatedWorkerGlobalScope
 
@@ -23,8 +23,9 @@ let prepared: EvacPrepared | null = null
 let wildDist: Float32Array | null = null
 /** The 200 m belt around inhabited land, by plan tile (src/engine/plan), built once per dataset. */
 let belt: Belt | null = null
-/** Visible notes about the plan for the last fire (e.g. ignition cells left untreated). */
-let planNotes: string[] = []
+/** Visible notes about the last fire's inputs (plan ignition cells left untreated, ignitions moved off cells that
+ *  cannot burn). */
+let fireNotes: string[] = []
 let lastFireKey = ''
 let lastFire: FireResult | null = null
 let lastFireInput: FireInput | null = null
@@ -56,10 +57,25 @@ async function init(synthetic: boolean, timeline: TimelineChoice) {
   post({ type: 'ready', loadMs, prepareMs: performance.now() - t - loadMs })
 }
 
+/** Loading the files can fail on a flaky network (a scenario switch at a demo venue): retry after 1, 2 and 4 s
+ *  before reporting the error. A data error (a file that fails validation) fails the same way each time and is
+ *  reported after the last attempt. */
+async function initWithRetry(synthetic: boolean, timeline: TimelineChoice) {
+  const waitsMs = [1000, 2000, 4000]
+  for (let k = 0; ; k++) {
+    try {
+      return await init(synthetic, timeline)
+    } catch (e) {
+      if (k >= waitsMs.length) throw e
+      await new Promise((r) => setTimeout(r, waitsMs[k]))
+    }
+  }
+}
+
 ctx.onmessage = (ev: MessageEvent<ToWorker>) => {
   const msg = ev.data
   if (msg.type === 'init') {
-    init(msg.synthetic, msg.timeline).catch((e: unknown) => post({ type: 'error', id: null, message: e instanceof Error ? e.message : String(e) }))
+    initWithRetry(msg.synthetic, msg.timeline).catch((e: unknown) => post({ type: 'error', id: null, message: e instanceof Error ? e.message : String(e) }))
     return
   }
   try {
@@ -72,25 +88,30 @@ ctx.onmessage = (ev: MessageEvent<ToWorker>) => {
       const ignitions = buildIgnitions(data.grid, data.ignitions, s)
       let fuel = data.fuel
       let firebreak = rasteriseFirebreaks(data.grid, s.firebreaks)
-      planNotes = []
+      // Notes and cache are set only once the fire succeeds: a failed run must leave the last good fire, its input
+      // (reused by the firefighters' pass) and its notes untouched.
+      const notes: string[] = []
       if (s.planTiles.length > 0) {
         // Plan de preparación: the belt cleared in the chosen tiles (src/engine/plan).
         const a = applyBelt(belt, s.planTiles, fuel, firebreak, ignitions.map((g) => g.cell))
         fuel = a.fuel
         firebreak = a.firebreak
         if (a.skippedIgnitionCells > 0)
-          planNotes.push(
+          notes.push(
             a.skippedIgnitionCells === 1
               ? 'Un foco cae en la franja tratada; esa celda se dejó sin tratar para que el fuego pueda empezar.'
               : `${a.skippedIgnitionCells} focos caen en la franja tratada; esas celdas se dejaron sin tratar para que el fuego pueda empezar.`,
           )
       }
-      lastFireInput = {
+      // A start point on water, pavement or a firebreak moves to the nearest vegetation (and the panel says so).
+      const snapped = snapIgnitions(data.grid, fuel, firebreak, ignitions)
+      notes.push(...snapped.notes)
+      const input: FireInput = {
         grid: data.grid,
         elevation: data.elevation,
         fuel,
         firebreak,
-        ignitions,
+        ignitions: snapped.ignitions,
         weather: wb.series,
         params: {
           ...DEFAULT_FIRE_PARAMS,
@@ -100,7 +121,10 @@ ctx.onmessage = (ev: MessageEvent<ToWorker>) => {
           horizonMin: data.horizonMin,
         },
       }
-      lastFire = simulateFire(lastFireInput)
+      const newFire = simulateFire(input)
+      lastFireInput = input
+      lastFire = newFire
+      fireNotes = notes
       lastFireKey = key
     }
     const evacParams: EvacParams = {
@@ -189,7 +213,7 @@ ctx.onmessage = (ev: MessageEvent<ToWorker>) => {
       brigades,
       safeNodes: safe,
       weather: wb.series,
-      notes: [...wb.notes, ...planNotes],
+      notes: [...wb.notes, ...fireNotes],
       workerMs: 0,
     }
     const e = result.evac

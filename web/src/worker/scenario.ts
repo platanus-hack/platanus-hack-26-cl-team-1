@@ -3,6 +3,7 @@
 import type { BrigadesFile, GridMeta, IgnitionPreset, Ignition, WeatherFile, WeatherSample, WeatherSeries } from '../engine/types'
 import type { BrigadeSettings } from '../engine/brigade'
 import { FUEL } from '../engine/types'
+import { nearestBurnableCell } from '../engine/fire'
 import { lonLatToCell, lonLatToColRow } from '../data/grid'
 import { localToMin } from '../data/time'
 
@@ -204,6 +205,50 @@ export function buildIgnitions(grid: GridMeta, presets: IgnitionPreset[], s: Sce
     out.push({ cell, tMin: u.tMin })
   }
   return out
+}
+
+/** How far (cells) an ignition that falls on a cell that cannot burn is moved to find vegetation: 10 cells, 600 m
+ *  on the 60 m grids. Farther than that, the ignition is left out and the app says so. */
+export const IGNITION_SNAP_MAX_CELLS = 10
+
+/** Ignitions on a cell that cannot burn (water, rock, pavement, or under a drawn firebreak or the plan's belt) are
+ *  moved to the nearest burnable cell within `maxRadiusCells` (nearestBurnableCell); one with no burnable cell that
+ *  close is left out. Clicking a river or drawing a line over a start point must not stop the simulation, and the
+ *  user must see what happened: every move and every drop is reported in the Spanish notes. */
+export function snapIgnitions(
+  grid: GridMeta,
+  fuel: Uint8Array,
+  firebreak: Uint8Array,
+  ignitions: Ignition[],
+  maxRadiusCells = IGNITION_SNAP_MAX_CELLS,
+): { ignitions: Ignition[]; notes: string[] } {
+  const out: Ignition[] = []
+  let moved = 0
+  let maxMovedM = 0
+  let dropped = 0
+  for (const ig of ignitions) {
+    const j = nearestBurnableCell(grid, fuel, firebreak, ig.cell, maxRadiusCells)
+    if (j === ig.cell) out.push(ig)
+    else if (j >= 0) {
+      const dr = Math.floor(j / grid.cols) - Math.floor(ig.cell / grid.cols)
+      const dc = (j % grid.cols) - (ig.cell % grid.cols)
+      maxMovedM = Math.max(maxMovedM, Math.hypot(dr, dc) * grid.cellM)
+      moved++
+      out.push({ cell: j, tMin: ig.tMin })
+    } else dropped++
+  }
+  const notes: string[] = []
+  if (moved > 0)
+    notes.push(
+      `${moved === 1 ? 'Un foco caía' : `${moved} focos caían`} en agua, pavimento o un cortafuego; ${moved === 1 ? 'se movió' : 'se movieron'} ` +
+        `a la vegetación más cercana (${Math.round(maxMovedM)} m o menos).`,
+    )
+  if (dropped > 0)
+    notes.push(
+      `${dropped === 1 ? 'Un foco no tiene' : `${dropped} focos no tienen`} vegetación a menos de ${Math.round(maxRadiusCells * grid.cellM)} m; ` +
+        `${dropped === 1 ? 'no se simuló' : 'no se simularon'}.`,
+    )
+  return { ignitions: out, notes }
 }
 
 // ---------------------------------------------------------------------------------------------------------

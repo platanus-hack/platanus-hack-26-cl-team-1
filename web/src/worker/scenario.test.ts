@@ -12,6 +12,7 @@ import {
   rasteriseFirebreaks,
   safeNodes,
   sampleAt,
+  snapIgnitions,
   sortedArrivals,
   wildlandDistanceM,
   type Scenario,
@@ -212,5 +213,39 @@ describe('scaleUnits (Mitad / Doble)', () => {
     expect(Object.values(half).reduce((a, x) => a + x[0], 0)).toBe(14)
     expect(scaleUnits({ rm: [50, 0, 0, 1] }, 2).rm).toEqual([99, 0, 0, 2])
     expect(scaleUnits({ a: [3, 1, 0, 0] }, 2).a).toEqual([6, 2, 0, 0])
+  })
+})
+
+describe('snapIgnitions', () => {
+  // 20 x 20 grass, 100 m cells; a river (no fuel) along column 10 and a firebreak along row 5.
+  const n = grid.rows * grid.cols
+  const fuel = new Uint8Array(n).fill(FUEL.GRASS)
+  const firebreak = new Uint8Array(n)
+  for (let r = 0; r < grid.rows; r++) fuel[r * grid.cols + 10] = FUEL.NONE
+  for (let c = 0; c < grid.cols; c++) firebreak[5 * grid.cols + c] = 1
+  const cell = (r: number, c: number) => r * grid.cols + c
+
+  it('keeps ignitions that can burn, with no notes', () => {
+    const ig = [{ cell: cell(2, 2), tMin: 30 }]
+    expect(snapIgnitions(grid, fuel, firebreak, ig)).toEqual({ ignitions: ig, notes: [] })
+  })
+
+  it('moves an ignition off water and off a firebreak to the nearest burnable cell, and says so', () => {
+    const r = snapIgnitions(grid, fuel, firebreak, [
+      { cell: cell(2, 10), tMin: 30 },
+      { cell: cell(5, 3), tMin: 45 },
+    ])
+    expect(r.ignitions).toHaveLength(2)
+    expect([cell(2, 9), cell(2, 11)]).toContain(r.ignitions[0].cell)
+    expect([cell(4, 3), cell(6, 3)]).toContain(r.ignitions[1].cell)
+    expect(r.ignitions.map((g) => g.tMin)).toEqual([30, 45])
+    expect(r.notes).toEqual(['2 focos caían en agua, pavimento o un cortafuego; se movieron a la vegetación más cercana (100 m o menos).'])
+  })
+
+  it('leaves out an ignition with no vegetation within the radius, and says so', () => {
+    const none = new Uint8Array(n)
+    const r = snapIgnitions(grid, none, firebreak, [{ cell: cell(10, 10), tMin: 0 }], 3)
+    expect(r.ignitions).toEqual([])
+    expect(r.notes).toEqual(['Un foco no tiene vegetación a menos de 300 m; no se simuló.'])
   })
 })
