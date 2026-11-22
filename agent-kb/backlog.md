@@ -61,8 +61,9 @@ Owner in brackets once someone takes an item. Project: Cortafuego (D-019). The O
 
 ## Done
 - [x] **Results UI stability and scope (2026-11-22):** reserve three lines for the changing population note;
-  hide the optional firefighting controls, map presentation and related copy across all scenarios. Branch
-  `codex/ui-layout-copy-cleanup`; original shared checkout and underlying engines/data preserved. [Alonso]
+  hide the optional firefighting controls, map presentation and related copy across all scenarios.
+  https://github.com/platanus-hack/platanus-hack-26-cl-team-1/pull/72. Original shared checkout and
+  underlying engines/data preserved. [Alonso]
 - [x] **Eaton firefighters**: 17 stations (LA County LMS), Pasadena FD trucks from its 2025 Standards of Cover,
   LA County counts, one engine as supuesto where nothing is published; all leave 18:18 (supuesto). Branch
   `feat/eaton-firefighters`. [Anaís + agent]

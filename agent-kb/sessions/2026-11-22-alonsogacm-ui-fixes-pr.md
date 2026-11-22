@@ -27,3 +27,8 @@
 
 ## Next
 - Publish the branch as a PR to `main`; leave merging to the user once Lint and Test are green (D-020).
+
+## Publication
+- Created commit `1bce67c` with no coauthor trailers and pushed the scoped branch.
+- Opened https://github.com/platanus-hack/platanus-hack-26-cl-team-1/pull/72 against `main`; CI runs Lint
+  and Test. The PR stays unmerged; readiness is marked after validation/publication bookkeeping.
