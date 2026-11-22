@@ -102,6 +102,11 @@ export const FIRE_MODEL = {
    *  deterministic for a seed and members of an ensemble differ cell by cell. 0 turns it off. */
   spotJitterSigma: 0,
   spotJitterSeed: 0,
+  /** Probabilistic landings (params.emberSeed !== null only; MODEL.md section 5): firebrands a source cell lofts
+   *  into its jump band, per hectare of source cell, before the ignition probability (emberIgnitionProbability).
+   *  The only fitted scalar of that mode: fitted on Viña with `calibrate.ts --embers` (robust objective 0.487 vs
+   *  0.470 for the deterministic run; flat between 267 and 356). Ignored by the deterministic main result. */
+  spotBrandsPerHa: 356,
   /** Spotting: nearest landing distance, in cells (closer than that is ordinary spread). */
   spotMinCells: 3,
   /** Spotting: travel time = spotDelayMin + spotTravelMin * (d / D_max). */
@@ -228,6 +233,35 @@ function copySample(a: WeatherSample, out: WeatherSample): WeatherSample {
 function normDeg(d: number): number {
   const r = d % 360
   return r < 0 ? r + 360 : r
+}
+
+/** Probability that a firebrand landing on fine dead fuel starts a fire (Schroeder 1969, Ignition probability,
+ *  USDA Forest Service Office Report 2106-1, eq. 10 and the fit printed below it): heat of pre-ignition
+ *  Qig = 144.51 - 0.266 T - 0.00058 T^2 - T M + 18.54 (1 - e^(-15.1 M)) + 640 M (cal/g; T fuel temperature in
+ *  deg C, M moisture as a fraction), then P = 0.000048 X^4.3 / 50 with X = (400 - Qig) / 10. 30 deg C and 6 %
+ *  give 0.53, the value of the usual probability-of-ignition tables. That is Schroeder's index scale, about twice his
+ *  own lognormal tail (he "raised" 0.5 to 1.0); only brands x P enters the model and the brands are fitted, so the
+ *  scale is absorbed. The engine feeds the 10 m air temperature and
+ *  the Cheney grass moisture (grassMoisturePct), not fuel temperature: an approximation (MODEL.md section 5). */
+export function emberIgnitionProbability(tempC: number, moisturePct: number): number {
+  if (!Number.isFinite(tempC) || !Number.isFinite(moisturePct)) {
+    throw new Error(`emberIgnitionProbability: temperature ${tempC} and moisture ${moisturePct} must be finite`)
+  }
+  const T = tempC
+  const M = Math.max(0, moisturePct) / 100 // Cheney's linear moisture can dip below 0 in extreme heat: physically 0
+  const qig = 144.51 - 0.266 * T - 0.00058 * T * T - T * M + 18.54 * (1 - Math.exp(-15.1 * M)) + 640 * M
+  const X = (400 - qig) / 10
+  if (!(X > 0)) return 0
+  // Cap at 1: Schroeder's fit passes 1 below Qig of about 149 cal/g, his truncation point (very hot, bone-dry fuel).
+  return Math.min(1, (0.000048 * Math.pow(X, 4.3)) / 50)
+}
+
+/** Probability that at least one igniting firebrand from a source lands in one cell of its jump band:
+ *  1 - exp(-lambda), lambda = brandsPerCell * pIgn / bandCells (Poisson landings spread evenly over the band,
+ *  thinned by the ignition probability: Kingman 1993, Poisson Processes, the colouring theorem). */
+export function emberCellProbability(brandsPerCell: number, pIgn: number, bandCells: number): number {
+  if (!(bandCells > 0)) throw new Error(`emberCellProbability: bandCells must be > 0 (got ${bandCells})`)
+  return -Math.expm1((-brandsPerCell * pIgn) / bandCells)
 }
 
 /** Byram fireline intensity I = H w R (kW/m with H kJ/kg, w kg/m^2 consumed, R m/s), used only to decide

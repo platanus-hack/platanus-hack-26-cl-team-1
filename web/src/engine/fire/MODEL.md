@@ -133,28 +133,172 @@ Spotting runs only when `params.spotting` is on. It starts from settled cells wh
   (cell, `spotJitterSeed`), for ensembles. The median of an ensemble overburns (the fastest path wins), so it
   stays at 0.
 
-**Drawn firebreaks in the app (D-034).** Because a 30-120 m firebreak is crossed whenever D_max is longer, whether
-a drawn line holds depends mostly on `spotMetresPerKmh`, which was calibrated only on Viña 2024. When the user has
-drawn firebreaks, the worker (`src/worker/emberRange.ts`) also runs the scenario, without firefighters, at the
-scenario's own ember setting (so one row always matches the main result without firefighters, embers off included)
-and at each distance the calibration tried (12, 15 and 25 m per km/h, section 6), without and with the lines, and the
-Cortafuegos panel shows the range. Fires are cached per setting, so a change that only affects the evacuation
-reruns the evacuations only. `pnpm exec tsx scripts/firebreak-embers.ts` measures the same for one line; on
-Talca (D-032), an 8 km x 120 m line 1 km ahead of the fire, measured on 2026-11-22:
+### Probabilistic landings (drawn firebreaks)
 
-| Embers | Households cut off, without -> with the line | Burned by midnight |
-|---|---|---|
-| 12 m per km/h | 4,625 -> 2,983 (-35.5 %) | 7,027 -> 6,330 ha |
-| 15 m per km/h | 7,022 -> 5,663 (-19.4 %) | 8,114 -> 7,474 ha |
-| 25 m per km/h (shipped) | 10,582 -> 10,001 (-5.5 %) | 14,098 -> 13,288 ha |
-| Off (reference) | 2,534 -> 107 (-95.8 %) | 6,072 -> 591 ha |
+The main result keeps the deterministic spotting above. When embers are on and the user draws firebreaks, the
+panel also runs 8 members with random ember landings (`params.emberSeed` = 1..8, `src/worker/embers.ts`), each
+seed once without and once with the drawn lines, and shows in how many members embers cross the lines and the
+paired difference in households cut off. Only *where embers ignite* is random. The gates, the band, D_max and
+the travel time are the calibrated ones above, and the "m por km/h" slider still sets D_max.
 
-A line drawn by hand a few tens of metres away gave -25 %, -12 % and -4.9 %: at the shorter distances the result
-also depends on exactly where the line crosses the shrub and forest that throw embers.
+**The model.** For each source cell i that passes the gates when it settles at time t:
+
+- Band: `bandCells = 3 · (kMax − spotMinCells + 1)`, with kMax = ⌊D_max / cellM⌋.
+- Brands the source lofts into its band: B = `spotBrandsPerHa` · cellM² / 10⁴ (356 per ha = 128 per 60 m cell).
+- Ignition probability of a brand on landing: P_ign(t) = Schroeder (1969), below, from the 10 m air temperature
+  and the Cheney grass moisture MC of section 1, recomputed whenever the weather changes.
+- Expected igniting brands per band cell, spread evenly over the band: λ_i = B · P_ign / bandCells.
+- A jump edge i → j that would improve j's time is kept only if `hashPair(i, j, seed)` < p_i = 1 − exp(−λ_i)
+  (`emberCellProbability`, written `-Math.expm1(-λ)`). Brands landing on a firebreak, an unburnable cell or a cell
+  without `spotTarget` are lost.
+
+**Why one draw per edge is exact.** The source lofts N ~ Poisson brands, each landing uniformly on a band cell
+and igniting with probability P_ign. By Poisson thinning (the colouring theorem, Kingman 1993), the igniting
+landings per cell are independent Poisson(λ_i) counts, and a spot fire starts when at least one lands, with
+probability 1 − exp(−λ_i).
+
+**Limits.** `emberSeed: null` takes no draws: every existing engine test is unchanged, and during review it was
+compared bit for bit with `main`'s engine on the three events' data (24 scenarios; a one-off check). As
+`spotBrandsPerHa` grows without bound, p = 1 exactly in floating point (every draw is < 1), so a seeded run equals
+the deterministic one (`index.test.ts`): the main result is this model's B → ∞ limit.
+
+**Schroeder (1969), eq. 10 and the fit printed below it** (`emberIgnitionProbability`):
+Qig = 144.51 − 0.266 T − 0.00058 T² − T·M + 18.54 (1 − e^(−15.1 M)) + 640 M (cal/g; T in °C, M = MC / 100),
+X = (400 − Qig) / 10, P = 0.000048 · X^4.3 / 50.
+
+- 30 °C and 6 % give 0.53, the value of the usual ignition-probability tables.
+- **Scale:** the printed fit is on Schroeder's index scale, about twice his own lognormal tail (σ = 0.139, mean
+  log₁₀ Qig = 2.1761): he notes that the probability of 0.5 "has been raised to 1.0" for the index. His full-curve
+  probability at 30 °C and 6 % is about 0.26. Only B · P_ign enters the model, and B is fitted, so the scale is
+  absorbed; B counts brands relative to this scale, not physical firebrands.
+- The fit passes 1 below Qig ≈ 149 cal/g, Schroeder's truncation point; P is capped at 1 there. It returns 0
+  when X ≤ 0, which this domain never reaches (Qig is at most ≈ 312 cal/g, at 0 °C and RH 100 %).
+- **An approximation:** Schroeder's inputs are fuel temperature and fine dead-fuel moisture; the engine feeds the
+  10 m air temperature and Cheney's grass moisture. B absorbs a constant scale, not the shape or the cap.
+- On Viña (`pnpm embers`), P_ign is 0.37 / 0.41 / 0.33 / 0.22 / 0.15 / 0.08 at 12:00 / 14:00 / 16:00 / 18:00 /
+  20:00 / 22:00, i.e. 47 / 52 / 42 / 29 / 19 / 11 igniting brands per source cell. On the Talca afternoon it is
+  0.60–0.75 (14:00–20:00); over the Eaton run (18:00 to 12:00) 0.20–0.37.
+
+**Draws.** `hashPair(a, b, seed)` (`index.ts`): two chained lowbias32 rounds keyed on (source cell, target cell,
+seed). The draw does not depend on the order cells are processed in or on any other draw, so a run is
+deterministic per seed, and the runs with and without lines share every uniform (common random numbers). If a line
+changes when source i settles, p_i moves monotonically against the same uniform. `index.test.ts` checks the
+deciles of 10⁵ draws (10 % ± 0.5 % each) and that a fire the added break never touches stays bit-identical.
+
+| Item | Status |
+|---|---|
+| Schroeder P_ign | Published (Schroeder 1969) |
+| Cheney grass moisture | Published, already in the engine (section 1) |
+| One Bernoulli draw per jump edge | Mathematical result (Poisson thinning, Kingman 1993) |
+| Band geometry, wind and ROS gates, travel time 4 + 10 · d / D_max | Inherited calibration (this section and section 6) |
+| Uniform landing across the band | The engine's existing modelling assumption, not a published distribution |
+| `spotBrandsPerHa` = 356 | **The only fitted scalar** (below) |
+
+**Fit** (`pnpm exec tsx src/engine/fire/calibrate.ts --embers`, which prints only and writes no file): the robust
+objective of section 6 (mean over ERA5 wind ×0.9 / ×1 / ×1.1 of pace score, Dice and building F1), scored on the
+per-cell median arrival of 8 members (seeds 1–8):
+
+| Brands per ha (per 60 m cell) | Robust objective | Dice at ×0.9 / ×1 / ×1.1 | Buildings in scar at ×1 |
+|---|---|---|---|
+| Deterministic (main result) | 0.470 | 0.650 / 0.639 / 0.616 | 5,784 |
+| 178 (64) | 0.460 | 0.632 / 0.656 / 0.644 | 4,365 |
+| 267 (96) | 0.487 | 0.640 / 0.654 / 0.633 | 5,315 |
+| **356 (128), shipped** | **0.487** | 0.650 / 0.653 / 0.628 | 5,646 |
+| 533 (192) | 0.483 | 0.649 / 0.647 / 0.622 | 5,736 |
+| 711 (256) | 0.475 | 0.650 / 0.644 / 0.619 | 5,774 |
+
+- The optimum is flat from 267 to 356 per ha; 356 is the end closer to the deterministic run (buildings in scar).
+- At 178 per ha the western head stalls at wind ×0.9 (GOES RMS lag west 120 min, 1,832 buildings in the scar): a
+  percolation knife edge, as with the intensity-scaled embers of section 6.
+- One-off, from a scratch prototype during the design: a constant "every landing ignites" (P_ign = 1) at its own
+  best yield scored 0.486, the same as Schroeder in-sample. Schroeder is kept because it is published and makes
+  humidity and temperature act on embers; Viña cannot tell the two apart.
+- In-sample, one fire, flat optimum; Eaton (below) shows no gain out of sample.
+
+**Viña 2024 and Eaton 2025, deterministic vs 32 members** (`pnpm embers`; no drawn lines; each event as the app
+runs it: Viña alert 18:00, 2.9 persons per household, 50 % on foot; Eaton alert 19:25, 2.7, 4 %):
+
+| Measure | Viña, deterministic | Viña, members: median [P10–P90] | Eaton, deterministic | Eaton, members |
+|---|---|---|---|---|
+| Area (burnedCells) | 18,008 ha | 17,173 [16,995–17,301] ha | 14,942 ha | 14,522 [14,353–14,684] ha |
+| Dice vs the scar, per member | 0.639 | 0.649 [0.646–0.652] | 0.344 | 0.338 [0.336–0.349] |
+| Burned in ≥ half the members | – | 17,264 ha, Dice 0.649 | – | 14,595 ha, Dice 0.338 |
+| Households cut off at the alert | 4,061 | 3,763 [3,696–3,829] (−7.3 %) | 1,670 | 1,585 [1,561–1,613] (−5.1 %) |
+
+(burnedCells counts every cell; section 6 scores 17,934 ha because it skips the scar's no-data cells.)
+
+**Talca: an 8 km line drawn across the fire's path** (built in `ember-ensemble.ts`: perpendicular to the head bearing at the
+17:00 alert, 28°, centred 1 km from the 14:00 ignition), the same 32 seeds without and with it, summarised with the
+panel's own `summariseEmbers`. Without the line: 10,580 [10,511–10,585] households cut off.
+
+| Width | Cells | Reached | Crossed | Households with the line | Saved (paired), median [P10–P90] | % | Spot fires beyond |
+|---|---|---|---|---|---|---|---|
+| 30 m | 182 | 32/32 | 32/32 | 10,053 [10,017–10,060] | 527 [480–531] | −5.0 [−4.6, −5.0] | 127 [125–128] |
+| 60 m | 182 (the same cells) | 32/32 | 32/32 | 10,053 [10,017–10,060] | 527 [480–531] | −5.0 [−4.6, −5.0] | 127 [125–128] |
+| 90 m | 202 | 32/32 | 32/32 | 10,053 [10,017–10,060] | 527 [480–531] | −5.0 [−4.6, −5.0] | 123 [121–124] |
+| 120 m | 274 | 32/32 | 32/32 | 10,000 [9,963–10,003] | 580 [537–586] | −5.5 [−5.1, −5.5] | 81 [79–83] |
+
+- The fire reaches the line at 14:45 and the first spot fire beyond it starts at 14:59 (medians, every width).
+  The 14 min come mostly from the travel-time formula, so the panel does not report "minutes bought".
+- References, one run each: deterministic spotting 10,582 → 10,055 (30, 60 and 90 m) and 10,001 (120 m), crossed;
+  embers off 2,534 → 107, never crossed.
+
+**Sensitivity on the 120 m line** (same line, 32 paired members):
+
+| Variant | Deterministic: without → with | Crossed | Saved (paired), median [P10–P90] | % |
+|---|---|---|---|---|
+| Wind ×0.55 | 1,842 → 217, not crossed | 0/32 | 1,625, every member | −88.2 |
+| Wind ×0.6 | 1,828 → 199, not crossed | 0/32 | 1,629, every member | −89.1 |
+| Wind ×0.65 | 1,988 → 1,535, crossed | 32/32 | 454, every member | −22.8 |
+| Wind ×0.7 | 2,079 → 1,534, crossed | 32/32 | 546, every member | −26.2 |
+| RH +30 points | 4,619 → 3,843, crossed | 32/32 | 687 [440–775] | −15.5 [−10.9, −18.3] |
+| 1 brand per cell (2.8 per ha; no longer reproduces Viña) | 10,582 → 10,001, crossed | 32/32 | 2,168 [1,063–5,242] | −31.5 [−15.3, −71.7] |
+
+**What this does and does not show.**
+
+- **Crossed or not is a step function of the inherited gates** (wind ≥ 15 km/h, source head ROS ≥ 15 m/min), not
+  of ember chance. On Talca it switches between wind ×0.6 (0 of 32) and ×0.65 (32 of 32), and on both sides of the
+  step every member equals the deterministic run. An 8 km line meets thousands of independent jumps, so even at
+  about 1 brand per cell it is crossed in every member. The count is nearly always 0 of N or N of N; it is not a
+  breach rate.
+- **The spread is ember chance only:** not uncertainty in the model, the weather or the ember reach. In hot, dry
+  weather nearly every edge is kept and the range collapses (Talca at wind ×0.65–0.7).
+- **Width barely matters at 60 m cells.** 30 and 60 m rasterise to the same one-cell trace, 90 m adds 20 cells,
+  120 m is two cells. A wider line drops more brands on bare ground and lengthens the shortest jumps (spot fires
+  beyond the line 127 → 81), so the paired saving grows from 5.0 % to 5.5 %; it never changes whether the line is
+  crossed. Fireguard-width rules apply "in the absence of spotting" (Alexander 2001). There is no sub-cell width and no surface-breaching model.
+- **The ensemble sits a few % below the main result** (Viña −7.3 % households, Eaton −5.1 %) because not every
+  landing ignites. The panel leads with the paired difference and says so.
+- **Stability.** Medians of the 4 disjoint 8-seed blocks: Viña households 3,745 / 3,763 / 3,791 / 3,753 (32
+  members: 3,763); Eaton 1,585 / 1,574 / 1,595 / 1,590 (1,585); Talca 120 m saved 581 / 561 / 579 / 575 (580).
+  That is in hot, dry weather, where nearly every edge is kept. With more humid air the 8-member median moves much
+  more: Talca 120 m at RH +30 points saved 497 / 733 / 595 / 717 by block (32 members: 687), and at about 1 brand
+  per cell 2,691 / 2,899 / 1,746 / 1,972. The panel always uses seeds 1–8 and shows their P10–P90 range, which is
+  wide exactly when its median is unstable.
+- **Cost** (`pnpm embers`, Node 26.12.1, medians): fire 42 ms on Viña, 31 ms on Eaton, 34 ms on Talca; evacuation
+  41, 52 and 31 ms. The panel's 8 paired members are 16 fires and 16 evacuations; not timed in the browser worker.
+- The crossing report samples each jump every quarter cell and can miss or double-count at line corners. It only
+  reports; it never changes the fire (`index.test.ts`).
+
+**Considered and not adopted.**
+
+- **RandomFront 2.3** (Trucchia et al. 2019), eq. 12 and eq. 10 with their Table 1 constants, at I = 5 MW/m,
+  r = 3 cm, U = 7.8 m/s: the distance parameter μ comes out at 5.6 cm in consistent SI units, or 5.6 km if I is
+  taken in W/m with Hc in kJ/kg, and σ = 5.9. Neither is a usable landing distance (recomputed once during the
+  design; one-off).
+- **Sardoy et al. (2008)** lognormal landing distances, coefficients as given by López-De-Castro et al. (2024),
+  eqs. 6–8 (Sardoy's paper itself was not read). One-off measurements from a scratch prototype during the design,
+  not reproduced by this repo's scripts: with one fitted yield (200 igniting embers per ha) the robust objective
+  was 0.508, the Viña P ≥ 0.5 Dice 0.676 and the Eaton Dice ≈ 0.41 (vs 0.470, 0.639 and 0.344), but Viña households
+  cut off fell to 2,681 (−34 %) and building recall to 0.69 (vs 0.89); fire runs took 55–69 ms; and in the
+  buoyancy-driven regime weaker wind throws embers farther (Talca at wind ×0.7: 8,234 households vs 2,079
+  deterministic). It would change the main result, its coefficients are second-hand and their validity range
+  unknown, so it stays a candidate for a full recalibration (backlog).
 
 ## 6. Calibration (`calibrate.ts`)
 
-Run `pnpm exec tsx src/engine/fire/calibrate.ts`, or add `--scan` for a grid search. It uses the baked
+Run `pnpm exec tsx src/engine/fire/calibrate.ts`, or add `--scan` for a grid search (`--embers` fits the
+probabilistic landings of section 5 and writes no file). It uses the baked
 dataset, the historical ERA5 weather (direction corrected, see below), the two preset ignitions and the UI horizon (midnight). It scores the burned
 cells against the Sentinel-2 scar, ignoring no-data cells.
 
@@ -396,7 +540,8 @@ On the real dataset a run takes 20–130 ms.
   fuel or weather beyond it. From the first contact on, burned area, buildings and households leave out what the
   fire would reach on the other side. `edge.ts` finds when and where the fire reaches the outer ring of cells;
   the explorer says so on the map and under the final burned area, and draws the simulated area's outline.
-- Spotting is deterministic: there is no ember probability and no long-range spotting beyond D_max.
+- The main result's spotting is deterministic. The firebreak ensemble samples only where embers ignite (uniform
+  within the calibrated band). It has no long-range spotting beyond D_max and no uncertainty in reach or weather.
 - Structures are modelled as a grass fraction, in two classes (intermix / consolidated). There is no
   building-to-building ignition model.
 - Time-dependent Dijkstra assumes FIFO, meaning leaving later never arrives earlier. This holds only
@@ -411,10 +556,16 @@ On the real dataset a run takes 20–130 ms.
 ## References
 
 - Alexander, M.E. (1985). Estimating the length-to-breadth ratio of elliptical forest fire patterns. Proc. 8th Conf. Fire and Forest Meteorology, 287–304.
+- Alexander, M.E. (2001). Fire behaviour as a factor in forest and rural fire suppression. New Zealand Fire Service Commission Research Report 21.
 - Cheney, N.P., Gould, J.S., Catchpole, W.R. (1998). Prediction of fire spread in grasslands. Int. J. Wildland Fire 8(1), 1–13.
 - Cheney, N.P., Gould, J.S., McCaw, W.L., Anderson, W.R. (2012). Predicting fire behaviour in dry eucalypt forest in southern Australia. Forest Ecology and Management 280, 120–131.
 - Finney, M.A. (2002). Fire growth using minimum travel time methods. Can. J. For. Res. 32, 1420–1424.
+- Kingman, J.F.C. (1993). Poisson Processes. Oxford University Press (Oxford Studies in Probability 3).
+- López-De-Castro, M., Trucchia, A., Morra di Cella, U., Fiorucci, P., Cardillo, A., Pagnini, G. (2024). Fire-spotting modelling in operational wildfire simulators based on Cellular Automata: a comparison study. Agric. For. Meteorol. 350, 109989.
 - Nash, A., Daniel, K., Koenig, S., Felner, A. (2007). Theta*: any-angle path planning on grids. AAAI-07.
 - Noble, I.R., Bary, G.A.V., Gill, A.M. (1980). McArthur's fire-danger meters expressed as equations. Aust. J. Ecol. 5, 201–203.
 - Rothermel, R.C. (1972). A mathematical model for predicting fire spread in wildland fuels. USDA For. Serv. Res. Pap. INT-115.
+- Sardoy, N., Consalvi, J.L., Kaiss, A., Fernandez-Pello, A.C., Porterie, B. (2008). Numerical study of ground-level distribution of firebrands generated by line fires. Combust. Flame 154(3), 478–488.
+- Schroeder, M.J. (1969). Ignition probability. USDA Forest Service Office Report 2106-1, Rocky Mountain Forest and Range Experiment Station.
+- Trucchia, A., Egorova, V., Butenko, A., Kaur, I., Pagnini, G. (2019). RandomFront 2.3: a physical parameterisation of fire spotting for operational fire spread models. Geosci. Model Dev. 12, 69–87.
 - Van Wagner, C.E. (1969). A simple fire-growth model. Forestry Chronicle 45, 103–104.

@@ -1,6 +1,6 @@
 // Typed wrapper around the simulation worker. Runs are coalesced: while one is in flight, only the newest
 // requested scenario is kept and sent when the worker is free.
-import type { FromWorker, RunResult, ToWorker } from './protocol'
+import type { EmbersMessage, FromWorker, RunResult, ToWorker } from './protocol'
 import type { Scenario } from './scenario'
 import type { TimelineChoice } from '../data/timeline'
 
@@ -9,8 +9,8 @@ export interface SimCallbacks {
   onResult: (r: RunResult, roundTripMs: number) => void
   onError: (message: string) => void
   onBusy: (busy: boolean) => void
-  /** Drawn firebreaks under several ember distances, after a run's result (protocol.ts). */
-  onEmberRange: (msg: Extract<FromWorker, { type: 'emberRange' }>) => void
+  /** The probabilistic-ember ensemble that follows a run's result (protocol.ts, EmbersMessage). */
+  onEmbers: (msg: EmbersMessage) => void
 }
 
 export class SimClient {
@@ -67,9 +67,10 @@ export class SimClient {
       this.pump()
       return
     }
-    if (msg.type === 'emberRange') {
-      // Follows a result already handled: not part of the request/response cycle.
-      this.cb.onEmberRange(msg)
+    if (msg.type === 'embers') {
+      // Follows a result already handled (or keeps coming while the ensemble runs): not part of the
+      // request/response cycle, so it must not touch the in-flight run or the busy flag.
+      this.cb.onEmbers(msg)
       return
     }
     const sentAt = this.inFlight?.sentAt ?? performance.now()

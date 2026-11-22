@@ -13,7 +13,7 @@ import type { EdgeContact } from '../engine/fire/edge'
 import { edgeStatNote } from './edgeNote'
 import { BrigadesSection } from './BrigadesSection'
 import { PlanSection } from './PlanSection'
-import { FirebreakEmberRange, type EmberRangeState } from './FirebreakEmberRange'
+import { EmberEnsemble, type EmberState } from './EmberEnsemble'
 import type { FirebreakWidth, Scenario, WeatherSettings } from '../worker/scenario'
 import { FIREBREAK_WIDTHS, sampleAt } from '../worker/scenario'
 import { Compass, compassLabel, fmtInt, fmtSigned, Section, Segmented, Slider, Toggle } from './controls'
@@ -57,8 +57,8 @@ interface Props {
   summary: Summary | null
   baseline: Summary | null
   setBaseline: (s: Summary | null) => void
-  /** Drawn firebreaks under several ember distances (worker/emberRange.ts). */
-  emberRange: EmberRangeState | null
+  /** Probabilistic-ember ensemble for the drawn firebreaks (worker/embers.ts); null when there is none to show. */
+  embers: EmberState | null
   timings: Timings | null
   busy: boolean
   simError: string | null
@@ -431,6 +431,9 @@ function CortafuegosSection(p: Props) {
           <label>Ancho del próximo cortafuego</label>
         </div>
         <Segmented label="Ancho del próximo cortafuego" value={p.firebreakWidth} onChange={p.setFirebreakWidth} options={widthOpts} />
+        {/* The cell counts in this note hold for 60 m cells only (rasteriseFirebreaks, measured on the Talca line);
+            other grids rasterise the widths differently. */}
+        {p.data.grid.cellM === 60 && <div className="hint">El simulador usa cuadros de 60 m: 30 y 60 m ocupan la misma franja de un cuadro; 120 m, dos.</div>}
       </div>
       {s.firebreaks.length === 0 ? (
         <p className="muted small">
@@ -470,7 +473,7 @@ function CortafuegosSection(p: Props) {
           <button type="button" className="btn small ghost" onClick={() => p.update({ firebreaks: [] })}>
             Borrar todos
           </button>
-          <FirebreakEmberRange range={p.emberRange} cellM={p.data.grid.cellM} own={s.spotting ? s.spotMetresPerKmh : null} />
+          <EmberEnsemble state={p.embers} busy={p.busy} spotting={s.spotting && s.spotMetresPerKmh > 0} t0={p.data.grid.t0} cellM={p.data.grid.cellM} />
         </>
       )}
     </Section>

@@ -159,6 +159,10 @@ export interface FireParams {
   /** Ember spotting on/off, and max spotting distance in metres per km/h of effective wind. */
   spotting: boolean
   spotMetresPerKmh: number
+  /** null = deterministic spotting (every ember landing in the jump band ignites: the calibrated main result).
+   *  An integer >= 0 makes each ember landing a random draw for that seed (engine/fire/MODEL.md section 5,
+   *  "Probabilistic landings"); the same seed with and without firebreaks gives common random numbers. */
+  emberSeed: number | null
   /** Stop the simulation at this time (minutes since t0). */
   horizonMin: number
 }
@@ -189,6 +193,19 @@ export interface FireInput {
   params: FireParams
   /** Optional firefighter defence (absent = no firefighting, the calibrated model). */
   defense?: FireDefense
+  /** Cells of the drawn firebreaks to report on in FireResult.line (0/1, same size as firebreak, a subset of
+   *  it). Reporting only: it does not change the fire. */
+  lineMask?: Uint8Array
+}
+
+/** What the fire did at the cells of FireInput.lineMask. */
+export interface FireLineReport {
+  /** First time a burned cell touches (8-neighbour) a line cell, minutes since t0; Infinity if never. */
+  reachedMin: number
+  /** First time a cell burns whose arrival came from an ember jump passing over a line cell; Infinity if none. */
+  firstCrossMin: number
+  /** Number of those spot ignitions across the line (not the cells they later burn). */
+  crossedCells: number
 }
 
 export interface FireResult {
@@ -198,6 +215,8 @@ export interface FireResult {
   rosMPerMin: Float32Array
   burnedCells: number
   elapsedMs: number
+  /** Present if and only if FireInput.lineMask was given. */
+  line?: FireLineReport
 }
 
 // export function simulateFire(input: FireInput): FireResult

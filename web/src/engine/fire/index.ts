@@ -9,6 +9,8 @@ import {
   FIRE_MODEL,
   SPREAD_MODEL,
   eccentricity,
+  emberCellProbability,
+  emberIgnitionProbability,
   forestRosKmh,
   grassCuringFactor,
   grassMoistureFactor,
@@ -23,6 +25,8 @@ import {
 export {
   ERA5_WIND_DIR_CORRECTION_DEG,
   FIRELINE,
+  emberCellProbability,
+  emberIgnitionProbability,
   FIRE_MODEL,
   SPREAD_MODEL,
   flatRosKmh,
@@ -34,6 +38,26 @@ export {
 /** Deterministic uniform in (0, 1) from (cell, seed, stream): 32-bit integer hash (Wellons' lowbias32). */
 function hashUnit(cell: number, seed: number, stream: number): number {
   let x = (Math.imul(cell, 0x9e3779b1) ^ Math.imul(seed + 1, 0x85ebca77) ^ Math.imul(stream + 1, 0xc2b2ae3d)) >>> 0
+  x ^= x >>> 16
+  x = Math.imul(x, 0x7feb352d) >>> 0
+  x ^= x >>> 15
+  x = Math.imul(x, 0x846ca68b) >>> 0
+  x ^= x >>> 16
+  return ((x >>> 0) + 0.5) / 4294967296
+}
+
+/** Uniform in (0, 1) for an ordered pair of cells and a seed: two chained lowbias32 rounds. The draw for
+ *  (source, target) depends on nothing else (not on the order cells are processed in, nor on other draws), so the
+ *  same seed with and without firebreaks gives common random numbers. hashUnit(i, seed, j) would not do: it XORs
+ *  the multiplied inputs before mixing, so distinct pairs can collide. */
+export function hashPair(a: number, b: number, seed: number): number {
+  let x = (Math.imul(a, 0x9e3779b1) ^ Math.imul(seed + 1, 0x85ebca77)) >>> 0
+  x ^= x >>> 16
+  x = Math.imul(x, 0x7feb352d) >>> 0
+  x ^= x >>> 15
+  x = Math.imul(x, 0x846ca68b) >>> 0
+  x ^= x >>> 16
+  x = (x ^ Math.imul(b + 1, 0xc2b2ae3d)) >>> 0
   x ^= x >>> 16
   x = Math.imul(x, 0x7feb352d) >>> 0
   x ^= x >>> 15
@@ -54,6 +78,7 @@ export const DEFAULT_FIRE_PARAMS: FireParams = {
   rosMultiplier: 1,
   spotting: true,
   spotMetresPerKmh: 25,
+  emberSeed: null, // deterministic spotting: the calibrated main result
   horizonMin: 12 * 60, // 12:00 to midnight: the model has no suppression, so later hours overburn
 }
 
@@ -107,7 +132,7 @@ const KMH_TO_M_PER_MIN = 1000 / 60
 export function simulateFire(input: FireInput): FireResult {
   const started = performance.now()
   validateInput(input)
-  const { grid, elevation, fuel, firebreak, ignitions, weather, params, defense } = input
+  const { grid, elevation, fuel, firebreak, ignitions, weather, params, defense, lineMask } = input
   const { rows, cols, cellM } = grid
   const n = rows * cols
   const M = FIRE_MODEL
@@ -152,6 +177,28 @@ export function simulateFire(input: FireInput): FireResult {
   const headY = new Float32Array(n)
   const headE = new Float32Array(n) // ellipse eccentricity
   const heap = new CellHeap(time)
+
+  // Probabilistic landings (params.emberSeed, MODEL.md section 5): each jump edge exists with probability
+  // 1 - exp(-lambda), drawn from hashPair(source, target, seed). pIgn follows the weather (Schroeder 1969).
+  const seed = params.emberSeed
+  const brandsPerCell = (M.spotBrandsPerHa * cellM * cellM) / 1e4
+  let pIgn = 1
+  // Line report (FireInput.lineMask): viaLine[j] = 1 while j's tentative time comes from a jump over a line cell.
+  const viaLine = lineMask ? new Uint8Array(n) : null
+  let lineReached = Infinity
+  let lineFirstCross = Infinity
+  let lineCrossed = 0
+  /** Whether the straight jump from (r0, c0) to (r1, c1) passes over a line cell. Sampled every quarter cell along
+   *  the major axis, so the visited cells form an 8-connected path, which a 4-connected rasterised line blocks. */
+  const jumpCrossesLine = (r0: number, c0: number, r1: number, c1: number): boolean => {
+    const steps = Math.ceil(4 * Math.max(Math.abs(r1 - r0), Math.abs(c1 - c0)))
+    for (let k = 1; k < steps; k++) {
+      const rr = Math.round(r0 + ((r1 - r0) * k) / steps)
+      const cc = Math.round(c0 + ((c1 - c0) * k) / steps)
+      if (lineMask![rr * cols + cc]) return true
+    }
+    return false
+  }
 
   for (const ig of ignitions) {
     if (!burnable[ig.cell]) {
@@ -217,6 +264,7 @@ export function simulateFire(input: FireInput): FireResult {
       downC = sinB
       forestPerLoad = forestRosKmh(mcArthurFFDI(params.droughtFactor, w.rh, w.tempC, V), 1)
       grassFlat = grassRosKmh(V, grassMoistureFactor(grassMoisturePct(w.tempC, w.rh), V), phiC)
+      if (seed !== null) pIgn = emberIgnitionProbability(w.tempC, grassMoisturePct(w.tempC, w.rh))
     }
 
     // Head of the fire leaving cell i: effective wind = wind + slope (vector), ROS, direction, shape.
@@ -247,6 +295,26 @@ export function simulateFire(input: FireInput): FireResult {
     headX[i] = hx
     headY[i] = hy
     headE[i] = e
+    if (lineMask) {
+      if (viaLine![i] === 1) {
+        lineCrossed++
+        if (t < lineFirstCross) lineFirstCross = t
+      }
+      // Cells settle in time order, so the first burned cell next to the line gives the time it is reached.
+      if (lineReached === Infinity) {
+        const r0 = (i / cols) | 0
+        const c0 = i - r0 * cols
+        for (let dr = -1; dr <= 1 && lineReached === Infinity; dr++)
+          for (let dc = -1; dc <= 1; dc++) {
+            const rr = r0 + dr
+            const cc = c0 + dc
+            if (rr >= 0 && rr < rows && cc >= 0 && cc < cols && lineMask[rr * cols + cc] === 1) {
+              lineReached = t
+              break
+            }
+          }
+      }
+    }
     if (!(Rh > 0)) continue
 
     const r = (i / cols) | 0
@@ -310,6 +378,7 @@ export function simulateFire(input: FireInput): FireResult {
       if (tt < time[j]) {
         time[j] = tt
         anchor[j] = from
+        if (viaLine) viaLine[j] = 0
         heap.pushOrDecrease(j)
       }
     }
@@ -321,6 +390,9 @@ export function simulateFire(input: FireInput): FireResult {
       const dMax = params.spotMetresPerKmh * V * fuelSpotDist[f] * scale * jitter // metres
       const kMax = Math.floor(dMax / cellM)
       const minD = spotMinCells * cellM
+      // Probabilistic landings: the source's igniting brands spread evenly over its band of 3 x (kMax - minCells + 1)
+      // cells (brands landing on a firebreak or unburnable cell are lost). p = 1 in the deterministic main result.
+      const pLand = seed !== null && kMax >= spotMinCells ? emberCellProbability(brandsPerCell, pIgn, 3 * (kMax - spotMinCells + 1)) : 1
       for (let s = spotMinCells; s <= kMax; s++) {
         const fr = r + s * downR
         const fc = c + s * downC
@@ -335,8 +407,10 @@ export function simulateFire(input: FireInput): FireResult {
           if (d < minD || d > dMax) continue
           const tt = t + M.spotDelayMin + (M.spotTravelMin * d) / dMax
           if (tt < time[j]) {
+            if (seed !== null && hashPair(i, j, seed) >= pLand) continue // no igniting brand landed in j
             time[j] = tt
             anchor[j] = j // a spot fire is a new ignition point
+            if (viaLine) viaLine[j] = jumpCrossesLine(r, c, tr, tc) ? 1 : 0
             heap.pushOrDecrease(j)
           }
         }
@@ -344,7 +418,9 @@ export function simulateFire(input: FireInput): FireResult {
     }
   }
 
-  return { arrivalMin: arrival, rosMPerMin: headR, burnedCells: burned, elapsedMs: performance.now() - started }
+  const result: FireResult = { arrivalMin: arrival, rosMPerMin: headR, burnedCells: burned, elapsedMs: performance.now() - started }
+  if (lineMask) result.line = { reachedMin: lineReached, firstCrossMin: lineFirstCross, crossedCells: lineCrossed }
+  return result
 }
 
 /** Upslope equivalent wind per cell, km/h: U_s = slopeWindKmhPerDeg * slopeDeg along the upslope direction.
@@ -413,6 +489,20 @@ function validateInput(input: FireInput): void {
   if (!(params.rosMultiplier > 0) || !Number.isFinite(params.rosMultiplier)) throw new Error(`simulateFire: rosMultiplier must be > 0 (got ${params.rosMultiplier})`)
   if (!(params.spotMetresPerKmh >= 0) || !Number.isFinite(params.spotMetresPerKmh)) throw new Error(`simulateFire: spotMetresPerKmh must be >= 0 (got ${params.spotMetresPerKmh})`)
   if (Number.isNaN(params.horizonMin)) throw new Error('simulateFire: horizonMin is NaN')
+  if (params.emberSeed !== null && !(Number.isInteger(params.emberSeed) && params.emberSeed >= 0 && params.emberSeed < 2 ** 31)) {
+    throw new Error(`simulateFire: emberSeed must be null or an integer in [0, 2^31) (got ${params.emberSeed})`)
+  }
+  if (params.emberSeed !== null && !(FIRE_MODEL.spotBrandsPerHa > 0 && Number.isFinite(FIRE_MODEL.spotBrandsPerHa))) {
+    throw new Error(`simulateFire: FIRE_MODEL.spotBrandsPerHa must be finite and > 0 (got ${FIRE_MODEL.spotBrandsPerHa})`)
+  }
+  if (input.lineMask) {
+    const m = input.lineMask
+    if (!(m instanceof Uint8Array) || m.length !== n) throw new Error(`simulateFire: lineMask must be a Uint8Array of ${n} cells`)
+    for (let i = 0; i < n; i++) {
+      if (m[i] > 1) throw new Error(`simulateFire: lineMask must be 0/1, got ${m[i]} at cell ${i}`)
+      if (m[i] === 1 && firebreak[i] !== 1) throw new Error(`simulateFire: lineMask must be a subset of firebreak (cell ${i})`)
+    }
+  }
   if (input.defense) {
     const d = input.defense
     for (const [name, arr] of [

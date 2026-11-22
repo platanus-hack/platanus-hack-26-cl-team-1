@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { FUEL, type WeatherSeries } from '../types'
 import {
   eccentricity,
+  emberCellProbability,
+  emberIgnitionProbability,
   flatRosKmh,
   grassCuringFactor,
   grassMoistureFactor,
@@ -101,5 +103,42 @@ describe('fire shape', () => {
     const e = eccentricity(lengthToBreadth(30))
     expect(rosAtAngle(10, e, 1)).toBeCloseTo(10)
     expect(rosAtAngle(10, e, -1)).toBeCloseTo((10 * (1 - e)) / (1 + e))
+  })
+})
+
+describe('ember landings (probabilistic spotting)', () => {
+  it('Schroeder (1969) ignition probability: 0.53 at 30 deg C and 6 %, falls with moisture, stays in [0, 1]', () => {
+    expect(Math.abs(emberIgnitionProbability(30, 6) - 0.53)).toBeLessThanOrEqual(0.01)
+    for (let T = -10; T <= 50; T += 5) {
+      let prev = Infinity
+      for (let mc = 0; mc <= 40; mc += 0.5) {
+        const p = emberIgnitionProbability(T, mc)
+        expect(p).toBeGreaterThanOrEqual(0)
+        expect(p).toBeLessThanOrEqual(1)
+        expect(p).toBeLessThanOrEqual(prev)
+        prev = p
+      }
+    }
+    // Strictly lower when wetter (away from the cap at 1), and higher when hotter.
+    expect(emberIgnitionProbability(30, 12)).toBeLessThan(emberIgnitionProbability(30, 6))
+    expect(emberIgnitionProbability(35, 6)).toBeGreaterThan(emberIgnitionProbability(20, 6))
+    expect(() => emberIgnitionProbability(NaN, 6)).toThrow(/finite/)
+    expect(() => emberIgnitionProbability(30, Infinity)).toThrow(/finite/)
+  })
+
+  it('cell probability 1 - exp(-B P / n): 0 with no brands, rising with brands, exactly 1 for a huge yield', () => {
+    expect(emberCellProbability(0, 0.5, 48)).toBe(0)
+    expect(emberCellProbability(1e-9, 0.5, 48)).toBeLessThan(1e-10)
+    let prev = 0
+    for (const b of [0.01, 0.1, 1, 10, 32, 100, 1000]) {
+      const p = emberCellProbability(b, 0.5, 48)
+      expect(p).toBeGreaterThan(prev)
+      expect(p).toBeLessThan(1)
+      prev = p
+    }
+    expect(emberCellProbability(32, 0.5, 48)).toBeCloseTo(1 - Math.exp((-32 * 0.5) / 48), 12)
+    expect(emberCellProbability(1e12, 0.5, 48)).toBe(1) // the deterministic limit, exactly
+    expect(emberCellProbability(10, 0, 48)).toBe(0)
+    expect(() => emberCellProbability(10, 0.5, 0)).toThrow(/bandCells/)
   })
 })

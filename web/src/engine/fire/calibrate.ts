@@ -9,6 +9,8 @@
 //
 //   pnpm exec tsx src/engine/fire/calibrate.ts          # score the current FIRE_MODEL / DEFAULT_FIRE_PARAMS
 //   pnpm exec tsx src/engine/fire/calibrate.ts --scan   # grid search over the main knobs, best first
+//   pnpm exec tsx src/engine/fire/calibrate.ts --embers # fit of FIRE_MODEL.spotBrandsPerHa (probabilistic landings,
+//                                                       # MODEL.md section 5); prints only, writes no file
 import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { lonLatToCell } from '../../data/grid'
@@ -18,6 +20,12 @@ import type { FireParams, WeatherSeries } from '../types'
 import { FUEL } from '../types'
 import { DEFAULT_FIRE_PARAMS, ERA5_WIND_DIR_CORRECTION_DEG, FIRE_MODEL, SPREAD_MODEL, simulateFire } from './index'
 import { FOOTPRINT_M, HALF_PIXEL_KM, LINK_KM, distanceKm, fireCluster, frontCurve, frontLagMin, lastAdvanceMin, modelFrontKm, observedFrontKm, overrunHa, rmsLag, type Obs } from './pacing'
+
+const MODES = ['--scan', '--embers'] as const
+const cliArgs = process.argv.slice(2)
+for (const a of cliArgs) if (!(MODES as readonly string[]).includes(a)) throw new Error(`calibrate: unknown option ${a} (options: ${MODES.join(', ')})`)
+if (cliArgs.length > 1) throw new Error(`calibrate: pass at most one of ${MODES.join(', ')}`)
+const mode = cliArgs[0] ?? 'validate'
 
 const dir = fileURLToPath(new URL('../../../public/data/', import.meta.url))
 const bin = (f: string) => {
@@ -288,6 +296,9 @@ interface Knobs {
   /** Ember jump time = spotDelayMin + spotTravelMin * d / D_max (FIRE_MODEL). */
   spotDelayMin: number
   spotTravelMin: number
+  /** Probabilistic ember landings (MODEL.md section 5): null = deterministic spotting (the main result); a number
+   *  sets FIRE_MODEL.spotBrandsPerHa and runs member m with params.emberSeed = m (score: per-cell median). */
+  brandsPerHa: number | null
   params: Partial<FireParams>
 }
 
@@ -320,6 +331,7 @@ function run(k: Knobs) {
   FIRE_MODEL.fuels[FUEL.SHRUB].factor = k.shrubFuelFactor
   FIRE_MODEL.spotDelayMin = k.spotDelayMin
   FIRE_MODEL.spotTravelMin = k.spotTravelMin
+  if (k.brandsPerHa !== null) FIRE_MODEL.spotBrandsPerHa = k.brandsPerHa // restored with the rest below
   const params = { ...DEFAULT_FIRE_PARAMS, ...k.params }
   const w = weather(k.windFactor, k.windDirCorrectionDeg)
   const combined: Float32Array[] = []
@@ -327,10 +339,11 @@ function run(k: Knobs) {
   let elapsedMs = 0
   for (let m = 1; m <= k.members; m++) {
     FIRE_MODEL.spotJitterSeed = m
-    const one = simulateFire({ grid, elevation, fuel, firebreak, ignitions, weather: w, params })
+    const p = k.brandsPerHa === null ? params : { ...params, emberSeed: m }
+    const one = simulateFire({ grid, elevation, fuel, firebreak, ignitions, weather: w, params: p })
     elapsedMs += one.elapsedMs
     combined.push(one.arrivalMin)
-    ignitions.forEach((ig, i) => single[i].push(simulateFire({ grid, elevation, fuel, firebreak, ignitions: [ig], weather: w, params }).arrivalMin))
+    ignitions.forEach((ig, i) => single[i].push(simulateFire({ grid, elevation, fuel, firebreak, ignitions: [ig], weather: w, params: p }).arrivalMin))
   }
   const res = { arrivalMin: medianArrival(combined), elapsedMs }
   const perFire = single.map(medianArrival)
@@ -377,13 +390,46 @@ const current: Knobs = {
   shrubFuelFactor: FIRE_MODEL.fuels[FUEL.SHRUB].factor,
   spotDelayMin: FIRE_MODEL.spotDelayMin,
   spotTravelMin: FIRE_MODEL.spotTravelMin,
+  brandsPerHa: null,
   params: {},
 }
 
 console.log(`grid ${grid.rows} x ${grid.cols}, ${grid.cellM} m; ignitions ${presets.map((p) => `${p.id} @ ${p.timeLocal}`).join(', ')}`)
 console.log(`scar: ${score(new Float32Array(n), 0).realHa.toFixed(0)} ha burned (no-data cells ignored)\n`)
 
-if (!process.argv.includes('--scan')) {
+if (mode === '--embers') {
+  // Fit of the only free scalar of the probabilistic landings (MODEL.md section 5, "Probabilistic landings"):
+  // brands per hectare of source cell. Each row is scored like the robust scan (ERA5 wind x0.9 / x1 / x1.1, mean
+  // objective) on the per-cell median arrival of EMBER_MEMBERS members (params.emberSeed = 1..8, the seeds the
+  // panel uses). Prints only: public/data/validation.json stays the deterministic main result.
+  const EMBER_MEMBERS = 8
+  const BRANDS_PER_HA = [178, 267, 356, 533, 711]
+  const perCell = (b: number) => (b * grid.cellM ** 2) / 1e4
+  const rows: [string, Partial<Knobs>][] = [
+    ['deterministic (shipped)', {}],
+    ...BRANDS_PER_HA.map((b): [string, Partial<Knobs>] => [`${b} per ha (${perCell(b).toFixed(0)} per ${grid.cellM} m cell)`, { brandsPerHa: b, members: EMBER_MEMBERS }]),
+  ]
+  console.log(`probabilistic landings: ${EMBER_MEMBERS} members (seeds 1..${EMBER_MEMBERS}) per row, per-cell median arrival, ERA5 wind x0.9 / x1 / x1.1`)
+  const shippedBrands = FIRE_MODEL.spotBrandsPerHa
+  console.log(`FIRE_MODEL.spotBrandsPerHa as shipped: ${shippedBrands}\n`)
+  const table: string[] = []
+  for (const [label, cfg] of rows) {
+    const t = performance.now()
+    const rs = [0.9, 1, 1.1].map((windFactor) => run({ ...current, ...cfg, windFactor }))
+    const robust = rs.reduce((x, r) => x + r.objective, 0) / rs.length
+    const j = (f: (r: (typeof rs)[number]) => number, d = 0) => rs.map((r) => f(r).toFixed(d)).join(' / ')
+    console.log(
+      `${label}: robust objective ${robust.toFixed(3)} | objective ${j((r) => r.objective, 3)} | Dice ${j((r) => r.end.dice, 3)} | ` +
+        `area ${j((r) => r.end.ha)} ha | buildings in scar ${j((r) => r.bld.inScar)} | GOES RMS W ${j((r) => r.pace.fires[0].rmsLagMin)} E ${j((r) => r.pace.fires[1].rmsLagMin)} min | ` +
+        `fire ${(rs[1].res.elapsedMs / (cfg.members ?? 1)).toFixed(0)} ms per member at x1 | ${((performance.now() - t) / 1000).toFixed(1)} s`,
+    )
+    table.push(`| ${label} | ${robust.toFixed(3)} | ${j((r) => r.end.dice, 3)} | ${rs[1].bld.inScar.toLocaleString('en-US')} |`)
+  }
+  console.log('\n| Brands | Robust objective | Dice at x0.9 / x1 / x1.1 | Buildings in scar at x1 |')
+  console.log('|---|---|---|---|')
+  for (const line of table) console.log(line)
+  if (FIRE_MODEL.spotBrandsPerHa !== shippedBrands) throw new Error(`calibrate: FIRE_MODEL.spotBrandsPerHa was not restored (${FIRE_MODEL.spotBrandsPerHa})`)
+} else if (mode === 'validate') {
   // The headline numbers: the shipped defaults, historical wind (x1, direction corrected), spotting on, at the UI horizon.
   const shipped = run({ ...current, params: {} })
   const validation = {
