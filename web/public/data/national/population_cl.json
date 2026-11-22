@@ -1,0 +1,22 @@
+{
+ "version": 1,
+ "lonMin": -109.45416694885,
+ "latMax": -17.499166260669995,
+ "dLon": 0.008333333333333333,
+ "dLat": 0.008333333333333333,
+ "rows": 4684,
+ "cols": 5165,
+ "n": 255736,
+ "layout": "little-endian: uint32 cell[n] (r * cols + c, row 0 north, ascending), float32 home[n], float32 work[n], float32 nonResidentialM3[n]",
+ "commute": {
+  "scaleM": 10000.0,
+  "maxM": 30000.0
+ },
+ "totals": {
+  "home": 19714431,
+  "work": 19714431,
+  "stayHome": 24034,
+  "nonResidentialMillionM3": 601.1
+ },
+ "source": "Residentes: WorldPop 2024, población restringida a asentamientos, 100 m (R2025A v1; https://www.worldpop.org/, CC BY 4.0). Lugar de trabajo o estudio: volumen construido no residencial GHSL GHS-BUILT-V NRES 2025 (Comisión Europea, JRC; https://human-settlement.emergency.copernicus.eu/, CC BY 4.0) con un modelo de gravedad (escala 10 km, máximo 30 km); se excluye la de Argentina, Bolivia y Perú (límites de geoBoundaries). Cuántos están fuera de casa según día y hora: supuestos documentados (ENE del INE oct-dic 2024; Censo 2024; matrícula Mineduc). Es una estimación, no un conteo."
+}

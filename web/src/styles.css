@@ -256,6 +256,12 @@ select {
   padding: 8px 10px;
   min-width: 0;
 }
+.stat.wide {
+  grid-column: 1 / -1;
+}
+.stat.wide .stat-label {
+  min-height: 0;
+}
 .stat.strong {
   border-color: rgba(239, 68, 68, 0.45);
   background: linear-gradient(180deg, rgba(239, 68, 68, 0.09), rgba(239, 68, 68, 0.02));
@@ -742,6 +748,13 @@ input[type='range']:focus-visible {
 }
 .swatch.fuel {
   background: linear-gradient(90deg, #d6c46a 33%, #8c9646 33% 66%, #2e6e3c 66%);
+}
+.swatch.pop,
+.lg.pop-ramp {
+  background: linear-gradient(90deg, rgba(110, 60, 255, 0.35), rgba(245, 210, 255, 0.95));
+}
+.lg.pop-ramp {
+  width: 36px;
 }
 .legend {
   margin-top: 8px;

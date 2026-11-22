@@ -95,6 +95,24 @@ export function makeMockDataset(): Dataset {
   }
   const buildings = new Float32Array(bld)
 
+  // Population: 2.9 residents per synthetic building; by day the same people move to the consolidated cells of
+  // the first "town" (a made-up job centre), so both layers have the same total.
+  const populationHome = new Float32Array(n)
+  for (let k = 0; k < bld.length; k += 3) {
+    const c = Math.floor((bld[k] - LON_MIN) / dLon)
+    const r = Math.floor((LAT_MAX - bld[k + 1]) / dLat)
+    populationHome[r * cols + c] += 2.9
+  }
+  const populationWork = new Float32Array(n)
+  const jobs: number[] = []
+  for (let i = 0; i < n; i++) {
+    const lon = LON_MIN + ((i % cols) + 0.5) * dLon
+    const lat = LAT_MAX - (Math.floor(i / cols) + 0.5) * dLat
+    if (fuel[i] === FUEL.URBAN_DENSE && inBox(lon, lat, DENSE[0])) jobs.push(i)
+  }
+  const totalHome = populationHome.reduce((x, y) => x + y, 0)
+  for (const i of jobs) populationWork[i] = totalHome / jobs.length
+
   // Roads: a lattice every 5 cells, a "highway" along one row.
   const step = 5
   const nr = Math.floor(rows / step)
@@ -163,5 +181,5 @@ export function makeMockDataset(): Dataset {
     { lon: -71.52, lat: -33.05, timeLocal: '2024-02-02T18:30', satellite: 'Sintético', frp: 90 },
     { lon: -71.525, lat: -33.04, timeLocal: '2024-02-03T02:10', satellite: 'Sintético', frp: 60 },
   ]
-  return { grid, elevation, fuel, scar, buildings, roads, weather, ignitions, firms, synthetic: true }
+  return { grid, elevation, fuel, scar, buildings, roads, weather, ignitions, firms, populationHome, populationWork, synthetic: true }
 }

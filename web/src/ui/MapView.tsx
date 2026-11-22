@@ -8,7 +8,7 @@ import { localToMin } from '../data/time'
 import type { EvacOut, FireOut } from '../worker/protocol'
 import type { Scenario } from '../worker/scenario'
 import { HOUSEHOLD } from '../engine/types'
-import { drawFire, drawFuel, drawHillshade, drawScar } from './overlays'
+import { drawFire, drawFuel, drawHillshade, drawPopulation, drawScar } from './overlays'
 import type { Feature, FeatureCollection, LineString, SetDataArg } from './geo'
 
 export type Tool = 'none' | 'ignition' | 'firebreak' | 'closeRoad' | 'link'
@@ -29,6 +29,7 @@ export interface LayerToggles {
   firms: boolean
   cicatriz: boolean
   combustible: boolean
+  poblacion: boolean
 }
 
 export const BASE_STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty'
@@ -50,6 +51,8 @@ interface Props {
   evac: EvacOut | null
   safe: Uint8Array | null
   clock: number
+  /** Share of residents at work or school at the clock's time (src/engine/population), for the population layer. */
+  awayNow: number
   layers: LayerToggles
   showRoutes: boolean
   terrain3d: boolean
@@ -84,6 +87,7 @@ export function MapView(props: Props) {
     fuel: document.createElement('canvas'),
     scar: document.createElement('canvas'),
     hill: document.createElement('canvas'),
+    pop: document.createElement('canvas'),
   })
   const roadGeoms = useRef<LineString[]>([])
   const popup = useRef<maplibregl.Popup | null>(null)
@@ -99,6 +103,18 @@ export function MapView(props: Props) {
     const { data, fire, clock } = p.current
     drawFire(canvases.current.fire, data.grid, fire?.arrivalMin ?? null, fire?.rosMPerMin ?? null, clock)
     const s = map.getSource('fire') as CanvasSource | undefined
+    if (s) {
+      s.play()
+      s.pause()
+    }
+  }
+
+  function updatePopulation() {
+    const map = mapRef.current
+    if (!map || !ready.current) return
+    const { data, awayNow } = p.current
+    drawPopulation(canvases.current.pop, data.grid, data.populationHome, data.populationWork, awayNow)
+    const s = map.getSource('pop') as CanvasSource | undefined
     if (s) {
       s.play()
       s.pause()
@@ -207,6 +223,7 @@ export function MapView(props: Props) {
     setVis('fire', L.fuego)
     setVis('fuel', L.combustible)
     setVis('scar', L.cicatriz)
+    setVis('pop', L.poblacion)
     setVis('roads', L.calles)
     setVis('roads-closed', L.calles)
     setVis('links', L.calles)
@@ -234,6 +251,7 @@ export function MapView(props: Props) {
   function syncAll() {
     updateClockState()
     updateFire()
+    updatePopulation()
     updateRoads()
     updateLinks()
     updateBuildings()
@@ -277,6 +295,10 @@ export function MapView(props: Props) {
     drawFuel(canvases.current.fuel, g, data.fuel)
     map.addSource('fuel', { type: 'canvas', canvas: canvases.current.fuel, coordinates: corners, animate: false })
     map.addLayer({ id: 'fuel', type: 'raster', source: 'fuel', paint: { 'raster-resampling': 'nearest', 'raster-fade-duration': 0 } }, firstSymbol)
+
+    drawPopulation(canvases.current.pop, g, data.populationHome, data.populationWork, p.current.awayNow)
+    map.addSource('pop', { type: 'canvas', canvas: canvases.current.pop, coordinates: corners, animate: false })
+    map.addLayer({ id: 'pop', type: 'raster', source: 'pop', paint: { 'raster-resampling': 'nearest', 'raster-fade-duration': 0 } }, firstSymbol)
 
     drawScar(canvases.current.scar, g, data.scar)
     map.addSource('scar', { type: 'canvas', canvas: canvases.current.scar, coordinates: corners, animate: false })
@@ -678,6 +700,8 @@ export function MapView(props: Props) {
 
   // ---------------------------------------------------------------- prop -> map sync
   useEffect(updateFire, [props.fire, props.clock])
+  // The away share only changes during the morning and evening ramps: redraw when it moves by 0.5 points.
+  useEffect(updatePopulation, [Math.round(props.awayNow * 200)])
   useEffect(updateClockState, [Math.floor(props.clock / CLOCK_STEP_MIN), props.showRoutes])
   useEffect(updateRoads, [props.evac, props.scenario.closedEdges])
   useEffect(updateBuildings, [props.evac])
