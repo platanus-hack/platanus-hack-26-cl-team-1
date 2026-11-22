@@ -17,3 +17,6 @@ tmp/
 
 # Workspace scratch (Conductor): recorded webcam runs, labels, model outputs. Never commit them.
 .context/
+
+# Cortafuego data pipeline download cache
+pipeline/.cache/
