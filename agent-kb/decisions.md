@@ -131,8 +131,10 @@ with a pointer to their replacement; nothing is ever deleted from §3.
   - Shipped: McArthur ×4 (was ×3) and matorral at half of it (`FIRE_MODEL.fuels[SHRUB].factor` 0.5).
   - Tested and not shipped: the Concón METAR as weather, intensity-scaled embers, a per-cell ember-jitter
     ensemble, faster ember jumps (knobs left at 0 in the engine). Ignitions unchanged.
-- **Consequences:** robust objective 0.372 → 0.470; at wind ×1, GOES RMS lag west 47 → 55 min and east
-  110 → 76 min, VIIRS/MODIS mean |lag| 62 → 55 min, Dice 0.628 → 0.639, buildings in the scar 83 % → 89 %,
+- **Consequences:** robust objective 0.372 → 0.470. At wind ×1, while the real fires were advancing (to
+  19:05 / 19:15) the GOES RMS lag is west 30 → 30 min and east 39 → 28 min, VIIRS/MODIS mean |lag| 42 → 34 min;
+  over 12:00–24:00 it is 47 → 55 and 110 → 76 min (62 → 55 min test), most of it the model's overshoot after the
+  real fires stopped (no suppression). Also Dice 0.628 → 0.639, buildings in the scar 83 % → 89 %,
   households cut off at an 18:00 alert 4,753 → 4,061. The western stall of 14:05–16:25 is still not reproduced;
   McArthur ×4 is above Project Vesta's 2–3× range; all of it is in-sample except the VIIRS/MODIS test.
   Details: `web/src/engine/fire/MODEL.md` section 6.

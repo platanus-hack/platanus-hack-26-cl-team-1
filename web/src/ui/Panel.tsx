@@ -501,10 +501,14 @@ function ValidacionSection(p: Props) {
       </p>
       <p className="small">
         Ritmo del avance frente al satélite (minutos que el frente simulado va atrasado, +, o adelantado, −, respecto del frente
-        detectado): con GOES-16, una imagen cada 10 minutos, el desfase cuadrático medio es de{' '}
-        <strong>{VALIDATION.pacing.fit.rmsLagMin['las-tablas-penuelas']} min</strong> en el foco oeste y{' '}
-        <strong>{VALIDATION.pacing.fit.rmsLagMin['quilpue-villa-alemana-oriente']} min</strong> en el este (con estos datos se ajustó el
-        modelo). En las pasadas VIIRS y MODIS, que no se usaron para ajustar:{' '}
+        detectado): con GOES-16, una imagen cada 10 minutos, mientras el fuego real avanzaba (hasta las{' '}
+        {VALIDATION.pacing.fit.advanceUntil['las-tablas-penuelas']} en el oeste y las{' '}
+        {VALIDATION.pacing.fit.advanceUntil['quilpue-villa-alemana-oriente']} en el este) el desfase cuadrático medio es de{' '}
+        <strong>{VALIDATION.pacing.fit.rmsAdvanceMin['las-tablas-penuelas']} min</strong> en el foco oeste y{' '}
+        <strong>{VALIDATION.pacing.fit.rmsAdvanceMin['quilpue-villa-alemana-oriente']} min</strong> en el este. Hasta medianoche sube a{' '}
+        {VALIDATION.pacing.fit.rmsLagMin['las-tablas-penuelas']} y {VALIDATION.pacing.fit.rmsLagMin['quilpue-villa-alemana-oriente']} min:
+        después de esa hora el fuego real dejó de avanzar y el modelo, que no incluye el combate del fuego, sigue (con estos datos se
+        ajustó el modelo). En las pasadas VIIRS y MODIS, que no se usaron para ajustar:{' '}
         {VALIDATION.pacing.test.map((x, k) => (
           <span key={`${x.time}-${x.fire}`}>
             {k > 0 ? ' · ' : ''}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { GridMeta } from '../types'
-import { fireCluster, frontCurve, frontLagMin, observedFrontKm, overrunHa, type Obs } from './pacing'
+import { fireCluster, frontCurve, frontLagMin, lastAdvanceMin, observedFrontKm, overrunHa, rmsLag, type Obs } from './pacing'
 
 const ORIGIN: [number, number] = [-71.5, -33.1]
 const KM_LAT = 1 / 111.32
@@ -79,5 +79,18 @@ describe('frontCurve and overrunHa on a grid', () => {
     // With the detection 1 km away, every burned cell is unsupported.
     const burned = Array.from(arrival).filter((a) => a <= 3).length
     expect(overrunHa(arrival, grid, [north(1, 0)], 3, 200)).toBeCloseTo((burned * 3600) / 1e4, 6)
+  })
+})
+
+describe('advance phase and RMS', () => {
+  it('lastAdvanceMin is the last time the observed front grew, up to tEnd', () => {
+    const obs = [north(1, 10), north(3, 20), north(2, 30), north(5, 40), north(5, 50), north(4, 60)]
+    expect(lastAdvanceMin(obs, ORIGIN, 100)).toBe(40)
+    expect(lastAdvanceMin(obs, ORIGIN, 35)).toBe(20)
+    expect(lastAdvanceMin([], ORIGIN, 100)).toBeNull()
+  })
+  it('rmsLag is the root mean square and refuses an empty set instead of scoring it as perfect', () => {
+    expect(rmsLag([3, -4])).toBeCloseTo(Math.sqrt(12.5), 9)
+    expect(() => rmsLag([])).toThrow(/no frames/)
   })
 })

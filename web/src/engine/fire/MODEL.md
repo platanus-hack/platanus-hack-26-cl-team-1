@@ -206,7 +206,7 @@ so the "≤ 120 m" column is the fairer reading.
 - The western head is ~45–65 min late at El Olivar / Villa Independencia and ~80 min late at the Jardín
   Botánico; the model's speed is ~40 m/min throughout, while the real head crawled until ~16:30 and then ran
   ~100 m/min.
-- The eastern fire (preset at 14:17) still burns sideways: 5,745 ha against ~1,300 ha of scar there, 4,756
+- (Before the pace fit below.) The eastern fire (preset at 14:17) still burns sideways: 5,745 ha against ~1,300 ha of scar there, 4,756
   buildings reached of which 357 are in the scar.
 - The model has no suppression, so precision stays low: about 28,000 buildings are reached against roughly
   6,000 homes destroyed (MINVU's preliminary count, 21 Feb 2024: 6,019 homes with non-repairable damage,
@@ -251,8 +251,10 @@ the 16:27–23:18 gap between polar passes, exactly when the fire reached Viña 
   19:05, and stopped there.
 - The eastern fire also began its run at ~16:30. Both fires are 20 km apart and of different ages, which
   points to a regional cause.
-- GOES puts the Jardín Botánico at ~17:55, not 17:00 as reported by the press. El Olivar and Villa
-  Independencia (~18:25) agree with the press (~18:30).
+- The first GOES pixel within 2 km of the Jardín Botánico is at 17:55 (press: ~17:00); for El Olivar and Villa
+  Independencia it is 18:25 (press: ~18:30).
+- The eastern preset ignition (14:17, approximate) is later than GOES's first pixels of that fire (14:15,
+  2 km away); its first lags (+65 / +35 min at 14:35 / 15:05) measure that offset, not the pace.
 
 **What was tried (wind ×0.9 / ×1 / ×1.1; RMS lag west, east; VIIRS/MODIS mean |lag|).**
 
@@ -265,8 +267,13 @@ the 16:27–23:18 gap between polar passes, exactly when the fire reached Viña 
 | **Shipped: McArthur ×4, matorral ×0.5** | **0.470** | 34 / 55 / 83 | 24 / 76 / 98 | 27 / 55 / 62 | 0.65 / 0.64 / 0.62 | 3,004 / 5,784 / 5,971 |
 
 - **Intensity-scaled embers** gave the best single run (28 / 22 min at wind ×1) but are a knife edge: at
-  19 or 21 m per km/h, or ±10 % wind, the lag goes back to 100–130 min (deterministic spotting has a
+  ±10 % wind (in `calibrate.ts`, and in the robust table) or at 19 or 21 m per km/h (one-off), the lag goes
+  back to 100–130 min; while the real fire was still advancing it is worse than the shipped model (37 / 31
+  min) (deterministic spotting has a
   percolation threshold, and with ERA5's near-constant afternoon the time it is crossed is arbitrary).
+The next three bullets (METAR, Lago Peñuelas, grass ×0.8) are one-off measurements made with scratch scripts
+during the fit, not reproduced by `calibrate.ts`:
+
 - **Concón airport METAR (SCVM)** shows a NNW sea breeze until ~14:30, then SSW wind with 33–35 °C and 25–30 %
   RH (ERA5: 28–30 °C, 37–43 %). Blending it in made things worse: with its direction the western head never
   reaches Viña (Dice 0.28); with only its temperature and humidity, Dice 0.56 and objective 0.386 (vs 0.429).
@@ -275,12 +282,24 @@ the 16:27–23:18 gap between polar passes, exactly when the fire reached Viña 
   13–15 h, none with a change at 16:30.
 - **Lago Peñuelas:** 206 of its 524 water cells (Sentinel-2, Feb 2024) are CROP in WorldCover 2021 (dry lake
   bed). Making them unburnable changes no score; left as is.
+- **Grass ×0.8** on top of the split scored 0.485 (vs 0.470) and was not shipped: the optimum is flat, and it
+  would add one more fitted scalar.
 - **The fuel split** (matorral half of forest) is the only change that is better at all three winds. It
   mainly fixes the eastern fire: its advance is on time with GOES from 16:05 to 18:05 and VIIRS tests at
   +21 / −3 / +4 min (before: −4 / −38 / −25).
 
-**Shipped at wind ×1** (`pnpm validate`): GOES RMS lag west 55 min (was 47), east 76 (was 110); VIIRS/MODIS
-mean |lag| 55 min (was 62); Dice 0.639 (0.628); buildings in the scar 5,784 / 6,505 (5,423); FIRMS reached
+**Most of the full-window RMS comes after the real fires stopped.** The observed front last grew at 19:05
+(west) and 19:15 (east); after that the model keeps spreading (no suppression) and its lag falls by 10 min a
+frame down to the cap. `calibrate.ts` reports both parts (`pacing.fit.rmsAdvanceMin` / `rmsAfterMin` in
+`validation.json`):
+
+| GOES RMS lag at wind ×1 (min) | West, advancing | West, after | East, advancing | East, after | VIIRS/MODIS \|lag\|, advancing |
+|---|---|---|---|---|---|
+| Before the pace fit | 30 | 63 | 39 | 154 | 42 |
+| **Shipped** | **30** | 78 | **28** | 105 | **34** |
+
+**Shipped at wind ×1** (`pnpm validate`): GOES RMS lag over 12:00–24:00 west 55 min (was 47), east 76 (was
+110), and while advancing 30 (30) and 28 (39); VIIRS/MODIS mean |lag| 55 min (was 62), 34 (42) while advancing; Dice 0.639 (0.628); buildings in the scar 5,784 / 6,505 (5,423); FIRMS reached
 193/237 (206: the one-sided score drops because the eastern fire is no longer early); households cut off at an
 18:00 alert 4,061 (4,753, `../evac/MODEL.md`).
 

@@ -68,6 +68,29 @@ export function observedFrontKm(obs: Obs[], origin: [number, number], tMin: numb
   return best
 }
 
+/** Last time (min, at most tEnd) the observed front grew, or null with no detection by tEnd. After it the real
+ *  fire had stopped advancing (firefighting, the city, the coast), which the model, with no suppression, cannot
+ *  do: lags scored after it measure that overshoot, not the pace of the spread. */
+export function lastAdvanceMin(obs: Obs[], origin: [number, number], tEnd: number): number | null {
+  let front = -1
+  let last: number | null = null
+  for (const o of [...obs].sort((a, b) => a.tMin - b.tMin)) {
+    if (o.tMin > tEnd) break
+    const d = distanceKm(origin, o.lon, o.lat)
+    if (d > front) {
+      front = d
+      last = o.tMin
+    }
+  }
+  return last
+}
+
+/** Root mean square of front lags (min). An empty set has no score: it throws instead of reading as perfect. */
+export function rmsLag(lags: number[]): number {
+  if (lags.length === 0) throw new Error('rmsLag: no frames to score')
+  return Math.sqrt(lags.reduce((s, x) => s + x * x, 0) / lags.length)
+}
+
 /** Element k = earliest model arrival (min) among cells at least k·binKm from origin. Non-decreasing in k. */
 export function frontCurve(arrival: Float32Array, grid: GridMeta, origin: [number, number], binKm = 0.1): Float64Array {
   const n = grid.rows * grid.cols

@@ -222,3 +222,13 @@ def test_goes_scan_time_is_mid_scan_local():
     name = "OR_ABI-L2-FDCF-M6_G16_s20240332100208_e20240332109516_c20240332113362.nc"
     # Scan start 2024 day 033 21:00:20.8 UTC = 2 Feb 18:00 local; +5 min to mid-scan.
     assert goes.scan_time_local(name) == "2024-02-02T18:05"
+
+
+def test_committed_grid_json_credits_every_bake_source():
+    # The "Fuentes" panel reads grid.json; a source added to bake.SOURCES must reach the committed file.
+    import json
+
+    import bake
+
+    meta = json.loads((grid.OUT_DIR / "grid.json").read_text())
+    assert meta["sources"] == bake.SOURCES

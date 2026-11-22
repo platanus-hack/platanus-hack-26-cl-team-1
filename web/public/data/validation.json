@@ -7,7 +7,7 @@
   "recall": 0.924,
   "modelHa": 17934,
   "scarHa": 9467,
-  "runMs": 78,
+  "runMs": 73,
   "firmsReached": {
     "reached": 193,
     "total": 237
@@ -53,6 +53,18 @@
       "rmsLagMin": {
         "las-tablas-penuelas": 55,
         "quilpue-villa-alemana-oriente": 76
+      },
+      "advanceUntil": {
+        "las-tablas-penuelas": "19:05",
+        "quilpue-villa-alemana-oriente": "19:15"
+      },
+      "rmsAdvanceMin": {
+        "las-tablas-penuelas": 30,
+        "quilpue-villa-alemana-oriente": 28
+      },
+      "rmsAfterMin": {
+        "las-tablas-penuelas": 78,
+        "quilpue-villa-alemana-oriente": 105
       }
     },
     "test": [
@@ -120,7 +132,8 @@
         "overrunHa": 26
       }
     ],
-    "testMeanAbsLagMin": 55
+    "testMeanAbsLagMin": 55,
+    "testAdvanceMeanAbsLagMin": 34
   },
   "windDirCorrectionDeg": -10
 }

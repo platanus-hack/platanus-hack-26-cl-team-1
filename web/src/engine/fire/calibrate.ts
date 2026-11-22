@@ -5,7 +5,7 @@
 // reached inside / outside the scar. The times reported by the press for four neighbourhoods are printed next to
 // the satellite and model times, as a contrast only. The scar, FIRMS and the reported times are used only to score and
 // to fit a handful of global scalars, never to build inputs. Every calibration number quoted in MODEL.md
-// comes from this script.
+// comes from this script, except the ones MODEL.md labels as one-off measurements.
 //
 //   pnpm exec tsx src/engine/fire/calibrate.ts          # score the current FIRE_MODEL / DEFAULT_FIRE_PARAMS
 //   pnpm exec tsx src/engine/fire/calibrate.ts --scan   # grid search over the main knobs, best first
@@ -17,7 +17,7 @@ import { localToMin, minToHHMM } from '../../data/time'
 import type { FireParams, WeatherSeries } from '../types'
 import { FUEL } from '../types'
 import { DEFAULT_FIRE_PARAMS, ERA5_WIND_DIR_CORRECTION_DEG, FIRE_MODEL, SPREAD_MODEL, simulateFire } from './index'
-import { FOOTPRINT_M, HALF_PIXEL_KM, LINK_KM, distanceKm, fireCluster, frontCurve, frontLagMin, modelFrontKm, observedFrontKm, overrunHa, type Obs } from './pacing'
+import { FOOTPRINT_M, HALF_PIXEL_KM, LINK_KM, distanceKm, fireCluster, frontCurve, frontLagMin, lastAdvanceMin, modelFrontKm, observedFrontKm, overrunHa, rmsLag, type Obs } from './pacing'
 
 const dir = fileURLToPath(new URL('../../../public/data/', import.meta.url))
 const bin = (f: string) => {
@@ -196,7 +196,14 @@ function pacing(arrivals: Float32Array[], horizonMin: number) {
       if (d === null) continue
       lags.push({ tMin: t, obsKm: d, modelKm: modelFrontKm(curve, BIN_KM, t), lagMin: frontLagMin(curve, BIN_KM, d, t, HALF_PIXEL_KM.goes) })
     }
-    const rmsLagMin = Math.sqrt(lags.reduce((s, x) => s + x.lagMin ** 2, 0) / Math.max(1, lags.length))
+    const rmsLagMin = rmsLag(lags.map((x) => x.lagMin))
+    // Advance phase: up to the last GOES frame in which the observed front grew. Later lags measure the model's
+    // overshoot after the real fire stopped (no suppression in the model), not the pace of the spread.
+    const advanceEndMin = lastAdvanceMin(f.clusters.goes, f.origin, horizonMin)
+    if (advanceEndMin === null) throw new Error(`calibrate: no GOES-16 detection for ${f.id}`)
+    const rmsAdvanceMin = rmsLag(lags.filter((x) => x.tMin <= advanceEndMin).map((x) => x.lagMin))
+    const after = lags.filter((x) => x.tMin > advanceEndMin).map((x) => x.lagMin)
+    const rmsAfterMin = after.length > 0 ? rmsLag(after) : null
     const test = TEST_PASSES.filter((p) => p.tMin <= horizonMin && p.tMin >= f.ignition.tMin).flatMap((p) => {
       const d = observedFrontKm(f.clusters[p.sensor], f.origin, p.tMin)
       if (d === null) return []
@@ -210,11 +217,14 @@ function pacing(arrivals: Float32Array[], horizonMin: number) {
         overrunHa: overrunHa(arrivals[i], grid, f.clusters[p.sensor], p.tMin, FOOTPRINT_M[p.sensor]),
       }]
     })
-    return { id: f.id, label: f.label, lags, rmsLagMin, test }
+    return { id: f.id, label: f.label, lags, rmsLagMin, advanceEndMin, rmsAdvanceMin, rmsAfterMin, test }
   })
   const lagScore = fires.reduce((s, f) => s + Math.max(0, 1 - f.rmsLagMin / 120), 0) / fires.length
   const testAbsLag = fires.flatMap((f) => f.test.map((x) => Math.abs(x.lagMin)))
-  return { fires, lagScore, testMeanAbsLagMin: testAbsLag.reduce((s, x) => s + x, 0) / Math.max(1, testAbsLag.length) }
+  if (testAbsLag.length === 0) throw new Error('calibrate: no VIIRS / MODIS pass to test against')
+  const testAdvance = fires.flatMap((f) => f.test.filter((x) => localToMin(grid.t0, `2024-02-02T${x.time}`) <= f.advanceEndMin).map((x) => Math.abs(x.lagMin)))
+  const mean = (xs: number[]) => xs.reduce((s, x) => s + x, 0) / xs.length
+  return { fires, lagScore, testMeanAbsLagMin: mean(testAbsLag), testAdvanceMeanAbsLagMin: testAdvance.length > 0 ? mean(testAdvance) : null }
 }
 
 function weather(windFactor: number, dirCorrectionDeg: number): WeatherSeries {
@@ -336,7 +346,7 @@ function run(k: Knobs) {
 const fmtFull = (r: ReturnType<typeof run>) =>
   `${fmt(r.end)}\n   buildings: ${r.bld.reached} reached, ${r.bld.inScar}/${r.bld.scarTotal} of those in the scar (recall ${r.bld.recall.toFixed(2)}, precision ${r.bld.precision.toFixed(2)}, within 120 m of the scar ${r.bld.precisionNear.toFixed(2)})` +
   `\n   FIRMS ${r.firms.reached}/${r.firms.total}; arrival ${r.anchors.map((a) => `${a.name} ${hhmm(a.modelMin)} (GOES ${hhmm(a.satelliteMin)}, press ${a.observed})`).join(', ')}` +
-  `\n   pace: GOES RMS lag ${r.pace.fires.map((f) => `${f.label} ${f.rmsLagMin.toFixed(0)} min`).join(', ')}; VIIRS/MODIS mean |lag| ${r.pace.testMeanAbsLagMin.toFixed(0)} min` +
+  `\n   pace: GOES RMS lag ${r.pace.fires.map((f) => `${f.label} ${f.rmsLagMin.toFixed(0)} min (advancing, to ${hhmm(f.advanceEndMin)}: ${f.rmsAdvanceMin.toFixed(0)}; after: ${f.rmsAfterMin?.toFixed(0) ?? '-'})`).join(', ')}; VIIRS/MODIS mean |lag| ${r.pace.testMeanAbsLagMin.toFixed(0)} min (advancing: ${r.pace.testAdvanceMeanAbsLagMin?.toFixed(0) ?? '-'})` +
   `\n   objective ${r.objective.toFixed(3)} (pace score ${r.pace.lagScore.toFixed(2)}; press timing score, not in the objective, ${r.timing.toFixed(2)})`
 
 /** Full pace tables: GOES every 30 min and every VIIRS / MODIS pass, per fire. */
@@ -398,9 +408,17 @@ if (!process.argv.includes('--scan')) {
     anchors: shipped.anchors.map((a) => ({ name: a.name, reported: a.observed, satellite: hhmm(a.satelliteMin), model: hhmm(a.modelMin) })),
     pacing: {
       note: 'Front lag = minutes the model is late (+) or early (-) at reaching the farthest satellite detection of each fire, 12:00-24:00. Fit: GOES-16 every 10 min (in sample). Test: VIIRS / MODIS passes (not used to fit).',
-      fit: { sensor: 'GOES-16 ABI', rmsLagMin: Object.fromEntries(shipped.pace.fires.map((f) => [f.id, Math.round(f.rmsLagMin)])) },
+      fit: {
+        sensor: 'GOES-16 ABI',
+        rmsLagMin: Object.fromEntries(shipped.pace.fires.map((f) => [f.id, Math.round(f.rmsLagMin)])),
+        /** Up to the last frame in which the observed front grew (the real fire was still advancing). */
+        advanceUntil: Object.fromEntries(shipped.pace.fires.map((f) => [f.id, hhmm(f.advanceEndMin)])),
+        rmsAdvanceMin: Object.fromEntries(shipped.pace.fires.map((f) => [f.id, Math.round(f.rmsAdvanceMin)])),
+        rmsAfterMin: Object.fromEntries(shipped.pace.fires.map((f) => [f.id, f.rmsAfterMin === null ? null : Math.round(f.rmsAfterMin)])),
+      },
       test: shipped.pace.fires.flatMap((f) => f.test.map((x) => ({ ...x, obsKm: Number(x.obsKm.toFixed(1)), modelKm: Number(x.modelKm.toFixed(1)), lagMin: Math.round(x.lagMin), overrunHa: Math.round(x.overrunHa) }))),
       testMeanAbsLagMin: Math.round(shipped.pace.testMeanAbsLagMin),
+      testAdvanceMeanAbsLagMin: shipped.pace.testAdvanceMeanAbsLagMin === null ? null : Math.round(shipped.pace.testAdvanceMeanAbsLagMin),
     },
     windDirCorrectionDeg: ERA5_WIND_DIR_CORRECTION_DEG,
   }
