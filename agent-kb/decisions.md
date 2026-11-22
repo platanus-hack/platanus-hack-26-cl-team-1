@@ -101,10 +101,25 @@ with a pointer to their replacement; nothing is ever deleted from §3.
   conflict with a newer engine. First deploy of `842d870` succeeded; Firefox loaded the map and worker results
   over HTTPS, including after navigating through `www`.
 
+### D-023 — Deploy merged main commits to Render after CI passes (2026-11-22)
+- **Context:** the user requested auto-deploy on "master merge"; the repository's actual default/release branch
+  is `main`. D-022's public Git deployment had no verified native auto-deploy integration.
+- **Decision:** extend `.github/workflows/ci.yml` with a deployment job that needs both **Lint** and **Test**
+  and runs only for a `push` to `main` (merging a PR creates that push). PRs and manual CI runs do not deploy.
+  - Store only Cortafuego's existing service-scoped hook in the encrypted repository secret
+    `RENDER_CORTAFUEGO_DEPLOY_HOOK`; do not reuse the previous app's API/WEB/WORKER hook secrets.
+  - Pass the tested `${GITHUB_SHA}` as Render's `ref`, and skip a run if `main` has advanced. Queue deploy jobs
+    without cancelling in-flight requests. A missing secret, wrong service URL, or failed request fails visibly.
+  - Render's native Auto-Deploy is **Off** so it cannot race ahead of CI or duplicate GitHub's trigger.
+  - The job needs only `contents: read`, checks out no code, and never logs the secret URL. HTTP 200/202 means
+    Render accepted the request; Render's deployment page remains the source of truth for build success.
+- **Consequences:** D-022's manual-deploy fallback is replaced once this workflow is merged and its first
+  post-merge deployment is verified. D-020's Lint/Test validation and manual squash PR merge policy remain;
+  automatic deployment is not automatic PR merging. No `master` branch is created or monitored.
+
 ## §2 Open
 
-- Automatic release delivery for the public Git deployment (Blueprint or a CI deploy hook); current fallback is
-  Render Manual Deploy. Never commit the private deploy-hook URL.
+- Verify the first CI-gated Render deployment after merging the deployment workflow (D-023).
 
 ## §3 Superseded
 

@@ -25,3 +25,5 @@ Owner in brackets once someone takes an item. Project: Cortafuego (D-019). The O
 - [x] Pivot research and decision (D-019).
 - [x] **Public deploy:** Render Static Site behind Cloudflare at https://cortafuego.app (D-022), with
   `www` redirecting to the apex. Deployment metadata and session notes are on `codex/render-cloudflare`.
+- [ ] **Auto-deploy:** CI-gated Render hook on merged `main` commits (D-023), implemented in
+  https://github.com/platanus-hack/platanus-hack-26-cl-team-1/pull/51; first post-merge deployment pending.
