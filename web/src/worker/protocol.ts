@@ -2,9 +2,11 @@
 import type { WeatherSeries } from '../engine/types'
 import type { PlannedUnit } from '../engine/brigade'
 import type { Scenario } from './scenario'
+import type { TimelineChoice } from '../data/timeline'
 
-/** init: the worker loads the same dataset the UI uses (real files, or the deterministic synthetic set). */
-export type ToWorker = { type: 'init'; synthetic: boolean } | { type: 'run'; id: number; scenario: Scenario }
+/** init: the worker loads the same dataset the UI uses (real files, or the deterministic synthetic set) and sees
+ *  it from the same timeline (src/data/timeline.ts). */
+export type ToWorker = { type: 'init'; synthetic: boolean; timeline: TimelineChoice } | { type: 'run'; id: number; scenario: Scenario }
 
 export interface FireOut {
   arrivalMin: Float32Array

@@ -2,6 +2,7 @@
 // requested scenario is kept and sent when the worker is free.
 import type { FromWorker, RunResult, ToWorker } from './protocol'
 import type { Scenario } from './scenario'
+import type { TimelineChoice } from '../data/timeline'
 
 export interface SimCallbacks {
   onReady: (loadMs: number, prepareMs: number) => void
@@ -28,10 +29,10 @@ export class SimClient {
     }
   }
 
-  /** The worker loads the dataset itself; `synthetic` must match what the UI loaded. */
-  init(synthetic: boolean) {
+  /** The worker loads the dataset itself; `synthetic` and `timeline` must match what the UI shows. */
+  init(synthetic: boolean, timeline: TimelineChoice) {
     this.ready = false
-    this.send({ type: 'init', synthetic })
+    this.send({ type: 'init', synthetic, timeline })
   }
 
   run(scenario: Scenario) {

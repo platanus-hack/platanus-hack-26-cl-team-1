@@ -113,6 +113,10 @@ bridleway / corridor -> PATH. Not-usable values (construction, proposed, raceway
 -33.10, -71.49, hourly, local time, 2-3 Feb 2024: temperature, relative humidity, 10 m wind speed,
 direction (from) and gusts.
 
+**Today's forecast (not baked).** The "starts today" scenario fetches the same variables at the same point
+from the Open-Meteo Forecast API in the visitor's browser (`web/src/data/forecast.ts`), today and tomorrow,
+America/Santiago time, and checks it like `weather.json`.
+
 **scar.bin.** Sentinel-2 L2A from the Element84 Earth Search STAC (no auth): pre-fire
 `S2B_19HBD_20240118` (0.62 % cloud), post-fire `S2A_19HBD_20240212` (0.06 % cloud); tile 19HBD covers the
 whole grid. Reflectance = DN x 0.0001 - 0.1; B08 averaged to the 20 m grid of B12 / SCL.

@@ -1,8 +1,24 @@
 // Loads and validates the baked data files in web/public/data/ (formats in src/engine/types.ts).
 // Every malformed file throws a DataError naming the file; the UI shows it. No silent fallbacks: the synthetic
 // dataset is used only when grid.json is absent altogether (data not baked yet), and the UI says so.
-import type { BrigadesFile, BrigadeStation, FirmsPoint, GridMeta, IgnitionPreset, NationalPopulation, NationalPopulationMeta, Reinforcement, RoadsFile, RouteCut, WeatherFile } from '../engine/types'
-import { FUEL, ROAD, UNIT_COUNT } from '../engine/types'
+import type {
+  BrigadesFile,
+  BrigadeStation,
+  FirmsPoint,
+  GridMeta,
+  IgnitionPreset,
+  NationalPopulation,
+  NationalPopulationMeta,
+  Reinforcement,
+  RoadsFile,
+  RouteCut,
+  TimelineId,
+  WeatherFile,
+} from '../engine/types'
+import { FUEL, ROAD, TIMELINE, UNIT_COUNT } from '../engine/types'
+import { ERA5_WIND_DIR_CORRECTION_DEG } from '../engine/fire/model'
+import { DEFAULT_FIRE_PARAMS } from '../engine/fire'
+import { DEFAULT_EVAC_PARAMS } from '../engine/evac'
 import { lonLatToColRow } from './grid'
 import { wallClockMin } from './time'
 
@@ -23,6 +39,17 @@ export interface Dataset {
   populationWork: Float32Array
   /** true when this is the in-browser synthetic dataset (src/data/mock.ts). */
   synthetic: boolean
+  /** The timeline grid.t0, weather, ignitions and firms belong to. The baked files are the 2 Feb 2024 fire;
+   *  src/data/timeline.ts derives the "today" view of the same territory. */
+  timeline: TimelineId
+  /** Calibrated wind-direction correction (degrees) the weather series gets: ERA5_WIND_DIR_CORRECTION_DEG for
+   *  the ERA5 reanalysis of 2 Feb 2024, 0 for a forecast (it was fitted on that day's ERA5 only). */
+  windDirCorrectionDeg: number
+  /** How long this timeline runs (minutes after grid.t0): the 2024 replay keeps its validated window (12:00 to
+   *  midnight, DEFAULT_FIRE_PARAMS.horizonMin); the today timeline covers the whole day (24 h). */
+  horizonMin: number
+  /** Default alert time (minutes after grid.t0): 18:00 in both timelines. */
+  defaultAlertMin: number
 }
 
 export class DataError extends Error {
@@ -220,8 +247,9 @@ export function parseRoads(j: unknown): RoadsFile {
   return j as unknown as RoadsFile
 }
 
-export function parseWeather(j: unknown): WeatherFile {
-  const f = 'weather.json'
+/** `file` names the source in error messages (the "today" forecast reuses this check). */
+export function parseWeather(j: unknown, file = 'weather.json'): WeatherFile {
+  const f = file
   if (!isObj(j)) throw new DataError(f, 'no es un objeto JSON')
   const times = j.times
   if (!Array.isArray(times) || times.length < 2 || !times.every((t) => typeof t === 'string'))
@@ -460,6 +488,10 @@ export async function loadRealDataset(): Promise<Dataset | null> {
     populationHome: parsePopulationLayer('population_home.bin', popHome, cells),
     populationWork: parsePopulationLayer('population_work.bin', popWork, cells),
     synthetic: false,
+    timeline: TIMELINE.VINA_2024,
+    windDirCorrectionDeg: ERA5_WIND_DIR_CORRECTION_DEG,
+    horizonMin: DEFAULT_FIRE_PARAMS.horizonMin,
+    defaultAlertMin: DEFAULT_EVAC_PARAMS.alertMin,
   }
 }
 

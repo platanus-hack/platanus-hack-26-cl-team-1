@@ -69,17 +69,22 @@ function scenario(patch: Partial<Scenario> = {}): Scenario {
 
 describe('buildWeatherSeries', () => {
   it('maps the hourly file to minutes since t0', () => {
-    const { series, notes } = buildWeatherSeries(weather, grid.t0, neutral)
+    const { series, notes } = buildWeatherSeries(weather, grid.t0, neutral, DIR)
     expect(series.t0Min).toBe(-60)
     expect(series.stepMin).toBe(60)
     expect(series.samples).toHaveLength(3)
-    // Mode "real" applies the calibrated ERA5 direction correction (engine/fire/model.ts).
+    // Mode "real" applies the source's calibrated direction correction (ERA5: engine/fire/model.ts).
     expect(series.samples[1]).toEqual({ tempC: 25, rh: 30, windKmh: 20, windFromDeg: (10 + DIR + 360) % 360 })
     expect(notes).toEqual([])
   })
 
+  it('a forecast (correction 0) keeps the wind direction as is', () => {
+    const { series } = buildWeatherSeries(weather, grid.t0, { ...neutral, windDirOffsetDeg: -20 }, 0)
+    expect(series.samples.map((x) => x.windFromDeg)).toEqual([330, 350, 10])
+  })
+
   it('applies adjustments and reports the humidity clamp', () => {
-    const { series, notes } = buildWeatherSeries(weather, grid.t0, { ...neutral, windFactor: 1.5, windDirOffsetDeg: 20, rhOffset: -10, tempOffsetC: 2 })
+    const { series, notes } = buildWeatherSeries(weather, grid.t0, { ...neutral, windFactor: 1.5, windDirOffsetDeg: 20, rhOffset: -10, tempOffsetC: 2 }, DIR)
     expect(series.samples[0]).toEqual({ tempC: 22, rh: 40, windKmh: 15, windFromDeg: (10 + DIR + 360) % 360 })
     expect(series.samples[2].rh).toBe(1)
     expect(notes).toHaveLength(1)
@@ -87,18 +92,18 @@ describe('buildWeatherSeries', () => {
   })
 
   it('constant mode holds one sample', () => {
-    const { series } = buildWeatherSeries(weather, grid.t0, { ...neutral, mode: 'constante', windKmh: 40, windFromDeg: 370, rh: 15, tempC: 33 })
+    const { series } = buildWeatherSeries(weather, grid.t0, { ...neutral, mode: 'constante', windKmh: 40, windFromDeg: 370, rh: 15, tempC: 33 }, DIR)
     expect(series.samples).toEqual([{ tempC: 33, rh: 15, windKmh: 40, windFromDeg: 10 }])
   })
 
   it('constant mode rejects humidity outside 1..100', () => {
-    expect(() => buildWeatherSeries(weather, grid.t0, { ...neutral, mode: 'constante', rh: 0 })).toThrow(/Humedad/)
+    expect(() => buildWeatherSeries(weather, grid.t0, { ...neutral, mode: 'constante', rh: 0 }, DIR)).toThrow(/Humedad/)
   })
 })
 
 describe('sampleAt', () => {
   it('interpolates linearly and wraps the wind direction', () => {
-    const { series } = buildWeatherSeries(weather, grid.t0, neutral)
+    const { series } = buildWeatherSeries(weather, grid.t0, neutral, DIR)
     const s = sampleAt(series, -30)
     expect(s.windKmh).toBeCloseTo(15)
     expect(s.windFromDeg).toBeCloseTo((360 + DIR) % 360) // halfway between 350 and 10 through north, plus the correction

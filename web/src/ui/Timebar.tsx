@@ -1,5 +1,4 @@
 import { minToDateLabel, minToHHMM } from '../data/time'
-import { HORIZON_MIN } from '../worker/scenario'
 
 /** Playback speeds in simulated minutes per real second. */
 export const SPEEDS = [5, 15, 30, 60] as const
@@ -17,6 +16,8 @@ export function Timebar(props: {
   terrainAvailable: boolean
   /** Evacuation alert time, marked on the scrubber. */
   alertMin: number
+  /** End of the timeline (minutes since t0). */
+  horizonMin: number
 }) {
   const { t0, clock } = props
   return (
@@ -46,7 +47,7 @@ export function Timebar(props: {
         <input
           type="range"
           min={0}
-          max={HORIZON_MIN}
+          max={props.horizonMin}
           step={1}
           value={clock}
           aria-label="Hora de la simulación"
@@ -55,7 +56,7 @@ export function Timebar(props: {
         {/* the thumb is 16 px wide, so the track spans 8 px .. width - 8 px */}
         <span
           className="alert-tick"
-          style={{ left: `calc(8px + (100% - 16px) * ${props.alertMin / HORIZON_MIN})` }}
+          style={{ left: `calc(8px + (100% - 16px) * ${props.alertMin / props.horizonMin})` }}
           title={`Alerta de evacuación: ${minToHHMM(t0, props.alertMin)}`}
         >
           <span>Alerta {minToHHMM(t0, props.alertMin)}</span>

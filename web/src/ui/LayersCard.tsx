@@ -11,7 +11,7 @@ const ITEMS: { key: keyof LayerToggles; label: string; swatch: string }[] = [
   { key: 'zonasSeguras', label: 'Zonas seguras', swatch: 'safe' },
   { key: 'cortafuegos', label: 'Cortafuegos', swatch: 'fb' },
   { key: 'firms', label: 'NASA FIRMS', swatch: 'firms' },
-  { key: 'cicatriz', label: 'Cicatriz real (Sentinel-2)', swatch: 'scar' },
+  { key: 'cicatriz', label: 'Cicatriz 2024 (Sentinel-2)', swatch: 'scar' },
   { key: 'combustible', label: 'Combustible', swatch: 'fuel' },
   { key: 'bomberos', label: 'Bomberos (rutas, sitios, cortes)', swatch: 'brig' },
   { key: 'poblacion', label: 'Personas a esta hora', swatch: 'pop' },
@@ -21,10 +21,13 @@ export function LayersCard({
   layers,
   setLayer,
   showRoutes,
+  hide = [],
 }: {
   layers: LayerToggles
   setLayer: (k: keyof LayerToggles, v: boolean) => void
   showRoutes: boolean
+  /** Layers this timeline has no data for (e.g. FIRMS detections from today). */
+  hide?: (keyof LayerToggles)[]
 }) {
   const [open, setOpen] = useState(() => window.matchMedia('(min-width: 900px)').matches)
   return (
@@ -37,7 +40,7 @@ export function LayersCard({
       </button>
       {open && (
         <div className="layers-body">
-          {ITEMS.map((it) => (
+          {ITEMS.filter((it) => !hide.includes(it.key)).map((it) => (
             <label key={it.key} className="layer-row">
               <input type="checkbox" checked={layers[it.key]} onChange={(e) => setLayer(it.key, e.target.checked)} />
               <span className={`swatch ${it.swatch}`} aria-hidden="true" />
