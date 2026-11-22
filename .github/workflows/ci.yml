@@ -38,77 +38,20 @@ jobs:
       - name: Unit tests for scripts/ci
         run: python3 -I -m unittest discover -s scripts/ci/tests -t . -v
 
-  contracts:
-    name: Contracts (ruff, pytest, schemas)
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    defaults:
-      run:
-        working-directory: contracts
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          persist-credentials: false
-      - uses: astral-sh/setup-uv@v6
-      - run: uv sync --frozen
-      - run: uv run ruff check .
-      - run: uv run ruff format --check .
-      - run: uv run pytest -q -ra
-      - name: Committed JSON Schemas match the models
-        run: uv run python -m contracts.export --check
-
-  server:
-    name: Server (ruff, pytest)
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    defaults:
-      run:
-        working-directory: server
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          persist-credentials: false
-      - uses: astral-sh/setup-uv@v6
-      - run: uv sync --frozen
-      - run: uv run ruff check .
-      - run: uv run ruff format --check .
-      - run: uv run pytest -q -ra
-
-  symsim:
-    name: Symbolic simulator (ruff, pytest)
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    defaults:
-      run:
-        working-directory: sim/symbolic
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          persist-credentials: false
-      - uses: astral-sh/setup-uv@v6
-      - run: uv sync --frozen
-      - run: uv run ruff check .
-      - run: uv run ruff format --check .
-      - run: uv run pytest -q -ra
-
-  training-lint:
-    # Lint only: the training tests need torch, kept out of CI (the server job tests the committed weights).
-    name: Controller training (ruff)
+  pipeline:
+    name: Data pipeline (ruff)
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    defaults:
-      run:
-        working-directory: training/controller
     steps:
       - uses: actions/checkout@v5
         with:
           persist-credentials: false
       - uses: astral-sh/setup-uv@v6
-      - run: uvx ruff@0.8.6 check .
-      - run: uvx ruff@0.8.6 format --check .
+      - run: uvx ruff@0.8.6 check pipeline
+      - run: uvx ruff@0.8.6 format --check pipeline
 
   web:
-    name: Web (types, tsc, vitest, build)
+    name: Web (tsc, vitest, build)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
@@ -127,8 +70,6 @@ jobs:
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
-      - name: Generated TS types match the schemas
-        run: pnpm check:types
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
@@ -138,7 +79,7 @@ jobs:
   ci-ok:
     name: CI OK
     if: always()
-    needs: [workflow-lint, tooling, contracts, server, symsim, training-lint, web]
+    needs: [workflow-lint, tooling, pipeline, web]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:

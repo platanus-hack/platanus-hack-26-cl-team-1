@@ -1,0 +1,27 @@
+[project]
+name = "cortafuego-pipeline"
+version = "0.1.0"
+description = "Bakes the Cortafuego data files (terrain, fuels, buildings, streets, weather, burn scar) into web/public/data/"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    "numpy>=2.0",
+    "rasterio>=1.4",
+    "requests>=2.32",
+    "scipy>=1.14",
+    "duckdb>=1.1",
+]
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+extend-exclude = [".cache"]

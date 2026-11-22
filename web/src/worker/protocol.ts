@@ -1,0 +1,43 @@
+// Messages between the UI thread (client.ts) and the simulation worker (sim.worker.ts).
+import type { WeatherSeries } from '../engine/types'
+import type { Scenario } from './scenario'
+
+/** init: the worker loads the same dataset the UI uses (real files, or the deterministic synthetic set). */
+export type ToWorker = { type: 'init'; synthetic: boolean } | { type: 'run'; id: number; scenario: Scenario }
+
+export interface FireOut {
+  arrivalMin: Float32Array
+  rosMPerMin: Float32Array
+  burnedCells: number
+  elapsedMs: number
+}
+
+export interface EvacOut {
+  householdRisk: Float32Array
+  householdStatus: Uint8Array
+  expectedTrappedHouseholds: number
+  expectedTrappedPeople: number
+  buildingsReached: number
+  edgeFlow: Float32Array
+  edgeClosesMin: Float32Array
+  riskByAlert: { alertMin: number; expectedTrappedHouseholds: number }[]
+  elapsedMs: number
+}
+
+export interface RunResult {
+  id: number
+  /** Present only when the fire was recomputed in this run (otherwise the previous fire still holds). */
+  fire?: FireOut
+  evac: EvacOut
+  /** 1 per road node that is a safe destination in this run. */
+  safeNodes: Uint8Array
+  weather: WeatherSeries
+  notes: string[]
+  /** Total time spent in the worker for this run (ms). */
+  workerMs: number
+}
+
+export type FromWorker =
+  | { type: 'ready'; loadMs: number; prepareMs: number }
+  | { type: 'result'; result: RunResult }
+  | { type: 'error'; id: number | null; message: string }

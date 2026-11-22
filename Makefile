@@ -1,47 +1,28 @@
 # Entry points. Needs uv and Node 24 + pnpm (corepack enable, or npm i -g pnpm).
-.PHONY: install dev server web test lint schemas types check controller
+.PHONY: install dev data test lint check validate build
 
 install: ## Install every part
-	cd contracts && uv sync
-	cd server && uv sync
-	cd sim/symbolic && uv sync
 	cd web && pnpm install
+	cd pipeline && uv sync
 
-dev: ## Server on :8000 + web on :5173 (Ctrl+C stops both)
-	@trap 'kill 0' EXIT INT TERM; \
-	(cd server && uv run uvicorn app.main:app --reload --port 8000) & \
-	(cd web && pnpm dev) & \
-	wait
-
-server: ## Server only
-	cd server && uv run uvicorn app.main:app --reload --port 8000
-
-web: ## Web only (proxies /api and /ws to :8000)
+dev: ## Web app on :5173
 	cd web && pnpm dev
 
-schemas: ## Regenerate JSON Schemas and TS types after changing contracts/
-	cd contracts && uv run python -m contracts.export
-	cd web && pnpm gen:types
+data: ## Re-bake web/public/data from the open sources (downloads; slow the first time)
+	cd pipeline && uv run python bake.py
 
 test: ## All tests
 	python3 -I -m unittest discover -s scripts/ci/tests -t .
-	cd contracts && uv run pytest -q
-	cd server && uv run pytest -q
-	cd sim/symbolic && uv run pytest -q
 	cd web && pnpm test
 
-lint: ## Lint and format checks
-	cd contracts && uv run ruff check . && uv run ruff format --check .
-	cd server && uv run ruff check . && uv run ruff format --check .
-	cd sim/symbolic && uv run ruff check . && uv run ruff format --check .
-	cd training/controller && uvx ruff@0.8.6 check . && uvx ruff@0.8.6 format --check .
+lint: ## Lint and type checks
+	uvx ruff@0.8.6 check pipeline
 	cd web && pnpm typecheck
 
-check: lint test ## What CI runs (plus schema/type freshness)
-	cd contracts && uv run python -m contracts.export --check
-	cd web && pnpm check:types && pnpm build
+build: ## Production build of the static site (web/dist)
+	cd web && pnpm build
 
-controller: ## Train the learned controller for TASK=tasks/<domain>/<task>.json, then re-run the comparison
-	@test -n "$(TASK)" || (echo "usage: make controller TASK=tasks/<domain>/<task>.json" && exit 1)
-	cd training/controller && uv run python -m ctrl.train --task ../../$(TASK)
-	cd training/controller && uv run python -m ctrl.evaluate $(foreach t,$(filter-out %/ontology.json,$(wildcard tasks/*/*.json)),--task ../../$(t))
+check: lint test build ## What CI runs
+
+validate: ## Model vs the real Sentinel-2 burn scar
+	cd web && pnpm validate

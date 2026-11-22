@@ -1,0 +1,15 @@
+{
+  "note": "Defaults as shipped, ERA5 wind x1, spotting on, preset ignitions; burned by the horizon vs the Sentinel-2 scar (final footprint, no-data cells ignored). In-sample: the model factors were fitted on this same fire.",
+  "evalTime": "2024-02-03T00:00",
+  "dice": 0.571,
+  "iou": 0.4,
+  "precision": 0.459,
+  "recall": 0.756,
+  "modelHa": 15576,
+  "scarHa": 9467,
+  "runMs": 58,
+  "firmsReached": {
+    "reached": 203,
+    "total": 237
+  }
+}
