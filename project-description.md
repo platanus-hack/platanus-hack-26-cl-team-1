@@ -42,8 +42,9 @@ haces mal, y nadie está mirando.
   el estado correcto en el 93,8% de las ejecuciones contra 37,4% de las reglas y da unas 8 veces menos falsas
   alarmas (0,42 contra 3,51 por ejecución), aunque detecta menos errores (38,7% contra 55,6%)
   (`training/results/controller.md`).
-- **Percepción** servida con vLLM en una RTX 5090: unos 0,75 s por observación en el servidor (p50,
-  `training/results/perception.md`).
+- **Percepción** servida con vLLM en una RTX 5090, con 3 cuadros por llamada y hasta 3 llamadas a la vez:
+  unos 0,84 s por llamada (p50) y 2,8 observaciones por segundo (`app.perception.bench --stream`, decisión
+  D-018 en `agent-kb/decisions.md`).
 - **Voz** en español con ElevenLabs o con la voz del navegador, con una cola en la que una corrección corta
   la frase anterior en vez de hablarle encima.
 
