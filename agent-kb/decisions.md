@@ -327,6 +327,22 @@ D-026 to D-028 were taken by #54, #53 and the today scenario._
   The UI shows these numbers as they are. Rerun `pnpm plan` whenever the data or the fire calibration change.
   Not included: firebreak, street-link and alert optimizers (reasons in the session log).
 
+### D-034 — Drawn firebreaks shown under several ember distances (2026-11-22)
+- **Context:** exploring a tool where firefighting experts draw firebreaks on a scenario (Talca, D-032), we found
+  that with the shipped embers (25 m per km/h, deterministic) a 60-120 m line barely matters on Talca (-1 to -5 %
+  households cut off), while with embers off the same line removes 27-96 %. The answer to "does my line hold?" is
+  set mostly by one knob calibrated only on Viña 2024.
+- **Decision (no contract change in `types.ts`; worker protocol gains an `emberRange` message):** when the scenario
+  has drawn firebreaks, the worker, after sending the normal result, runs the scenario without firefighters at 12,
+  15 and 25 m per km/h (the distances the calibration tried), without and with the lines, one distance per task so
+  the next change interrupts it, cached per `emberRangeKey`. The Cortafuegos panel shows households cut off and
+  burned area per distance and the range, and says the distances were calibrated only on Viña. The main result is
+  unchanged. `scripts/firebreak-embers.ts` measures one line with the same helper.
+- **Consequences:** on Talca an 8 km x 120 m line 1 km ahead of the fire reads -5.5 % to -35.5 % (fire `MODEL.md`
+  section 5). Each change with firebreaks costs about 6 extra fire and evacuation runs in the background
+  (about 1 s on Talca). Making embers probabilistic, so a line reduces rather than all-or-nothing, is the model
+  fix; not done.
+
 ## §2 Open
 
 - Viña's scar (`scar.bin`) applies a −0.1 reflectance offset that the Earth Search COGs do not need (15.6 % / 19.6 %

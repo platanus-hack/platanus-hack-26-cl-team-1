@@ -19,6 +19,7 @@ import { MapView } from './ui/MapView'
 import type { LayerToggles, Tool } from './ui/MapView'
 import { Panel } from './ui/Panel'
 import type { Summary, Timings } from './ui/Panel'
+import type { EmberRangeState } from './ui/FirebreakEmberRange'
 import { Timebar } from './ui/Timebar'
 import { LayersCard } from './ui/LayersCard'
 import { SourcesModal } from './ui/SourcesModal'
@@ -307,6 +308,8 @@ function Explorer({
   const [simError, setSimError] = useState<string | null>(null)
   const [timings, setTimings] = useState<Timings | null>(null)
   const [baseline, setBaseline] = useState<Summary | null>(null)
+  /** Drawn firebreaks under several ember distances (worker/emberRange.ts); null until the worker sends one. */
+  const [emberRange, setEmberRange] = useState<EmberRangeState | null>(null)
   /** Which day the population model assumes (who is home, who is at work or school). UI-only: the worker's
    *  fire and evacuation do not depend on it. */
   const [populationDay, setPopulationDay] = useState<PopulationDay>(POPULATION_DAY.REAL)
@@ -356,6 +359,7 @@ function Explorer({
       },
       onError: (m) => setSimError(m),
       onBusy: setBusy,
+      onEmberRange: (m) => setEmberRange({ rows: m.rows, error: m.error }),
     })
     c.init(data.synthetic, choice)
     // A new worker starts with the current scenario (the debounced effect below only fires on changes).
@@ -516,6 +520,7 @@ function Explorer({
     summary,
     baseline,
     setBaseline,
+    emberRange,
     timings,
     busy,
     simError,

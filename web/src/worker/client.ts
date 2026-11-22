@@ -9,6 +9,8 @@ export interface SimCallbacks {
   onResult: (r: RunResult, roundTripMs: number) => void
   onError: (message: string) => void
   onBusy: (busy: boolean) => void
+  /** Drawn firebreaks under several ember distances, after a run's result (protocol.ts). */
+  onEmberRange: (msg: Extract<FromWorker, { type: 'emberRange' }>) => void
 }
 
 export class SimClient {
@@ -63,6 +65,11 @@ export class SimClient {
       this.ready = true
       this.cb.onReady(msg.loadMs, msg.prepareMs)
       this.pump()
+      return
+    }
+    if (msg.type === 'emberRange') {
+      // Follows a result already handled: not part of the request/response cycle.
+      this.cb.onEmberRange(msg)
       return
     }
     const sentAt = this.inFlight?.sentAt ?? performance.now()

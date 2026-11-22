@@ -3,6 +3,7 @@ import type { WeatherSeries } from '../engine/types'
 import type { PlannedUnit } from '../engine/brigade'
 import type { Scenario } from './scenario'
 import type { TimelineChoice } from '../data/timeline'
+import type { EmberRangeRow } from './emberRange'
 
 /** init: the worker loads the same dataset the UI uses (real files, or the deterministic synthetic set) and sees
  *  it from the same timeline (src/data/timeline.ts). */
@@ -58,3 +59,6 @@ export type FromWorker =
   | { type: 'ready'; loadMs: number; prepareMs: number }
   | { type: 'result'; result: RunResult }
   | { type: 'error'; id: number | null; message: string }
+  /** Drawn firebreaks under several ember distances (emberRange.ts), sent after the run's result when the scenario
+   *  has firebreaks: rows null while it is being computed, then the rows (or an error). */
+  | { type: 'emberRange'; id: number; rows: EmberRangeRow[] | null; error: string | null }

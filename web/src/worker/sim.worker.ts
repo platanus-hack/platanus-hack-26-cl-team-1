@@ -14,6 +14,7 @@ import { loadRealDataset } from '../data/load'
 import { makeMockDataset } from '../data/mock'
 import { timelineDataset, type TimelineChoice } from '../data/timeline'
 import { checkEvent, EVENTS, eventOfTimeline } from '../data/events'
+import { EMBER_RANGE_M_PER_KMH, emberRangeKey, emberRangeRow, type EmberRangeRow } from './emberRange'
 import { brigadeKey, buildIgnitions, buildWeatherSeries, fireKey, rasteriseFirebreaks, safeNodes, wildlandDistanceM } from './scenario'
 
 const ctx = self as unknown as DedicatedWorkerGlobalScope
@@ -28,10 +29,17 @@ let planNotes: string[] = []
 let lastFireKey = ''
 let lastFire: FireResult | null = null
 let lastFireInput: FireInput | null = null
+/** The last fire's firebreak mask without the drawn lines (the plan's belt only), for the ember range. */
+let lastNoLinesFirebreak: Uint8Array | null = null
 /** Pass 2 (defended fire) cache, keyed by fireKey + brigadeKey. */
 let lastDefKey = ''
 let lastDef: { fire: FireResult; plan: BrigadePlan; planMs: number } | null = null
 let lastSentKey = ''
+/** Ember range (emberRange.ts): computed after the result, one distance per task so a new run can start in between;
+ *  rows are kept per emberRangeKey and resumed when the key is unchanged. */
+let rangeTimer: ReturnType<typeof setTimeout> | null = null
+let rangeKey = ''
+let rangeRows: EmberRangeRow[] = []
 
 function post(msg: FromWorker, transfer: Transferable[] = []) {
   ctx.postMessage(msg, transfer)
@@ -53,6 +61,8 @@ async function init(synthetic: boolean, timeline: TimelineChoice) {
   lastDefKey = ''
   lastDef = null
   lastSentKey = ''
+  rangeKey = ''
+  rangeRows = []
   post({ type: 'ready', loadMs, prepareMs: performance.now() - t - loadMs })
 }
 
@@ -61,6 +71,10 @@ ctx.onmessage = (ev: MessageEvent<ToWorker>) => {
   if (msg.type === 'init') {
     init(msg.synthetic, msg.timeline).catch((e: unknown) => post({ type: 'error', id: null, message: e instanceof Error ? e.message : String(e) }))
     return
+  }
+  if (rangeTimer !== null) {
+    clearTimeout(rangeTimer)
+    rangeTimer = null
   }
   try {
     if (!data || !prepared || !wildDist || !belt) throw new Error('El simulador aún no tiene datos')
@@ -72,12 +86,14 @@ ctx.onmessage = (ev: MessageEvent<ToWorker>) => {
       const ignitions = buildIgnitions(data.grid, data.ignitions, s)
       let fuel = data.fuel
       let firebreak = rasteriseFirebreaks(data.grid, s.firebreaks)
+      let noLines: Uint8Array = new Uint8Array(firebreak.length)
       planNotes = []
       if (s.planTiles.length > 0) {
         // Plan de preparación: the belt cleared in the chosen tiles (src/engine/plan).
         const a = applyBelt(belt, s.planTiles, fuel, firebreak, ignitions.map((g) => g.cell))
         fuel = a.fuel
         firebreak = a.firebreak
+        noLines = applyBelt(belt, s.planTiles, data.fuel, noLines, ignitions.map((g) => g.cell)).firebreak
         if (a.skippedIgnitionCells > 0)
           planNotes.push(
             a.skippedIgnitionCells === 1
@@ -101,6 +117,7 @@ ctx.onmessage = (ev: MessageEvent<ToWorker>) => {
         },
       }
       lastFire = simulateFire(lastFireInput)
+      lastNoLinesFirebreak = noLines
       lastFireKey = key
     }
     const evacParams: EvacParams = {
@@ -203,7 +220,41 @@ ctx.onmessage = (ev: MessageEvent<ToWorker>) => {
     }
     result.workerMs = performance.now() - t
     post({ type: 'result', result }, transfer)
+    if (s.firebreaks.length > 0) {
+      const pr = prepared
+      scheduleEmberRange(msg.id, emberRangeKey(s), lastFireInput!, lastNoLinesFirebreak!, (arrivalMin) =>
+        simulateEvac({ prepared: pr, arrivalMin, params: evacParams, edits, programme }).expectedTrappedHouseholds,
+      )
+    }
   } catch (e) {
     post({ type: 'error', id: msg.id, message: e instanceof Error ? e.message : String(e) })
   }
+}
+
+/** Drawn firebreaks under each ember distance (emberRange.ts), after the result: cached rows are sent at once,
+ *  missing ones are computed one per task (a new run cancels the timer and resumes them if its key is the same). */
+function scheduleEmberRange(id: number, key: string, input: FireInput, noLines: Uint8Array, trapped: (arrivalMin: Float32Array) => number) {
+  if (key !== rangeKey) {
+    rangeKey = key
+    rangeRows = []
+  }
+  if (rangeRows.length === EMBER_RANGE_M_PER_KMH.length) {
+    post({ type: 'emberRange', id, rows: rangeRows, error: null })
+    return
+  }
+  post({ type: 'emberRange', id, rows: null, error: null })
+  const step = () => {
+    rangeTimer = null
+    try {
+      rangeRows.push(emberRangeRow(input, noLines, EMBER_RANGE_M_PER_KMH[rangeRows.length], trapped))
+    } catch (e) {
+      rangeKey = ''
+      rangeRows = []
+      post({ type: 'emberRange', id, rows: null, error: e instanceof Error ? e.message : String(e) })
+      return
+    }
+    if (rangeRows.length < EMBER_RANGE_M_PER_KMH.length) rangeTimer = setTimeout(step, 0)
+    else post({ type: 'emberRange', id, rows: rangeRows, error: null })
+  }
+  rangeTimer = setTimeout(step, 0)
 }
