@@ -17,6 +17,8 @@ Owner in brackets once someone takes an item. Project: Cortafuego (D-019). The O
     from the same SVG source (D-029).
   - Animated splash ready: the canonical flame is cut by its diagonal firebreak, with a short exit fade,
     reduced-motion support and a skip control; loading and worker initialization continue behind it.
+  - README refreshed in Spanish with a human-centered Cortafuego overview, scenario explanations and public demo;
+    removed template instructions and the obsolete deployment-mirror guide. Ready for team review.
 - [ ] **Pitch (3 min):** sober opening on 2 Feb 2024, live demo (wind, humidity, firebreak, alert time), the
   validation number, who pays (comunas under Ley 21.364, forestry companies, distributors, insurers). [team]
   - The site now opens on today's forecast (D-028): open the demo at `https://cortafuego.app/?escenario=vina-2024`.
