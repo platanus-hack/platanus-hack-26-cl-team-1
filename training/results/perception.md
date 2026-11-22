@@ -47,8 +47,8 @@ mistake at 28 s, and the task is done at 46 s.
 
 | Variant | Calls right | Spoken warnings (false) | wet / soap / palms / rinse at | Bare faucet / done | p50 |
 |---|---|---|---|---|---|
-| live (old cues, 1 answer acts) | 76% | 7 (6) | 4.4 / 7.1 / 8.4 / 14.1 s | flagged / 43.7 s | 0.84 s |
-| water-aware cues | 76% | 11 (10) | 4.0 / 9.7 / 11.9 / 21.8 s | flagged / 45.7 s | 0.71 s |
+| live (old cues, 1 answer acts) | 76% | 6 (5) | 4.4 / 7.1 / 8.4 / 14.1 s | flagged / 43.7 s | 0.84 s |
+| water-aware cues | 76% | 12 (11) | 4.0 / 9.7 / 11.9 / 21.8 s | flagged / 45.7 s | 0.71 s |
 | **cues + 2 of 3 answers agree** | **77%** | **4 (4)** | **4.7 / 10.1 / 14.5 / 21.8 s** | missed / missed | 0.70 s |
 
 The same settings on run 1 (138 calls, recorded at one call every 1.5 s): 60% of calls right (62% before).

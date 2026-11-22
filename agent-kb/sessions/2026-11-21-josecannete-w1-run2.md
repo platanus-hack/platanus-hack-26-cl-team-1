@@ -9,7 +9,7 @@
   sessions died while the phone was carried: the supervisor page stops after 3 s with no frames. With the phone
   on a stand, one session ran 111 s at ~3 answers/s.
 - **Labelled that session** (320 calls) from the frames. The user lathers under running water, and the old cues
-  said rubbing happens away from it. Single stray answers completed steps early and caused 7 warnings.
+  said rubbing happens away from it. Single stray answers completed steps early and caused 5 false warnings.
 - **Fixes:** water-aware cues; the rules controller acts only when 2 of the last 3 answers agree (VLM only);
   `review` and `rejudge` replay with the live setting. Measured in `training/results/perception.md` (run 2).
 
