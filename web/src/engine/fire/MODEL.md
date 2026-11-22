@@ -18,8 +18,9 @@ factor (0..10) and C is grass curing (%).
 | URBAN_DENSE (consolidated) | 0.35 × grass in the spec; shipped 0.05, and embers do not ignite it (section 6) |
 | NONE | does not burn |
 
-Then each model gets its calibration factor (`FIRE_MODEL.modelFactor`, section 6), and everything is
-multiplied by `params.rosMultiplier`.
+Then each fuel gets its own factor (`FIRE_MODEL.fuels[...].factor`: SHRUB ×0.5 since the pace fit, CROP and the
+urban fuels as in the table) and each model its calibration factor (`FIRE_MODEL.modelFactor`: McArthur ×4,
+CSIRO grass ×0.25; section 6), and everything is multiplied by `params.rosMultiplier`.
 
 ## 2. Wind and slope as one vector
 
@@ -139,7 +140,7 @@ dataset, the historical ERA5 weather (direction corrected, see below), the two p
 cells against the Sentinel-2 scar, ignoring no-data cells.
 
 `pnpm validate` runs it and writes `public/data/validation.json`, which the app's "Validación" section shows.
-Numbers measured on 2026-11-22 00:25 (scar 9,467 ha; Dice = F1 = 2·IoU/(1+IoU)):
+Numbers measured on 2026-11-22 00:25, last row at 02:30 (scar 9,467 ha; Dice = F1 = 2·IoU/(1+IoU)):
 
 | Setup | Dice | IoU | Burned by 06:00 |
 |---|---|---|---|

@@ -19,6 +19,9 @@ Owner in brackets once someone takes an item. Project: Cortafuego (D-019). The O
 ## Next
 - [ ] Western stall of 14:05–16:25 (satellite) not reproduced: needs a cause the data shows (initial attack?
   local wind?); see `web/src/engine/fire/MODEL.md` section 6.
+- [ ] Pace back test polish (review of PR #53): GOES half-pixel 1.0 km vs a ~2.5–3 km pixel, look fires up by
+  id in `calibrate.ts`, check the 10-min GOES slots by name, score extent instead of lag once the observed
+  front stops.
 - [ ] Bomberos (D-026): real inventories per company (ask each cuerpo), reopening time of Ruta 68, hydrant
   availability as a variable, congestion slowing the trucks, units that move between sectors.
 - [ ] Evacuation by time of day: people per building at the alert time from the population layers (D-024),

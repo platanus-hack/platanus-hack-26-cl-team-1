@@ -141,7 +141,8 @@ example in `tests/test_steps.py`); pixels whose centre is outside the grid are d
 10-14 and 30-34 (good, saturated, cloud-contaminated, high and medium probability, plain and temporally
 filtered); low probability (15, 35) is left out. `timeLocal` = scan start + 5 min (middle of the full-disk
 scan), UTC - 3 h. `frp` = `Power` (MW); the algorithm leaves it unset (fill -9) on some fire pixels
-(saturated or cloud-contaminated), recorded as 0: the pacing score uses the location only. Same record shape as
+(saturated or cloud-contaminated; 233 of the 1,379 pixels of this bake), recorded as 0, which means "not
+computed", not a weak fire: the pacing score uses the location only. Same record shape as
 `firms.json` (`satellite` = "GOES-16 ABI"). It is used only by `web/src/engine/fire/calibrate.ts` to score the
 pace of the simulated fire (`web/src/engine/fire/MODEL.md` section 6); the browser app does not load it.
 

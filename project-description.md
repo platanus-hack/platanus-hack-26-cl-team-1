@@ -25,7 +25,9 @@ evacuación y alertas, pero casi nunca pueden probar esas decisiones contra el f
    sobre el mapa; calles cerradas y salidas de emergencia nuevas; y la hora de la alerta. Todo se recalcula en
    segundos.
 5. **Se contrasta con la realidad:** la cicatriz del incendio medida por Sentinel-2 y los focos satelitales de
-   NASA FIRMS se pueden superponer al resultado del modelo.
+   NASA FIRMS se pueden superponer al resultado del modelo, y el ritmo del avance se mide contra el satélite
+   GOES-16 (una imagen cada 10 minutos) y las pasadas VIIRS y MODIS, tanto si el fuego simulado va adelantado
+   como atrasado.
 
 ## Lo que no es
 
