@@ -17,6 +17,21 @@ from datetime import datetime
 
 OVERTURE_RELEASE = "2026-11-18.0"  # latest in the bucket at bake time; older releases are not kept there
 
+FIRE_FIELDS = (
+    "s2_post",
+    "scar_offset",
+    "scar_max_negative_share",
+    "scar_firms_days",
+    "firms_country",
+    "firms_year",
+    "firms_first",
+    "firms_last",
+    "goes_bucket",
+    "goes_satellite",
+    "goes_first_utc",
+    "goes_last_utc",
+)
+
 BASE_OUTPUTS = (
     "grid.json",
     "elevation.bin",
@@ -49,19 +64,21 @@ class Event:
     dem_tiles: tuple[str, ...]  # Copernicus GLO-30 1x1 degree tiles (lower-left corner names)
     worldcover_tiles: tuple[str, ...]  # ESA WorldCover 3x3 degree tiles (lower-left corner names)
     s2_pre: str  # Sentinel-2 L2A scene (Earth Search id): pre-fire, also the NDVI scene of steps/wui.py
-    s2_post: str  # Sentinel-2 L2A scene: post-fire
     s2_window_pad_m: int  # margin around the grid when reading the Sentinel-2 window (clipped to the tile)
-    scar_offset: float  # added to DN * 0.0001 to get the reflectance used for the scar (see steps/scar.py)
-    scar_max_negative_share: float  # the bake stops if more valid pixels than this come out negative
-    scar_firms_days: tuple[str, ...]  # local dates of the VIIRS detections that keep a scar patch
-    firms_country: str  # FIRMS yearly country archive file name part
-    firms_year: int
-    firms_first: str  # local times kept in firms.json, "YYYY-MM-DDTHH:MM" (inclusive)
-    firms_last: str
-    goes_bucket: str  # NOAA bucket on AWS
-    goes_satellite: str  # `satellite` field of goes.json
-    goes_first_utc: datetime  # first and last hour (UTC, inclusive) of full-disk scans
-    goes_last_utc: datetime
+    # Observed fire (scar.bin, firms.json, goes.json). All None for a hypothetical scenario with no real fire
+    # (Talca): bake.py then writes scar.bin as all "no data", firms.json as [] and no goes.json.
+    s2_post: str | None  # Sentinel-2 L2A scene: post-fire
+    scar_offset: float | None  # added to DN * 0.0001 to get the reflectance used for the scar (see steps/scar.py)
+    scar_max_negative_share: float | None  # the bake stops if more valid pixels than this come out negative
+    scar_firms_days: tuple[str, ...] | None  # local dates of the VIIRS detections that keep a scar patch
+    firms_country: str | None  # FIRMS yearly country archive file name part
+    firms_year: int | None
+    firms_first: str | None  # local times kept in firms.json, "YYYY-MM-DDTHH:MM" (inclusive)
+    firms_last: str | None
+    goes_bucket: str | None  # NOAA bucket on AWS
+    goes_satellite: str | None  # `satellite` field of goes.json
+    goes_first_utc: datetime | None  # first and last hour (UTC, inclusive) of full-disk scans
+    goes_last_utc: datetime | None
     weather_lat: float
     weather_lon: float
     weather_first_day: str  # local dates requested from Open-Meteo (inclusive)
@@ -73,13 +90,26 @@ class Event:
     perimeter: dict | None = field(default=None)  # official final perimeter (validation only), see perimeter.py
     dins: dict | None = field(default=None)  # CAL FIRE damage inspection points (validation only), see dins.py
 
+    def __post_init__(self) -> None:
+        fire = [getattr(self, f) for f in FIRE_FIELDS]
+        if any(v is None for v in fire) and any(v is not None for v in fire):
+            raise ValueError(f"event {self.id}: set all of {FIRE_FIELDS} (a real fire) or none (hypothetical)")
+        if not self.observed_fire and not self.ignitions:
+            raise ValueError(f"event {self.id}: a hypothetical scenario needs fixed ignition presets")
+
+    @property
+    def observed_fire(self) -> bool:
+        """A real fire was observed here: scar, FIRMS and GOES are baked from satellites."""
+        return self.s2_post is not None
+
     @property
     def outputs(self) -> tuple[str, ...]:
-        out = BASE_OUTPUTS
+        out = BASE_OUTPUTS if self.observed_fire else tuple(f for f in BASE_OUTPUTS if f != "goes.json")
         if self.population:
+            out += ("population_home.bin", "population_work.bin")
+        if self.population and not self.out_subdir:
+            # The national product lives in web/public/data/national/: listed once, under the root event.
             out += (
-                "population_home.bin",
-                "population_work.bin",
                 "national/population_cl.json",
                 "national/population_cl.bin",
             )
@@ -277,5 +307,80 @@ EATON_2025 = Event(
     dins={"url": EATON_DINS_URL},
 )
 
-EVENTS = {e.id: e for e in (VINA_2024, EATON_2025)}
+# Hypothetical scenario: no fire happened here; the fire-only fields stay None (Event.observed_fire is False).
+TALCA_SOURCE_IGNITION = (
+    "Punto elegido para la demostración en pastizal del valle (ESA WorldCover), unos 2 km al oeste-noroeste del "
+    "pueblo de Maule y 10 km al suroeste del centro de Talca: con el viento de la tarde de ese día (del sur-suroeste) "
+    "el fuego avanza hacia la ciudad. No corresponde a un incendio "
+    "ocurrido."
+)
+TALCA = Event(
+    id="talca",
+    # 27.8 x 31.7 km: Talca's whole built-up area (with Maule Norte), the grass and crop valley and the hills SW
+    # of the city (upwind of the summer afternoon wind) and the wooded hills across the Río Claro to the W/NW.
+    # ESA WorldCover share of cells: 29 % tree, 34 % grass, 2 % shrub, 27 % crop, 6 % built-up.
+    lat_max=-35.305,
+    lon_min=-71.905,
+    rows=464,
+    cols=529,
+    ref_lat=35.43,
+    t0="2025-02-08T12:00:00-03:00",
+    timezone="America/Santiago",
+    utc_offset_h=-3,  # Chile summer time (CLST) in February 2025
+    out_subdir="talca",
+    cache_subdir="talca",
+    dem_tiles=("S36_00_W072_00",),
+    worldcover_tiles=("S36W072",),
+    s2_pre="S2B_19HBA_20260318_0_L2A",  # NDVI only (WUI split): recent, 0.001 % cloud over the grid
+    s2_post=None,
+    s2_window_pad_m=200,
+    scar_offset=None,
+    scar_max_negative_share=None,
+    scar_firms_days=None,
+    firms_country=None,
+    firms_year=None,
+    firms_first=None,
+    firms_last=None,
+    goes_bucket=None,
+    goes_satellite=None,
+    goes_first_utc=None,
+    goes_last_utc=None,
+    weather_lat=-35.43,
+    weather_lon=-71.66,
+    # A hot, dry, windy reference afternoon at Talca (ERA5): 37.4 C, 13 % RH, 24.6 km/h from the SSW at 17:00.
+    weather_first_day="2025-02-08",
+    weather_last_day="2025-02-09",
+    weather_summary=("2025-02-08T12:00", "2025-02-08T20:00"),
+    sources={
+        "Relieve": _COPERNICUS_DEM.format(tiles="S36 W072"),
+        "Cobertura de suelo / combustible": (
+            "ESA WorldCover 10 m 2021 v200 (https://esa-worldcover.org/), © ESA WorldCover project 2021 / Contiene "
+            "datos Copernicus Sentinel modificados (2021), CC BY 4.0. Clase mayoritaria por celda de 60 m. Zonas "
+            "urbanas divididas en interfaz (casas entre vegetación: >= 40 % de vegetación en 180 m, según WorldCover y "
+            "NDVI de Sentinel-2 del 18-03-2026, escena reciente sin nubes, tile 19HBA) y ciudad consolidada (el resto)."
+        ),
+        "Edificaciones": (
+            f"Overture Maps Foundation, buildings, release {OVERTURE_RELEASE} (https://overturemaps.org/), ODbL 1.0 "
+            "(incluye OpenStreetMap y huellas derivadas de Microsoft y Google). Huellas actuales."
+        ),
+        "Calles": "© OpenStreetMap contributors, vía Overpass API (https://www.openstreetmap.org/copyright), ODbL 1.0. Red actual.",
+        "Meteorología": _OPEN_METEO.format(lat=-35.43, lon=-71.66, tz="America/Santiago")
+        + ". Día de referencia caluroso, seco y ventoso: 8 de febrero de 2025. El escenario no reproduce un incendio "
+        "ocurrido ese día.",
+        "Foco hipotético": TALCA_SOURCE_IGNITION,
+    },
+    ignitions=(
+        {
+            "id": "talca-hipotetico-sso",
+            "label": "Foco hipotético: pastizal al suroeste de Talca",
+            "lon": -71.72,
+            "lat": -35.505,  # valley floor, 104 m, WorldCover grassland
+            "timeLocal": "2025-02-08T14:00",
+            "source": TALCA_SOURCE_IGNITION,
+        },
+    ),
+    population=True,
+)
+
+EVENTS = {e.id: e for e in (VINA_2024, EATON_2025, TALCA)}
 DEFAULT = VINA_2024.id

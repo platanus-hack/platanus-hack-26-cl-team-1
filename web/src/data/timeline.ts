@@ -13,18 +13,25 @@ export const TODAY_START = '00:00'
 export const TODAY_HORIZON_MIN = 24 * 60
 
 /** What the worker needs to rebuild the UI's view of the dataset (sent once, with init). */
-export type TimelineChoice = { id: typeof TIMELINE.VINA_2024 } | { id: typeof TIMELINE.EATON_2025 } | { id: typeof TIMELINE.TODAY; forecast: Forecast }
+export type TimelineChoice =
+  | { id: typeof TIMELINE.VINA_2024 }
+  | { id: typeof TIMELINE.EATON_2025 }
+  | { id: typeof TIMELINE.TALCA }
+  | { id: typeof TIMELINE.TODAY; forecast: Forecast }
 
 /** The 2024 choice as one shared object: the explorer re-creates its worker when the choice's identity changes. */
 export const VINA_2024_CHOICE: TimelineChoice = { id: TIMELINE.VINA_2024 }
 /** Same for the Eaton fire (its own baked event, src/data/events.ts). */
 export const EATON_2025_CHOICE: TimelineChoice = { id: TIMELINE.EATON_2025 }
+/** Same for the hypothetical Talca scenario. */
+export const TALCA_CHOICE: TimelineChoice = { id: TIMELINE.TALCA }
 
 /** Order and labels of the scenario picker (`short` on narrow screens). */
 export const TIMELINE_OPTIONS: { value: TimelineId; label: string; short: string }[] = [
   { value: TIMELINE.TODAY, label: 'Desde hoy (pronóstico)', short: 'Desde hoy' },
   { value: TIMELINE.VINA_2024, label: '2 feb 2024 · Viña del Mar', short: '2 feb 2024' },
   { value: TIMELINE.EATON_2025, label: '7 ene 2025 · Eaton, California', short: 'Eaton 2025' },
+  { value: TIMELINE.TALCA, label: 'Talca, Maule · hipotético', short: 'Talca (hipot.)' },
 ]
 
 export function isTimelineId(v: string | null): v is TimelineId {

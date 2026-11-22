@@ -1,5 +1,5 @@
 # Entry points. Needs uv and Node 24 + pnpm (corepack enable, or npm i -g pnpm).
-.PHONY: install dev data population bomberos test lint check validate validate-eaton build
+.PHONY: install dev data data-talca population bomberos test lint check validate validate-eaton build
 
 install: ## Install every part
 	cd web && pnpm install
@@ -10,6 +10,9 @@ dev: ## Web app on :5173
 
 data: ## Re-bake web/public/data from the open sources (downloads; slow the first time)
 	cd pipeline && uv run python bake.py
+
+data-talca: ## Re-bake the hypothetical Talca scenario (web/public/data/talca/)
+	cd pipeline && uv run python bake.py --event talca
 
 population: ## Re-bake where people are by time of day: all of Chile + the simulation grid (~80 MB of downloads)
 	cd pipeline && uv run python bake_population.py

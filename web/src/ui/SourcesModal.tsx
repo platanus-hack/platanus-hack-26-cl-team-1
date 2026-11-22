@@ -93,7 +93,7 @@ export function SourcesModal({ data, onClose }: { data: Dataset; onClose: () => 
           </li>
           <li>Zona segura: punto de la red lejos de vegetación combustible y que no se quema en el escenario.</li>
           <li>
-            Valores por defecto de este incendio: alerta a las {minToHHMM(data.grid.t0, data.defaultAlertMin)} ({sourceOf(ev.alertMin.source)});{' '}
+            Valores por defecto de este {data.event.observedFire ? 'incendio' : 'escenario'}: alerta a las {minToHHMM(data.grid.t0, data.defaultAlertMin)} ({sourceOf(ev.alertMin.source)});{' '}
             {fmtDec(ev.personsPerHousehold.value)} personas por hogar ({sourceOf(ev.personsPerHousehold.source)}); {Math.round(ev.footShare.value * 100)} % de
             los hogares a pie ({sourceOf(ev.footShare.source)}).
           </li>
@@ -103,9 +103,15 @@ export function SourcesModal({ data, onClose }: { data: Dataset; onClose: () => 
         <ul>
           <li>Es un modelo simplificado: no reproduce el comportamiento real del fuego ni de las personas, y no reemplaza la planificación profesional.</li>
           <li>
-            El clima es una serie horaria en un solo punto (reanálisis ERA5 para el 2 feb 2024; pronóstico de Open-Meteo para el escenario desde hoy),
-            no el viento local en cada quebrada.
+            El clima es una serie horaria en un solo punto (reanálisis ERA5 para el 2 feb 2024 y para el día de referencia de Talca; pronóstico de
+            Open-Meteo para el escenario desde hoy), no el viento local en cada quebrada.
           </li>
+          {data.timeline === TIMELINE.TALCA && (
+            <li>
+              El escenario de Talca es hipotético: el punto de inicio fue elegido para la demostración, el modelo de fuego se calibró solo con el incendio
+              de Viña del Mar 2024 y no tiene validación local. El combustible es el de ESA WorldCover 2021.
+            </li>
+          )}
           <li>
             El escenario desde hoy es hipotético: usa el pronóstico sin la corrección de viento calibrada para 2024, los puntos de inicio de 2024 y el
             combustible de antes de ese incendio: en el área quemada en 2024 supone la vegetación previa, no la actual (quemada y en rebrote).

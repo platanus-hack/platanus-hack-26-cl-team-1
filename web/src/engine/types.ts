@@ -105,11 +105,15 @@ export interface IgnitionPreset {
  *    (fetched in the browser, src/data/forecast.ts), the 2024 ignition points at the same time of day, and no
  *    satellite detections. src/data/timeline.ts builds it.
  *  - EATON_2025: the Eaton fire (Altadena / Pasadena, California, 7 Jan 2025 18:00 to 8 Jan 12:00 Pacific time),
- *    its own baked files in public/data/eaton-2025/ (another territory: src/data/events.ts). */
+ *    its own baked files in public/data/eaton-2025/ (another territory: src/data/events.ts).
+ *  - TALCA: a hypothetical fire around Talca (Maule region) on a hot reference day (ERA5 weather of
+ *    8 Feb 2025, 12:00-24:00) with one hypothetical ignition point; its own baked files in public/data/talca/.
+ *    No fire was observed there: no scar (scar.bin is all "no data"), no FIRMS, no validation. */
 export const TIMELINE = {
   TODAY: 'hoy',
   VINA_2024: 'vina-2024',
   EATON_2025: 'eaton-2025',
+  TALCA: 'talca',
 } as const
 export type TimelineId = (typeof TIMELINE)[keyof typeof TIMELINE]
 

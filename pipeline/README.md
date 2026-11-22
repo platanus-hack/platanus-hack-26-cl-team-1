@@ -8,6 +8,7 @@ this pipeline writes exactly that and re-reads every file at the end to check it
 cd pipeline
 uv run python bake.py            # Viña del Mar 2024 -> web/public/data/ (~8 s warm; ~3-4 min from scratch)
 uv run python bake.py --event eaton-2025  # Eaton 2025 -> web/public/data/eaton-2025/ (~2 min warm, ~11 cold)
+uv run python bake.py --event talca  # Talca, hypothetical -> web/public/data/talca/ (~7 s warm, ~2 min cold)
 uv run python bake.py --refresh  # wipe the event's download cache first and re-download everything
 uv run python bake_population.py # national population product + the grid's two layers (~25 s warm, ~80 MB cold)
 uv run python population_report.py  # totals and day/night checks quoted in the population MODEL.md
@@ -40,6 +41,13 @@ default, `vina-2024`, so `bake_population.py`, `population_report.py` and the te
 |---|---|---|---|
 | `vina-2024` (default) | `web/public/data/` | `pipeline/.cache/` | everything below except the `eaton-2025/` validation files |
 | `eaton-2025` | `web/public/data/eaton-2025/` | `pipeline/.cache/eaton-2025/` | the ten base files + `perimeter.bin` + `dins.json`; no population, no brigades (later) |
+| `talca` (hypothetical) | `web/public/data/talca/` | `pipeline/.cache/talca/` | the base files except `goes.json` (`scar.bin` all 255, `firms.json` `[]`) + population; no brigades |
+
+An event either has an **observed fire** (every field of `events.FIRE_FIELDS` set: post-fire Sentinel-2 scene,
+scar parameters, FIRMS and GOES windows) or none of them (`Event.observed_fire` False, a hypothetical scenario);
+a mix stops at import. A hypothetical scenario needs fixed ignition presets, and its bake writes `scar.bin` as
+all 255 ("no data": there was no fire to observe), `firms.json` as `[]` and no `goes.json`; `validate_outputs`
+checks exactly that.
 
 Both events use the same global sources, so they are comparable; US-only data (the official perimeter, CAL FIRE
 damage inspections) is used for validation only. `--refresh` wipes only the selected event's cache (Viña's keeps the other events'
@@ -296,7 +304,30 @@ reading the 198 GOES files).
   structures, all inside the grid: 9,419 destroyed, 70 major, 148 minor, 858 affected, 7,893 no damage,
   40 inaccessible (the service's closed `DAMAGE` domain; any other value stops the bake).
 
-## Sources and licences
+## Talca, hypothetical (`--event talca`)
+
+No fire is replayed: a demo scenario in the Maule region on a hot reference day, with one hypothetical ignition.
+Same steps and methods; the fire-only steps are skipped (see "Events"). Measured on the bake of 2026-11-22.
+
+- **Grid and clock**: `latMax = -35.305`, `lonMin = -71.905`, 464 x 529 cells of 60 m (`ref_lat` 35.43; to about
+  lat -35.555, lon -71.555), `t0 = 2025-02-08T12:00:00-03:00`. The box holds Talca's whole built-up area (with
+  Maule Norte), Maule, Pencahue, the grass and crop valley and hills SW of the city (upwind of the summer afternoon wind) and
+  the wooded hills across the Río Claro. WorldCover majority class: 29 % tree, 34 % grass, 2 % shrub, 27 % crop,
+  6 % built-up, 1 % water / bare.
+- **elevation.bin**: GLO-30 tile `S36_00_W072_00`; 31-621 m.
+- **fuel.bin**: WorldCover tile `S36W072`; NDVI from `S2B_19HBA_20260318_0_L2A` (a recent scene with 0.001 %
+  cloud over the grid; tile 19HBA is the only one that covers the whole box). Same WUI rule: 7,909 intermix and
+  8,001 consolidated cells.
+- **buildings.bin**: Overture `2026-11-18.0`, 150,320 buildings.
+- **roads.json**: current OSM, 22,973 nodes and 31,488 edges after clipping (4.1 MB).
+- **weather.json**: Open-Meteo archive at -35.43, -71.66 (answered at -35.466, -71.654), 8-9 Feb 2025 (48 h).
+  12:00-20:00 on 8 Feb: 27-37 °C, RH 34-13 %, wind 15-25 km/h from the SSW (201-210°), gusts up to 52 km/h. Chosen
+  as a hot, dry, windy reference afternoon; days on which a real fire is known to have burned in Maule were
+  left out (25 Jan 2017, 11 Jan 2026).
+- **ignitions.json**: one hypothetical preset at 14:00 on WorldCover grassland on the valley floor (104 m),
+  2 km WNW of the town of Maule and 10 km SW of Talca's centre (-35.505, -71.72), labelled as a point chosen for
+  the demo; under that afternoon's SSW wind the fire runs NNE into the city's south-west side.
+- **population_{home,work}.bin**: from the committed national product: 306,396 residents in the grid.
 
 - Copernicus DEM GLO-30: © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018, provided
   under COPERNICUS by the European Union and ESA; free licence. https://registry.opendata.aws/copernicus-dem/

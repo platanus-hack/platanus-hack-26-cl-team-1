@@ -249,3 +249,10 @@ def bake(firms_points: list[dict], fuel: np.ndarray) -> dict:
         "negative_reflectance_share": {k: f"{v:.1%}" for k, v in neg.items()},
         f"viirs_{days[0]}..{days[-1]}_within_400m_of_scar": f"{agree:.1%} of {len(fc)}",
     }
+
+
+def write_no_data() -> dict:
+    """scar.bin for a hypothetical scenario (Event.observed_fire False): every cell 255, "no data". There was no
+    fire to observe, so nothing is marked burned or unburned; the app hides the scar layer for such events."""
+    np.full(grid.N_CELLS, 255, dtype=np.uint8).tofile(grid.OUT_DIR / "scar.bin")
+    return {"no_data_cells": grid.N_CELLS, "reason": "no observed fire (hypothetical scenario)"}

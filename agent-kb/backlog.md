@@ -20,6 +20,8 @@ Owner in brackets once someone takes an item. Project: Cortafuego (D-019). The O
 - [ ] **Pitch (3 min):** sober opening on 2 Feb 2024, live demo (wind, humidity, firebreak, alert time), the
   validation number, who pays (comunas under Ley 21.364, forestry companies, distributors, insurers). [team]
   - The site now opens on today's forecast (D-028): open the demo at `https://cortafuego.app/?escenario=vina-2024`.
+  - Hypothetical Maule demo (D-032): `https://cortafuego.app/?escenario=talca` (Talca, 8 Feb 2025 weather,
+    one hypothetical ignition at 14:00). [Anaís + agent]
 
 ## Next
 - [ ] Western stall of 14:05–16:25 (satellite) not reproduced: needs a cause the data shows (initial attack?
