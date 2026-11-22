@@ -9,7 +9,8 @@
 //   pnpm lines                         # 5, 10 and 20 km of line
 //   pnpm lines --budgets 10 --quick    # one budget, fewer proposals (a smoke run)
 //   pnpm lines --dispatch file,13:00   # crews leave at brigades.json's time, and (another case) at 13:00
-import { readFileSync } from 'node:fs'
+//   pnpm lines --out /tmp/lines.json   # also write the lines found (cell indices and finishing times)
+import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { EVENTS } from '../../data/events'
 import { parseBrigades, parseBuildings, parseElevation, parseFuel, parseGrid, parseIgnitions, parsePlan, parseRoads, parseWeather } from '../../data/load'
@@ -30,7 +31,7 @@ const secs = (t: number) => ((performance.now() - t) / 1000).toFixed(1)
 // ---------------------------------------------------------------------------------------------------------
 const args = process.argv.slice(2)
 const FLAGS = ['--quick']
-const OPTIONS = ['--budgets', '--crews', '--dispatch', '--random']
+const OPTIONS = ['--budgets', '--crews', '--dispatch', '--random', '--out']
 function arg(name: string): string | undefined {
   const i = args.indexOf(name)
   if (i < 0) return undefined
@@ -128,6 +129,9 @@ const HELD_OUT: Member[] = [
 const MEMBERS = [...DESIGN, ...HELD_OUT]
 const DESIGN_IDX = DESIGN.map((_, k) => k)
 const HELD_IDX = HELD_OUT.map((_, k) => DESIGN.length + k)
+/** Design members that change only the wind, and those that only move the ignitions. */
+const WEATHER_IDX = DESIGN_IDX.filter((k) => k > 0 && DESIGN[k].shiftM[0] === 0 && DESIGN[k].shiftM[1] === 0)
+const MOVED_IDX = DESIGN_IDX.filter((k) => DESIGN[k].shiftM[0] !== 0 || DESIGN[k].shiftM[1] !== 0)
 const NO_FIREBREAK = rasteriseFirebreaks(grid, scenario.firebreaks)
 const SNAP_CELLS = 10
 
@@ -456,13 +460,23 @@ interface Line {
   readyMin: Float64Array
   note: string
 }
-function search(d: Design, mode: Mode, props: Proposal[], budgetCells: number): Line {
+/** What a search hands to the search of the next (larger) budget: its line and the pieces it tried, so that
+ *  more line never gives a worse result on what the search minimises. */
+interface Carry {
+  cells: Int32Array
+  pool: Int32Array[]
+}
+function search(d: Design, mode: Mode, props: Proposal[], budgetCells: number, carry: Carry | null): { line: Line; carry: Carry } {
   const t = performance.now()
   const fits = props.filter((p) => p.cells.length <= budgetCells)
-  // Per threshold, the two largest proposals inside the budget, scored on the real engines.
-  const shortlist: Proposal[] = []
-  for (const untilMin of mode.untilMin) shortlist.push(...fits.filter((p) => p.untilMin === untilMin).sort((a, b) => b.cells.length - a.cells.length).slice(0, 2))
-  let start: Proposal | null = null
+  // Per threshold, the two largest proposals inside the budget, scored on the real engines; and the line the
+  // smaller budget ended with.
+  const shortlist: { label: string; cells: Int32Array }[] = []
+  for (const untilMin of mode.untilMin)
+    for (const p of fits.filter((q) => q.untilMin === untilMin).sort((a, b) => b.cells.length - a.cells.length).slice(0, 2))
+      shortlist.push({ label: `the cut to ${hhmm(p.untilMin)} at ${p.lambda} cells per household (${km(p.cells.length).toFixed(1)} km)`, cells: p.cells })
+  if (carry && carry.cells.length > 0) shortlist.push({ label: `the line of the smaller budget (${km(carry.cells.length).toFixed(1)} km)`, cells: carry.cells })
+  let start: { label: string; cells: Int32Array } | null = null
   let startScore = objective(d, mode, new Int32Array(0))
   for (const p of shortlist) {
     const s = objective(d, mode, p.cells)
@@ -474,7 +488,11 @@ function search(d: Design, mode: Mode, props: Proposal[], budgetCells: number): 
   const pieces = new Map<string, Int32Array>()
   for (const p of props.filter((q) => q.cells.length <= 3 * budgetCells))
     for (const seg of lineSegments(rows, cols, p.cells)) if (seg.length <= budgetCells) pieces.set(Array.from(seg).join(','), seg)
-  const pool = [...pieces.values()].sort((a, b) => b.length - a.length).slice(0, POOL_MAX)
+  // The largest pieces of this budget, plus every piece the smaller budgets tried.
+  const poolByKey = new Map<string, Int32Array>()
+  for (const seg of [...pieces.values()].sort((a, b) => b.length - a.length).slice(0, POOL_MAX)) poolByKey.set(Array.from(seg).join(','), seg)
+  for (const seg of carry?.pool ?? []) poolByKey.set(Array.from(seg).join(','), seg)
+  const pool = [...poolByKey.values()]
   const r = refineLine({
     start: start ? lineSegments(rows, cols, start.cells) : [],
     pool,
@@ -484,9 +502,12 @@ function search(d: Design, mode: Mode, props: Proposal[], budgetCells: number): 
     maxAddRounds: ADD_ROUNDS,
   })
   return {
-    cells: r.cells,
-    readyMin: mode.ready(d, r.cells),
-    note: `${start ? `starts from the cut to ${hhmm(start.untilMin)} at ${start.lambda} cells per household (${km(start.cells.length).toFixed(1)} km)` : 'no proposal inside the budget helps'}; dropped ${r.dropped} pieces, added ${r.added}; ${r.evaluations} engine checks, ${secs(t)} s`,
+    line: {
+      cells: r.cells,
+      readyMin: mode.ready(d, r.cells),
+      note: `${start ? `starts from ${start.label}` : 'no proposal inside the budget helps on its own'}; dropped ${r.dropped} pieces, added ${r.added} of ${pool.length}; ${r.evaluations} engine checks, ${secs(t)} s`,
+    },
+    carry: { cells: r.cells, pool },
   }
 }
 
@@ -547,21 +568,43 @@ function rowOfLine(label: string, line: Line): Row {
   return { label, cells: line.cells.length, saved: MEMBERS.map((_, k) => base[k].trapped - trappedWith(k, line.cells, line.readyMin)) }
 }
 function printRows(rowsOut: Row[]) {
-  console.log(`    ${'measure'.padEnd(34)} ${'km'.padStart(5)} ${'scenario'.padStart(9)} ${'ens. mean'.padStart(9)} ${'ens. worst'.padStart(10)} ${'unseen mean'.padStart(11)} ${'unseen worst'.padStart(12)}`)
+  console.log(
+    `    ${'measure'.padEnd(34)} ${'km'.padStart(5)} ${'scenario'.padStart(9)} ${'wind/dir.'.padStart(9)} ${'ign. moved'.padStart(10)} ${'ens. mean'.padStart(9)} ${'ens. worst'.padStart(10)} ${'unseen mean'.padStart(11)} ${'unseen worst'.padStart(12)}`,
+  )
   for (const r of rowsOut) {
     const e = stat(DESIGN_IDX.map((k) => r.saved[k]))
     const h = stat(HELD_IDX.map((k) => r.saved[k]))
-    const pct = (x: number, k: number[]) => `${x.toFixed(0)}`.padStart(6) + ` ${((100 * x) / stat(k.map((q) => base[q].trapped)).mean).toFixed(0).padStart(2)}%`
+    // Mean households saved over some members, and its share of their mean baseline.
+    const pct = (k: number[]) => {
+      const x = stat(k.map((q) => r.saved[q])).mean
+      return `${x.toFixed(0)}`.padStart(6) + ` ${((100 * x) / stat(k.map((q) => base[q].trapped)).mean).toFixed(0).padStart(2)}%`
+    }
     console.log(
-      `    ${r.label.padEnd(34)} ${km(r.cells).toFixed(1).padStart(5)} ${pct(r.saved[0], [0]).padStart(9)} ${pct(e.mean, DESIGN_IDX).padStart(9)} ${e.min.toFixed(0).padStart(10)} ${pct(h.mean, HELD_IDX).padStart(11)} ${h.min.toFixed(0).padStart(12)}`,
+      `    ${r.label.padEnd(34)} ${km(r.cells).toFixed(1).padStart(5)} ${pct([0]).padStart(9)} ${pct(WEATHER_IDX).padStart(9)} ${pct(MOVED_IDX).padStart(10)} ${pct(DESIGN_IDX).padStart(9)} ${e.min.toFixed(0).padStart(10)} ${pct(HELD_IDX).padStart(11)} ${h.min.toFixed(0).padStart(12)}`,
     )
   }
 }
 
 const cellHa = (cellM * cellM) / 1e4
 console.log(`\nhouseholds saved = households cut off without the measure minus with it (expectedTrappedHouseholds); % of the baseline of the same members`)
-console.log(`ensemble = the ${DESIGN.length} design members (the scenario, wind x0.8 / x1.2, direction +-10 deg, ignitions moved 1 km N/E/S/W); unseen = ${HELD_OUT.length} members no search saw`)
+console.log(`ensemble = the ${DESIGN.length} design members: the scenario, wind/dir. (wind x0.8 / x1.2, direction +-10 deg) and ign. moved (ignitions 1 km N/E/S/W); unseen = ${HELD_OUT.length} members no search saw`)
 const detail: { title: string; row: Row }[] = []
+/** The lines found, for --out: cell indices (row-major) and when each is finished (minutes since t0; null = in
+ *  place before the fire). */
+const saved: { case: string; budgetKm: number; search: string; km: number; cells: number[]; readyMin: (number | null)[] }[] = []
+/** Where a line is: its pieces and how far its cells are from the scenario's ignition points. */
+function whereIs(cells: Int32Array): string {
+  let lo = Infinity
+  let hi = 0
+  for (const i of cells) {
+    let d = Infinity
+    for (const g of memberIgnitions[0]) d = Math.min(d, Math.hypot(Math.floor(i / cols) - Math.floor(g.cell / cols), (i % cols) - (g.cell % cols)) * cellM)
+    lo = Math.min(lo, d)
+    hi = Math.max(hi, d)
+  }
+  const segs = lineSegments(rows, cols, cells)
+  return `${segs.length} pieces (the longest ${km(segs[0].length).toFixed(1)} km), ${(lo / 1000).toFixed(1)} to ${(hi / 1000).toFixed(1)} km from the nearest ignition point of the scenario`
+}
 for (const mode of MODES) {
   console.log(`\n=== ${mode.name} ===`)
   const props = new Map<Design, Proposal[]>()
@@ -569,13 +612,18 @@ for (const mode of MODES) {
     console.log(`  search ${d.name}:`)
     props.set(d, proposals(d, mode))
   }
-  for (const budgetKm of BUDGETS_KM) {
+  const carry = new Map<Design, Carry>()
+  for (const budgetKm of [...BUDGETS_KM].sort((a, b) => a - b)) {
     const budgetCells = Math.floor((budgetKm * 1000) / cellM)
     console.log(`\n  budget ${budgetKm} km of line (${budgetCells} cells, ${(budgetCells * cellHa).toFixed(0)} ha at the grid's 60 m):`)
     const out: Row[] = []
     for (const d of DESIGNS) {
-      const line = search(d, mode, props.get(d)!, budgetCells)
+      const found = search(d, mode, props.get(d)!, budgetCells, carry.get(d) ?? null)
+      carry.set(d, found.carry)
+      const line = found.line
       console.log(`    ${d.name}: ${line.note}`)
+      if (line.cells.length > 0) console.log(`      ${whereIs(line.cells)}`)
+      saved.push({ case: mode.name, budgetKm, search: d.name, km: km(line.cells.length), cells: Array.from(line.cells), readyMin: Array.from(line.readyMin, (x) => (Number.isFinite(x) ? Math.round(x * 10) / 10 : null)) })
       if (mode !== PREBUILT && line.cells.length > 0) {
         const fin = Array.from(line.readyMin).filter(Number.isFinite)
         const jobsLate = Array.from(line.cells).filter((c, q) => line.readyMin[q] > d.near[c] - MARGIN).length
@@ -619,4 +667,9 @@ console.log('\nper member (households saved):')
 console.log(`  ${'line'.padEnd(78)} ${MEMBERS.map((_, k) => `m${k}`.padStart(6)).join('')}`)
 for (const { title, row } of detail) console.log(`  ${title.padEnd(78)} ${row.saved.map((x) => x.toFixed(0).padStart(6)).join('')}`)
 console.log(`  members: ${MEMBERS.map((m, k) => `m${k} ${m.name}`).join('; ')}`)
+const OUT = arg('--out')
+if (OUT !== undefined) {
+  writeFileSync(OUT, JSON.stringify({ event: event.id, grid: { rows, cols, cellM, t0: grid.t0 }, lines: saved }))
+  console.log(`\nwrote ${saved.length} lines to ${OUT}`)
+}
 console.log(`\n${fireRuns} fire runs, ${secs(T0)} s in all. The lines are the best this search found, checked by the simulator; they are not an optimum.`)
