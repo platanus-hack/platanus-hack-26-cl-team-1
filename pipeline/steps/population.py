@@ -61,9 +61,7 @@ GHSL_TILES = [f"R{r}_C{c}" for r in range(11, 16) for c in (11, 12)] + ["R12_C8"
 # coarse coastline would drop coastal cities (a 1:10M Chile outline misses ~144k residents of Punta Arenas and
 # Chiloe); there are no non-residential buildings at sea for an imprecise coastline to let in.
 NEIGHBOURS = ["ARG", "BOL", "PER"]
-NEIGHBOUR_URL = (
-    "https://github.com/wmgeolab/geoBoundaries/raw/main/releaseData/gbOpen/{c}/ADM0/geoBoundaries-{c}-ADM0_simplified.geojson"
-)
+NEIGHBOUR_URL = "https://github.com/wmgeolab/geoBoundaries/raw/main/releaseData/gbOpen/{c}/ADM0/geoBoundaries-{c}-ADM0_simplified.geojson"
 
 CACHE = grid.CACHE_DIR / "population"
 NATIONAL_DIR = grid.OUT_DIR / "national"
@@ -213,9 +211,7 @@ def gravity(
     return work + stay, stay
 
 
-def supersample_bin(
-    values: np.ndarray, lon_w: float, lat_n: float, px_deg: float, s: int, cell_index
-) -> np.ndarray:
+def supersample_bin(values: np.ndarray, lon_w: float, lat_n: float, px_deg: float, s: int, cell_index) -> np.ndarray:
     """Split each pixel of `values` (row 0 north; pixel (r, c) spans lon_w + c px .. +1, lat_n - r px .. -1) into
     s x s sub-pixels of value / s^2 and sum them into the simulation grid cell holding each sub-pixel centre
     (cell_index(lon, lat) -> flat index, -1 outside). Returns Float64 (N_CELLS,)."""
@@ -364,14 +360,19 @@ def bake_national() -> dict:
 def load_national() -> tuple[NationalGrid, dict, dict[str, np.ndarray]]:
     """Reads the committed national product. Raises if it is missing or inconsistent."""
     if not NATIONAL_JSON.exists() or not NATIONAL_BIN.exists():
-        raise RuntimeError(f"{NATIONAL_JSON} missing: run `make population` (cd pipeline && uv run python bake_population.py)")
+        raise RuntimeError(
+            f"{NATIONAL_JSON} missing: run `make population` (cd pipeline && uv run python bake_population.py)"
+        )
     meta = json.loads(NATIONAL_JSON.read_text())
     n = meta["n"]
     raw = np.fromfile(NATIONAL_BIN, dtype="u1")
     if raw.size != 16 * n:
         raise RuntimeError(f"{NATIONAL_BIN.name}: {raw.size} bytes, expected {16 * n}")
     cells = raw[: 4 * n].view("<u4").astype(np.int64)
-    layers = {k: raw[4 * n * (i + 1) : 4 * n * (i + 2)].view("<f4").astype(np.float64) for i, k in enumerate(("home", "work", "nres"))}
+    layers = {
+        k: raw[4 * n * (i + 1) : 4 * n * (i + 2)].view("<f4").astype(np.float64)
+        for i, k in enumerate(("home", "work", "nres"))
+    }
     ng = NationalGrid(meta["lonMin"], meta["latMax"], meta["rows"] * BLOCK, meta["cols"] * BLOCK)
     if ng.rows != meta["rows"] or ng.cols != meta["cols"]:
         raise RuntimeError("population_cl.json: rows/cols inconsistent")
@@ -421,7 +422,11 @@ def bake_domain() -> dict:
     # Per national cell: home is WorldPop as is. Work = NRES pixel share of the cell's workers where the cell has
     # non-residential volume, else the stay-at-home residents in proportion to home.
     home_cell = lookup["home"][parent_pop]
-    stay_frac = np.where((lookup["nres"][parent_pop] == 0) & (home_cell > 0), lookup["work"][parent_pop] / np.maximum(home_cell, 1e-30), 0.0)
+    stay_frac = np.where(
+        (lookup["nres"][parent_pop] == 0) & (home_cell > 0),
+        lookup["work"][parent_pop] / np.maximum(home_cell, 1e-30),
+        0.0,
+    )
     work_from_home = pop * stay_frac
 
     nres_px = []

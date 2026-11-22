@@ -20,6 +20,7 @@ test: ## All tests
 
 lint: ## Lint and type checks
 	uvx ruff@0.8.6 check pipeline
+	uvx ruff@0.8.6 format --check pipeline
 	cd web && pnpm typecheck
 
 build: ## Production build of the static site (web/dist)
