@@ -10,6 +10,8 @@ Owner in brackets once someone takes an item. Project: Cortafuego (D-019). The O
   the pitch; tune `rosMultiplier` and the per-fuel factors, in-sample, and say so. [Alonso + agents]
 - [ ] **Submission files:** `project-description.md`, the one-liner and description in the jsonc, a 1000×1000
   logo (≤ 500 KB), a short README written by the team. [team]
+  - Logo ready (D-025): `project-logo.svg` and `project-logo.png` (1000×1000, 58.9 KB); remaining submission
+    text still needs the team's review.
 - [ ] **Pitch (3 min):** sober opening on 2 Feb 2024, live demo (wind, humidity, firebreak, alert time), the
   validation number, who pays (comunas under Ley 21.364, forestry companies, distributors, insurers). [team]
 

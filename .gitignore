@@ -20,3 +20,6 @@ tmp/
 
 # Cortafuego data pipeline download cache
 pipeline/.cache/
+
+# Local Codex config: holds the hackathon proxy URL with its key. Never commit it.
+.codex/
