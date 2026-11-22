@@ -140,12 +140,14 @@ describe('timelines', () => {
 
   it('today keeps the 2024 fire companies, with dispatch, reinforcement and cut times at the same time of day', () => {
     const b = base.brigades
+    if (!b) throw new Error('the synthetic dataset ships brigades')
     const withCut = {
       ...base,
       brigades: { ...b, cuts: [{ id: 'c', label: 'Ruta', lines: [], fromLocal: '2024-02-02T17:00', toLocal: '2024-02-03T01:00', source: 's' }] },
     }
-    const d = todayDataset(withCut, forecast)
+    const today = todayDataset(withCut, forecast)
     const hhmm = (x: string) => x.slice(11, 16)
+    const d = { brigades: today.brigades! }
     expect(d.brigades.stations).toBe(b.stations)
     expect(d.brigades.dispatch.map((x) => hhmm(x.dispatchLocal))).toEqual(b.dispatch.map((x) => hhmm(x.dispatchLocal)))
     expect(d.brigades.reinforcements.map((x) => x.arrivalLocal)).toEqual(b.reinforcements.map((x) => `2026-11-22T${hhmm(x.arrivalLocal)}`))

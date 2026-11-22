@@ -1,5 +1,6 @@
-"""goes.json: GOES-16 ABI fire pixels (L2 Fire Detection and Characterization, full disk, every 10 min) whose
-centre falls in the grid, from 2 Feb 2024 12:00 to 3 Feb 04:00 local. Same record shape as firms.json. Used only
+"""goes.json: GOES ABI fire pixels (L2 Fire Detection and Characterization, full disk, every 10 min) whose
+centre falls in the grid, over the event's window (grid.EVENT.goes_*; Viña: GOES-16, 2 Feb 2024 12:00 to 3 Feb
+04:00 local; Eaton: GOES-18, 7 Jan 2025 16:00 to 9 Jan 01:00 local). Same record shape as firms.json. Used only
 to score the pace of the simulated fire (web/src/engine/fire/calibrate.ts); the browser app does not load it.
 
 Files come from the public NOAA bucket on AWS (no key) and are cached in .cache/goes/. Pixel centres are
@@ -19,22 +20,13 @@ import requests
 
 from . import grid
 
-BUCKET = "https://noaa-goes16.s3.amazonaws.com"
+BUCKET = "https://{bucket}.s3.amazonaws.com"
 PRODUCT = "ABI-L2-FDCF"
-SATELLITE = "GOES-16 ABI"
-UTC_OFFSET_H = -3  # Chile summer time (CLST) in February 2024
-FIRST_UTC = datetime(2024, 2, 2, 15)  # 2 Feb 12:00 local
-LAST_UTC = datetime(2024, 2, 3, 6)  # 3 Feb 03:00-04:00 local (last hour included)
 FILES_PER_HOUR = 6  # mode 6 full disk: one scan every 10 min
 MID_SCAN_MIN = 5  # a full-disk scan takes 10 min; the time recorded is the middle of it
 # Fire categories of the Mask variable: good, saturated, cloud-contaminated, high and medium probability, plain
 # and temporally filtered. Low probability (15, 35) is left out: it is where most false alarms are.
 FIRE_MASK_CODES = frozenset({10, 11, 12, 13, 14, 30, 31, 32, 33, 34})
-SOURCE = (
-    "NOAA GOES-16 ABI L2 Fire Detection and Characterization (ABI-L2-FDCF), disco completo cada 10 min, "
-    "píxel ~2 km, vía NOAA Open Data Dissemination en AWS (https://registry.opendata.aws/noaa-goes/). "
-    "Datos públicos de NOAA. Solo se usa para medir el ritmo del fuego simulado."
-)
 
 
 def fixed_grid_to_lonlat(
@@ -69,13 +61,17 @@ def scan_time_local(name: str) -> str:
         raise RuntimeError(f"goes: no scan start time in file name {name!r}")
     year, doy, hh, mm, ss = (int(g) for g in m.groups())
     utc = datetime(year, 1, 1) + timedelta(days=doy - 1, hours=hh, minutes=mm, seconds=ss)
-    local = utc + timedelta(hours=UTC_OFFSET_H, minutes=MID_SCAN_MIN)
+    local = utc + timedelta(hours=grid.EVENT.utc_offset_h, minutes=MID_SCAN_MIN)
     return local.strftime("%Y-%m-%dT%H:%M")
+
+
+def _bucket() -> str:
+    return BUCKET.format(bucket=grid.EVENT.goes_bucket)
 
 
 def _hour_keys(t: datetime) -> list[str]:
     prefix = f"{PRODUCT}/{t.year}/{t.timetuple().tm_yday:03d}/{t.hour:02d}/"
-    r = requests.get(BUCKET, params={"list-type": "2", "prefix": prefix}, timeout=120)
+    r = requests.get(_bucket(), params={"list-type": "2", "prefix": prefix}, timeout=120)
     r.raise_for_status()
     keys = re.findall(r"<Key>([^<]+\.nc)</Key>", r.text)
     if len(keys) < FILES_PER_HOUR:
@@ -91,19 +87,26 @@ def _files() -> list:
     if listing.exists():
         keys = json.loads(listing.read_text())
     else:
-        keys, t = [], FIRST_UTC
-        while t <= LAST_UTC:
+        keys, t = [], grid.EVENT.goes_first_utc
+        while t <= grid.EVENT.goes_last_utc:
             keys += _hour_keys(t)
             t += timedelta(hours=1)
         listing.write_text(json.dumps(keys))
-    paths = []
-    for k in keys:
-        path = cache / k.rsplit("/", 1)[1]
-        if not path.exists():
-            r = requests.get(f"{BUCKET}/{k}", timeout=300)
+    paths = [cache / k.rsplit("/", 1)[1] for k in keys]
+    missing = [(k, p) for k, p in zip(keys, paths) if not p.exists()]
+    if missing:
+        from concurrent.futures import ThreadPoolExecutor
+
+        def get(kp) -> None:
+            k, p = kp
+            r = requests.get(f"{_bucket()}/{k}", timeout=300)
             r.raise_for_status()
-            path.write_bytes(r.content)
-        paths.append(path)
+            tmp = p.with_suffix(".part")
+            tmp.write_bytes(r.content)
+            tmp.rename(p)
+
+        with ThreadPoolExecutor(8) as pool:
+            list(pool.map(get, missing))  # re-raises the first download error
     return paths
 
 
@@ -146,7 +149,7 @@ def pixels(path) -> list[dict]:
                 "lon": round(float(lon[i]), 5),
                 "lat": round(float(lat[i]), 5),
                 "timeLocal": t,
-                "satellite": SATELLITE,
+                "satellite": grid.EVENT.goes_satellite,
                 "frp": round(frp, 2),
             }
         )
@@ -159,7 +162,7 @@ def bake() -> tuple[list[dict], dict]:
         pts += pixels(path)
     pts.sort(key=lambda p: (p["timeLocal"], p["lat"], p["lon"]))
     if not pts:
-        raise RuntimeError("goes: no GOES-16 fire pixels in the grid for 2-3 Feb 2024")
+        raise RuntimeError(f"goes: no {grid.EVENT.goes_satellite} fire pixels in the grid in the event window")
     (grid.OUT_DIR / "goes.json").write_text(json.dumps(pts, separators=(",", ":")))
     per_hour: dict[str, int] = {}
     for p in pts:

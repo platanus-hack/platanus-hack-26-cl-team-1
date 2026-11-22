@@ -1,0 +1,23 @@
+{
+ "rows": 306,
+ "cols": 337,
+ "latMax": 34.27,
+ "lonMin": -118.2,
+ "dLat": 0.0005389867049946101,
+ "dLon": 0.0006515771658261054,
+ "cellM": 60,
+ "t0": "2025-01-07T18:00:00-08:00",
+ "sources": {
+  "Relieve": "Copernicus DEM GLO-30 (ESA / Airbus), tiles N34 W119/W118 vía AWS Open Data (https://registry.opendata.aws/copernicus-dem/). © DLR e.V. 2010-2014 y © Airbus Defence and Space GmbH 2014-2018, provisto bajo COPERNICUS por la Unión Europea y ESA.",
+  "Cobertura de suelo / combustible": "ESA WorldCover 10 m 2021 v200 (https://esa-worldcover.org/), © ESA WorldCover project 2021 / Contiene datos Copernicus Sentinel modificados (2021), CC BY 4.0. Clase mayoritaria por celda de 60 m. Zonas urbanas divididas en interfaz (casas entre vegetación: >= 40 % de vegetación en 180 m, según WorldCover y NDVI de Sentinel-2 del 02-01-2025, previo al incendio) y ciudad consolidada (el resto).",
+  "Edificaciones": "Overture Maps Foundation, buildings, release 2026-11-18.0 (https://overturemaps.org/), ODbL 1.0 (incluye OpenStreetMap y huellas derivadas de Microsoft y Google). Huellas actuales, no necesariamente las de enero de 2025. Parte de las casas destruidas puede faltar o estar reconstruida.",
+  "Calles": "© OpenStreetMap contributors, vía Overpass API (https://www.openstreetmap.org/copyright), ODbL 1.0. Red actual, no necesariamente la de enero de 2025.",
+  "Meteorología": "Open-Meteo Historical Weather API (reanalysis based on ECMWF ERA5 / ERA5-Land), punto 34.19, -118.12, horario local America/Los_Angeles. https://open-meteo.com/ (CC BY 4.0). Reanálisis de baja resolución: suaviza los extremos locales del viento (ráfagas).",
+  "Cicatriz del incendio": "Copernicus Sentinel-2 L2A (ESA), escenas S2A_11SLT_20250102 (pre) y S2C_11SLT_20250221 (post, tras la contención del 31-01-2025), tile 11SLT, vía Element84 Earth Search (https://earth-search.aws.element84.com/v1). Mismos umbrales que Viña del Mar: dNBR > 0.27 (0.15 en zonas urbanas). Huella final del evento. Contiene datos Copernicus Sentinel modificados (2025), licencia abierta Copernicus.",
+  "Detecciones satelitales de fuego": "NASA FIRMS (Fire Information for Resource Management System), detecciones VIIRS S-NPP / NOAA-20 375 m y MODIS 1 km, archivo por país (Estados Unidos 2025), 7-10 ene 2025. https://firms.modaps.eosdis.nasa.gov/ (datos NASA, uso libre con atribución)",
+  "Detecciones de fuego GOES-18 (cada 10 min)": "NOAA GOES-18 (GOES-West) ABI L2 Fire Detection and Characterization (ABI-L2-FDCF), disco completo cada 10 min, píxel ~2 km, vía NOAA Open Data Dissemination en AWS (https://registry.opendata.aws/noaa-goes/). Datos públicos de NOAA. Solo se usa para medir el ritmo del fuego simulado.",
+  "Focos predefinidos": "Hora y coordenadas de inicio según la página oficial del incendio de CAL FIRE (https://www.fire.ca.gov/incidents/2025/1/7/eaton-fire).",
+  "Perímetro oficial (solo validación)": "Perímetro final del incendio Eaton (2025-CALAC-009087, 14.021 acres), NIFC / WFIGS Interagency Fire Perimeters (https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/WFIGS_Interagency_Perimeters/FeatureServer/0), datos públicos. No lo usa el simulador: solo sirve para comparar.",
+  "Daños en estructuras (solo validación)": "CAL FIRE Damage Inspection (DINS), incendio Eaton 2025: una inspección por estructura con su clase de daño (https://services1.arcgis.com/jUJYIo9tSA7EHvfZ/arcgis/rest/services/DINS_2025_Eaton_Public_View/FeatureServer/0), datos públicos. No lo usa el simulador: solo sirve para comparar."
+ }
+}

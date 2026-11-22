@@ -3,8 +3,13 @@ import type { ReactElement } from 'react'
 import type { Dataset } from '../data/load'
 import { DEFAULT_EVAC_PARAMS } from '../engine/evac'
 import { TIMELINE } from '../engine/types'
+import { minToHHMM } from '../data/time'
+
+const sourceOf = (src: string | null) => (src === null ? 'supuesto' : `fuente: ${src}`)
+const fmtDec = (x: number) => x.toLocaleString('es-CL', { maximumFractionDigits: 2 })
 
 export function SourcesModal({ data, onClose }: { data: Dataset; onClose: () => void }) {
+  const ev = data.event.evac
   const ref = useRef<HTMLDialogElement>(null)
   useEffect(() => {
     const d = ref.current
@@ -87,6 +92,11 @@ export function SourcesModal({ data, onClose }: { data: Dataset; onClose: () => 
             ).
           </li>
           <li>Zona segura: punto de la red lejos de vegetación combustible y que no se quema en el escenario.</li>
+          <li>
+            Valores por defecto de este incendio: alerta a las {minToHHMM(data.grid.t0, data.defaultAlertMin)} ({sourceOf(ev.alertMin.source)});{' '}
+            {fmtDec(ev.personsPerHousehold.value)} personas por hogar ({sourceOf(ev.personsPerHousehold.source)}); {Math.round(ev.footShare.value * 100)} % de
+            los hogares a pie ({sourceOf(ev.footShare.source)}).
+          </li>
         </ul>
 
         <h3>Limitaciones</h3>

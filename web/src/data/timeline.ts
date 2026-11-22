@@ -5,6 +5,7 @@ import type { BrigadesFile, IgnitionPreset, TimelineId } from '../engine/types'
 import { TIMELINE } from '../engine/types'
 import type { Forecast } from './forecast'
 import type { Dataset } from './load'
+import { eventOfTimeline } from './events'
 import { localToMin, minToLocalIso } from './time'
 
 /** The today timeline covers the whole local day: from 00:00 for 24 hours. */
@@ -12,24 +13,29 @@ export const TODAY_START = '00:00'
 export const TODAY_HORIZON_MIN = 24 * 60
 
 /** What the worker needs to rebuild the UI's view of the dataset (sent once, with init). */
-export type TimelineChoice = { id: typeof TIMELINE.VINA_2024 } | { id: typeof TIMELINE.TODAY; forecast: Forecast }
+export type TimelineChoice = { id: typeof TIMELINE.VINA_2024 } | { id: typeof TIMELINE.EATON_2025 } | { id: typeof TIMELINE.TODAY; forecast: Forecast }
 
 /** The 2024 choice as one shared object: the explorer re-creates its worker when the choice's identity changes. */
 export const VINA_2024_CHOICE: TimelineChoice = { id: TIMELINE.VINA_2024 }
+/** Same for the Eaton fire (its own baked event, src/data/events.ts). */
+export const EATON_2025_CHOICE: TimelineChoice = { id: TIMELINE.EATON_2025 }
 
 /** Order and labels of the scenario picker (`short` on narrow screens). */
 export const TIMELINE_OPTIONS: { value: TimelineId; label: string; short: string }[] = [
   { value: TIMELINE.TODAY, label: 'Desde hoy (pronóstico)', short: 'Desde hoy' },
   { value: TIMELINE.VINA_2024, label: '2 feb 2024 · Viña del Mar', short: '2 feb 2024' },
+  { value: TIMELINE.EATON_2025, label: '7 ene 2025 · Eaton, California', short: 'Eaton 2025' },
 ]
 
 export function isTimelineId(v: string | null): v is TimelineId {
   return v !== null && (Object.values(TIMELINE) as string[]).includes(v)
 }
 
-/** The dataset as seen from a timeline. `base` must be the baked files (the 2 Feb 2024 timeline). */
+/** The dataset as seen from a timeline. `base` must be the baked files of the timeline's event
+ *  (eventOfTimeline: Viña's for the 2024 and today timelines, Eaton's for Eaton). */
 export function timelineDataset(base: Dataset, choice: TimelineChoice): Dataset {
-  if (base.timeline !== TIMELINE.VINA_2024) throw new Error(`timelineDataset: se esperaban los datos de 2024, no "${base.timeline}"`)
+  const want = eventOfTimeline(choice.id)
+  if (base.timeline !== want) throw new Error(`timelineDataset: se esperaban los datos de "${want}", no "${base.timeline}"`)
   return choice.id === TIMELINE.TODAY ? todayDataset(base, choice.forecast) : base
 }
 
@@ -52,7 +58,7 @@ export function todayDataset(base: Dataset, f: Forecast): Dataset {
     source: `Punto y hora del día de un foco del 2 feb 2024. ${g.source}`,
   }))
   const b = base.brigades
-  const brigades: BrigadesFile = {
+  const brigades: BrigadesFile | null = b && {
     ...b,
     dispatch: b.dispatch.map((d) => ({ ...d, dispatchLocal: retime(d.dispatchLocal) })),
     reinforcements: b.reinforcements.map((r) => ({ ...r, arrivalLocal: retime(r.arrivalLocal) })),

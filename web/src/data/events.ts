@@ -1,0 +1,99 @@
+// The historical events whose data is baked (pipeline/bake.py --event <id>), one territory and grid each, and
+// what differs between them: data folder, horizon, wind correction, which optional layers ship, evacuation
+// defaults with their sources. Each timeline (TIMELINE in types.ts) is shown on one of them: the "today"
+// timeline reuses Viña's territory (src/data/timeline.ts).
+import { DEFAULT_EVAC_PARAMS } from '../engine/evac'
+import { DEFAULT_FIRE_PARAMS } from '../engine/fire'
+import { ERA5_WIND_DIR_CORRECTION_DEG } from '../engine/fire/model'
+import { TIMELINE, type TimelineId } from '../engine/types'
+
+export const EVENT_IDS = [TIMELINE.VINA_2024, TIMELINE.EATON_2025] as const
+export type EventId = (typeof EVENT_IDS)[number]
+
+/** A value used by default, with where it comes from (null source = labelled assumption). */
+export interface Sourced<T> {
+  value: T
+  source: string | null
+}
+
+export interface EventDef {
+  id: EventId
+  /** Data folder under public/data/ ('' = the root: Viña's files stayed where they were). */
+  dir: string
+  /** Simulation horizon, minutes since GridMeta.t0. */
+  horizonMin: number
+  /** Correction added to the historical ERA5 wind direction (deg). Fitted on Viña's scar only; 0 elsewhere
+   *  (a site fit, not part of the model: engine/fire/MODEL.md section 6b). */
+  windDirCorrectionDeg: number
+  /** Optional layers this event ships: brigades.json, population_{home,work}.bin. */
+  layers: { brigades: boolean; population: boolean }
+  /** Evacuation defaults that depend on the place. */
+  evac: {
+    alertMin: Sourced<number>
+    personsPerHousehold: Sourced<number>
+    footShare: Sourced<number>
+  }
+  /** Calendar of the real date, for the population section (Spanish), or null. */
+  calendarNote: string | null
+}
+
+export const EVENTS: Record<EventId, EventDef> = {
+  [TIMELINE.VINA_2024]: {
+    id: TIMELINE.VINA_2024,
+    dir: '',
+    horizonMin: DEFAULT_FIRE_PARAMS.horizonMin, // 12:00 to midnight: the model has no suppression, so later hours overburn
+    windDirCorrectionDeg: ERA5_WIND_DIR_CORRECTION_DEG,
+    layers: { brigades: true, population: true },
+    evac: {
+      alertMin: { value: DEFAULT_EVAC_PARAMS.alertMin, source: null },
+      personsPerHousehold: { value: DEFAULT_EVAC_PARAMS.personsPerHousehold, source: null },
+      footShare: { value: DEFAULT_EVAC_PARAMS.footShare, source: null },
+    },
+    calendarNote: 'La fecha real del escenario fue un viernes de vacaciones de verano.',
+  },
+  [TIMELINE.EATON_2025]: {
+    id: TIMELINE.EATON_2025,
+    dir: 'eaton-2025/',
+    horizonMin: 18 * 60, // 18:00 on 7 Jan to 12:00 on 8 Jan (Pacific time): the first night and morning
+    windDirCorrectionDeg: 0,
+    layers: { brigades: false, population: false },
+    evac: {
+      // 19:25: the first evacuation orders (east of Lake Avenue). West of Lake the first order came at 03:25.
+      alertMin: {
+        value: 85,
+        source:
+          'primeras órdenes de evacuación, al este de Lake Avenue, a las 19:25 del 7 ene (Los Angeles Times, 26 ene 2025, según alertas archivadas; actualización de CAL FIRE de las 19:25, https://www.fire.ca.gov/incidents/2025/1/7/eaton-fire). Al oeste de Lake Avenue la primera orden fue a las 03:25 del 8 ene (Condado de Los Ángeles, 18 may 2026, https://lacounty.gov/2026/05/18/county-of-los-angeles-fire-department-releases-independent-investigation-findings-of-west-altadena-evacuation-decisions/)',
+      },
+      personsPerHousehold: {
+        value: 2.7,
+        source: 'US Census, ACS 2020-2024 (5 años), tabla B25010: 2,70 personas por hogar en Altadena (2,30 en Pasadena), https://censusreporter.org/profiles/16000US0601290-altadena-ca/',
+      },
+      footShare: {
+        value: 0.04,
+        source:
+          'supuesto derivado: a pie solo los hogares sin vehículo, 570 de 15.092 en Altadena (3,8 %; US Census, ACS 2020-2024, tabla B08201); no se encontró una encuesta de cómo evacuaron los hogares en el incendio Eaton',
+      },
+    },
+    calendarNote: null,
+  },
+}
+
+/** The baked event a timeline is shown on. */
+export function eventOfTimeline(t: TimelineId): EventId {
+  return t === TIMELINE.TODAY ? TIMELINE.VINA_2024 : t
+}
+
+/** Every number of the registry must be finite and in range: a bad value stops here, not deep in an engine. */
+export function checkEvent(e: EventDef): EventDef {
+  const nums: [string, number][] = [
+    ['horizonMin', e.horizonMin],
+    ['windDirCorrectionDeg', e.windDirCorrectionDeg],
+    ['evac.alertMin', e.evac.alertMin.value],
+    ['evac.personsPerHousehold', e.evac.personsPerHousehold.value],
+    ['evac.footShare', e.evac.footShare.value],
+  ]
+  for (const [k, v] of nums) if (!Number.isFinite(v)) throw new Error(`Evento ${e.id}: "${k}" no está definido`)
+  if (e.evac.footShare.value < 0 || e.evac.footShare.value > 1) throw new Error(`Evento ${e.id}: "evac.footShare" fuera de 0..1`)
+  if (e.evac.alertMin.value < 0 || e.evac.alertMin.value > e.horizonMin) throw new Error(`Evento ${e.id}: la alerta queda fuera del horizonte`)
+  return e
+}

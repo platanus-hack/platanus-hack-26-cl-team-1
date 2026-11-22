@@ -6,6 +6,7 @@ import { ERA5_WIND_DIR_CORRECTION_DEG } from '../engine/fire/model'
 import { DEFAULT_FIRE_PARAMS } from '../engine/fire'
 import { DEFAULT_EVAC_PARAMS } from '../engine/evac'
 import type { Dataset } from './load'
+import { EVENTS } from './events'
 
 function mulberry32(seed: number) {
   let a = seed >>> 0
@@ -213,8 +214,8 @@ export function makeMockDataset(): Dataset {
     weather,
     ignitions,
     firms,
-    populationHome,
-    populationWork,
+    event: EVENTS[TIMELINE.VINA_2024],
+    population: { home: populationHome, work: populationWork },
     brigades,
     synthetic: true,
     // the synthetic set stands in for the 2024 files (same t0, same kind of weather series)

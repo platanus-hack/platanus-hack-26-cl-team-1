@@ -4,7 +4,7 @@ import type { Dataset } from '../data/load'
 import { minToHHMM } from '../data/time'
 import { FIREFIGHT_MODEL } from '../engine/brigade/model'
 import type { UnitStatus } from '../engine/brigade'
-import { UNIT_COUNT, UNIT_LABEL_ES, UNIT_SHORT_ES, type UnitType } from '../engine/types'
+import { UNIT_COUNT, UNIT_LABEL_ES, UNIT_SHORT_ES, type BrigadesFile, type UnitType } from '../engine/types'
 import type { BrigadesOut } from '../worker/protocol'
 import type { BrigadeScenario, Scenario } from '../worker/scenario'
 import { defaultBrigades, MAX_UNITS, scaleUnits } from '../worker/scenario'
@@ -65,7 +65,17 @@ function Diff({ now, base, unit = '' }: { now: number; base: number; unit?: stri
 }
 
 export function BrigadesSection(p: Props) {
-  const file = p.data.brigades
+  if (!p.data.brigades)
+    return (
+      <Section title="Bomberos" defaultOpen={false}>
+        <p className="muted small">Aún no hay datos de bomberos para este incendio: por ahora esta sección está disponible solo para Viña del Mar.</p>
+      </Section>
+    )
+  return <BrigadesBody {...p} file={p.data.brigades} />
+}
+
+function BrigadesBody(p: Props & { file: BrigadesFile }) {
+  const file = p.file
   const t0 = p.data.grid.t0
   const b = p.scenario.brigades
   const set = (patch: Partial<BrigadeScenario>) => p.update({ brigades: { ...b, ...patch } })

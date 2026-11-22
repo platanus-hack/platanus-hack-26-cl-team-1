@@ -12,6 +12,7 @@ import type { Dataset } from '../data/load'
 import { loadRealDataset } from '../data/load'
 import { makeMockDataset } from '../data/mock'
 import { timelineDataset, type TimelineChoice } from '../data/timeline'
+import { checkEvent, EVENTS, eventOfTimeline } from '../data/events'
 import { brigadeKey, buildIgnitions, buildWeatherSeries, fireKey, rasteriseFirebreaks, safeNodes, wildlandDistanceM } from './scenario'
 
 const ctx = self as unknown as DedicatedWorkerGlobalScope
@@ -33,8 +34,9 @@ function post(msg: FromWorker, transfer: Transferable[] = []) {
 
 async function init(synthetic: boolean, timeline: TimelineChoice) {
   const t = performance.now()
-  const d: Dataset | null = synthetic ? makeMockDataset() : await loadRealDataset()
-  if (!d) throw new Error('El simulador no encontró los datos reales en /data/ (grid.json)')
+  const event = checkEvent(EVENTS[eventOfTimeline(timeline.id)])
+  const d: Dataset | null = synthetic ? makeMockDataset() : await loadRealDataset(event)
+  if (!d) throw new Error(`El simulador no encontró los datos reales en /data/${event.dir} (grid.json)`)
   data = timelineDataset(d, timeline)
   const loadMs = performance.now() - t
   prepared = prepareEvac(d.grid, d.fuel, d.roads, d.buildings, { safeDistanceM: DEFAULT_EVAC_PARAMS.safeDistanceM })
@@ -80,6 +82,7 @@ ctx.onmessage = (ev: MessageEvent<ToWorker>) => {
     }
     const evacParams: EvacParams = {
       ...DEFAULT_EVAC_PARAMS,
+      personsPerHousehold: data.event.evac.personsPerHousehold.value,
       alertMin: s.alertMin,
       cueShare: s.cueShare,
       cueRadiusM: s.cueRadiusM,
@@ -93,6 +96,7 @@ ctx.onmessage = (ev: MessageEvent<ToWorker>) => {
     let brigades: BrigadesOut | undefined
     let evac
     if (bKey !== null) {
+      if (!data.brigades) throw new Error('Este escenario no tiene datos de bomberos')
       const dKey = key + bKey
       if (dKey !== lastDefKey || !lastDef) {
         const tp = performance.now()
@@ -121,7 +125,7 @@ ctx.onmessage = (ev: MessageEvent<ToWorker>) => {
         householdRisk: rescue.householdRisk,
         householdStatus: rescue.householdStatus,
         expectedTrappedHouseholds: rescue.expectedTrappedHouseholds,
-        expectedTrappedPeople: rescue.expectedTrappedHouseholds * DEFAULT_EVAC_PARAMS.personsPerHousehold,
+        expectedTrappedPeople: rescue.expectedTrappedHouseholds * evacParams.personsPerHousehold,
       }
       brigades = {
         units: lastDef.plan.units,

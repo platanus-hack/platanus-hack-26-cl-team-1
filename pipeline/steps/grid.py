@@ -1,7 +1,12 @@
-"""The fixed simulation grid shared with web/src/engine/types.ts (GridMeta).
+"""The simulation grid of the selected event, shared with web/src/engine/types.ts (GridMeta).
 
 Row 0 is the NORTH edge, col 0 the WEST edge, row-major (index = r * cols + c).
 Cell (r, c) centre: lat = LAT_MAX - (r + 0.5) * D_LAT, lon = LON_MIN + (c + 0.5) * D_LON.
+
+The module attributes below describe ONE event (steps/events.py). Importing this module selects the default
+event (Viña del Mar 2024); `select(event_id)` switches every attribute, and steps read them as `grid.X` at
+call time (never `from .grid import X`), so the selection reaches all of them. `EVENT` holds the selected
+event's source parameters.
 """
 
 from __future__ import annotations
@@ -11,22 +16,51 @@ from pathlib import Path
 
 import numpy as np
 
-LAT_MAX = -32.965
-LON_MIN = -71.625
+from . import events
+
 CELL_M = 60
 D_LAT = 60 / 111320
-D_LON = 60 / (111320 * math.cos(math.radians(33.09)))
-ROWS = 464
-COLS = 529
-T0 = "2024-02-02T12:00:00-03:00"
-
-LAT_MIN = LAT_MAX - ROWS * D_LAT
-LON_MAX = LON_MIN + COLS * D_LON
-N_CELLS = ROWS * COLS
+MAX_CELLS = 464 * 529  # the Viña grid: the largest the browser engines are sized and timed for
 
 PIPELINE_DIR = Path(__file__).resolve().parent.parent
-CACHE_DIR = PIPELINE_DIR / ".cache"
-OUT_DIR = PIPELINE_DIR.parent / "web" / "public" / "data"
+CACHE_ROOT = PIPELINE_DIR / ".cache"
+DATA_ROOT = PIPELINE_DIR.parent / "web" / "public" / "data"
+
+# Set by select() (typed here for readers and linters).
+EVENT: events.Event
+LAT_MAX: float
+LON_MIN: float
+D_LON: float
+ROWS: int
+COLS: int
+T0: str
+LAT_MIN: float
+LON_MAX: float
+N_CELLS: int
+CACHE_DIR: Path
+OUT_DIR: Path
+
+
+def select(event_id: str) -> events.Event:
+    """Point every module attribute at the grid, clock, cache and output directory of one event."""
+    global EVENT, LAT_MAX, LON_MIN, D_LON, ROWS, COLS, T0, LAT_MIN, LON_MAX, N_CELLS, CACHE_DIR, OUT_DIR
+    if event_id not in events.EVENTS:
+        raise ValueError(f"unknown event {event_id!r}; known: {sorted(events.EVENTS)}")
+    ev = events.EVENTS[event_id]
+    if ev.rows * ev.cols > MAX_CELLS:
+        raise ValueError(f"{event_id}: {ev.rows} x {ev.cols} cells is over the {MAX_CELLS} cell budget")
+    EVENT = ev
+    LAT_MAX, LON_MIN, ROWS, COLS, T0 = ev.lat_max, ev.lon_min, ev.rows, ev.cols, ev.t0
+    D_LON = CELL_M / (111320 * math.cos(math.radians(ev.ref_lat)))
+    LAT_MIN = LAT_MAX - ROWS * D_LAT
+    LON_MAX = LON_MIN + COLS * D_LON
+    N_CELLS = ROWS * COLS
+    CACHE_DIR = CACHE_ROOT / ev.cache_subdir if ev.cache_subdir else CACHE_ROOT
+    OUT_DIR = DATA_ROOT / ev.out_subdir if ev.out_subdir else DATA_ROOT
+    return ev
+
+
+select(events.DEFAULT)
 
 
 def bbox() -> tuple[float, float, float, float]:

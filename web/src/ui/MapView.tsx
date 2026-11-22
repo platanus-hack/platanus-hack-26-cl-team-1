@@ -115,7 +115,9 @@ export function MapView(props: Props) {
     const map = mapRef.current
     if (!map || !ready.current) return
     const { data, awayNow } = p.current
-    drawPopulation(canvases.current.pop, data.grid, data.populationHome, data.populationWork, awayNow)
+    // No population layer for this event (EventDef.layers): the canvas stays blank and the panel says so.
+    if (!data.population) return
+    drawPopulation(canvases.current.pop, data.grid, data.population.home, data.population.work, awayNow)
     const s = map.getSource('pop') as CanvasSource | undefined
     if (s) {
       s.play()
@@ -221,7 +223,8 @@ export function MapView(props: Props) {
     const { data, brigades, scenario } = p.current
     const on = scenario.brigades.enabled
     const out = on ? brigades : null
-    const stations: Feature[] = on
+    const stations: Feature[] =
+      on && data.brigades
       ? [
           ...data.brigades.stations.map((s): Feature => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [s.lon, s.lat] }, properties: { entry: 0 } })),
           ...data.brigades.reinforcements.flatMap((r) =>
@@ -333,7 +336,7 @@ export function MapView(props: Props) {
     map.addSource('fuel', { type: 'canvas', canvas: canvases.current.fuel, coordinates: corners, animate: false })
     map.addLayer({ id: 'fuel', type: 'raster', source: 'fuel', paint: { 'raster-resampling': 'nearest', 'raster-fade-duration': 0 } }, firstSymbol)
 
-    drawPopulation(canvases.current.pop, g, data.populationHome, data.populationWork, p.current.awayNow)
+    if (data.population) drawPopulation(canvases.current.pop, g, data.population.home, data.population.work, p.current.awayNow)
     map.addSource('pop', { type: 'canvas', canvas: canvases.current.pop, coordinates: corners, animate: false })
     map.addLayer({ id: 'pop', type: 'raster', source: 'pop', paint: { 'raster-resampling': 'nearest', 'raster-fade-duration': 0 } }, firstSymbol)
 

@@ -32,7 +32,7 @@
 - Preview (not committed): `tmp/bomberos-chile.html`, a dot map and the per-region table.
 
 ## Decisions
-- D-030 (national fire-company dataset; trucks matched to the JNB register per region).
+- D-031 (national fire-company dataset; trucks matched to the JNB register per region).
 
 ## Open / blocked
 - Estimated trucks match the register per region and type, not per compañía: not an inventory.

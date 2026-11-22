@@ -26,8 +26,8 @@ export function LayersCard({
   layers: LayerToggles
   setLayer: (k: keyof LayerToggles, v: boolean) => void
   showRoutes: boolean
-  /** Layers this timeline has no data for (e.g. FIRMS detections from today). */
-  hide?: (keyof LayerToggles)[]
+  /** Layers this timeline has no data for (e.g. FIRMS detections from today, population where the event has none). */
+  hide?: readonly (keyof LayerToggles)[]
 }) {
   const [open, setOpen] = useState(() => window.matchMedia('(min-width: 900px)').matches)
   return (

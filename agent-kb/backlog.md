@@ -29,7 +29,7 @@ Owner in brackets once someone takes an item. Project: Cortafuego (D-019). The O
   front stops.
 - [ ] Bomberos (D-026): real inventories per company (ask each cuerpo), reopening time of Ruta 68, hydrant
   availability as a variable, congestion slowing the trucks, units that move between sectors.
-- [ ] Scenario from scratch: load `national/bomberos_cl.json` (`loadNationalStations` + `stationsInBox`, D-030) for the
+- [ ] Scenario from scratch: load `national/bomberos_cl.json` (`loadNationalStations` + `stationsInBox`, D-031) for the
   scenario's box; each cuerpo needs a dispatch time. Real inventories go into `pipeline/bomberos/fleets.json`.
 - [ ] Evacuation by time of day: people per building at the alert time from the population layers (D-024),
   instead of a fixed 2.9 per household; offices and schools as origins on weekdays.
@@ -37,13 +37,21 @@ Owner in brackets once someone takes an item. Project: Cortafuego (D-019). The O
   comuna); public holidays and February vacations in the presence model.
 - [ ] Congestion on evacuation routes (today free flow).
 - [ ] Ensemble (perturbed wind and spotting) for a burn-probability map and a range on the counts.
-- [ ] A second event (Penco / Lirquén, January 2026) to show it generalises.
+- [ ] **Fit on both fires** (Viña + Eaton, D-030): out of sample the Viña calibration overburns Eaton ~2.6×; tune
+  the spread factors on both together, keep a fit only if Viña does not get worse. [Anaís + agent]
+- [ ] Eaton population layer (WorldPop USA + GHSL; US time-of-day assumptions: ATUS, ACS B08302; LAUSD and PUSD
+  were in session on 7 Jan 2025). [Anaís + agent]
+- [ ] Eaton firefighters (LA County LMS stations; Pasadena FD apparatus from its 2025 Standards of Cover; LACoFD
+  publishes counts only). [Anaís + agent]
+- [ ] Score Eaton buildings against CAL FIRE DINS (`dins.json`, 9,419 destroyed) instead of scar cells.
+- [ ] Viña scar reflectance offset (decisions §2).
+- [ ] A third event (Penco / Lirquén, January 2026).
 
 ## Later
 - [ ] Any comuna: bake the data for another bounding box from the same pipeline.
 
 ## Done
-- [x] **Every fire company of Chile with its trucks** (D-030): 1,256 compañías (JNB catastro 2025), documented fleets
+- [x] **Every fire company of Chile with its trucks** (D-031): 1,256 compañías (JNB catastro 2025), documented fleets
   for 330, the rest matched to the JNB register 2025 per region and type. Branch `feat/bomberos-chile-dataset`.
   [Anaís + agent]
 - [x] Bomberos: companies, trucks per type, dispatch, Ruta 68 cut, defended cells, rescue (D-026). [Anaís + agent]

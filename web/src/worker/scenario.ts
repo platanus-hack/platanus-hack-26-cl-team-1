@@ -79,6 +79,11 @@ export function defaultBrigades(file: BrigadesFile, t0: string): BrigadeScenario
   }
 }
 
+/** Firefighter settings for an event without brigades.json (EventDef.layers.brigades false): off, nothing to plan. */
+export function noBrigades(): BrigadeScenario {
+  return { enabled: false, units: {}, dispatchMin: {}, reinforcementUnits: {}, reinforcementMin: {}, historicalCuts: false }
+}
+
 /** Max trucks of one type per company (the panel's stepper limit). */
 export const MAX_UNITS = 99
 
