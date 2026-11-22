@@ -197,7 +197,8 @@ export interface FireResult {
   elapsedMs: number
 }
 
-// export function simulateFire(input: FireInput): FireResult
+// export function simulateFire(input: FireInput, onSpot?: (from: number, to: number) => void): FireResult
+//   (onSpot only observes the ember jumps of the run; it never changes the result)
 // export const DEFAULT_FIRE_PARAMS: FireParams
 
 // ---------------------------------------------------------------------------------------------------------

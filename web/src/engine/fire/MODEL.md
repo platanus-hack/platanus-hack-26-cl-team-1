@@ -102,6 +102,11 @@ not pass between it and another held or unburnable cell, so a held line is as wa
 Embers still jump it. Without `defense`, or with every fromMin = Infinity, the engine is bit-for-bit the same
 (`index.test.ts`).
 
+The pass-between test of a diagonal or knight move is made at the time the fire leaves the source cell. A held
+line one cell wide therefore stops the front only if its window opens before the fire is within two cells of
+it; a window that opens when the fire is already next to the line lets a knight move through. `src/engine/firebreak`
+builds its lines against that clock (`fireNearMin`).
+
 ## 5. Spotting
 
 Spotting runs only when `params.spotting` is on. It starts from settled cells whose fuel has `spotSource`
@@ -112,6 +117,8 @@ Spotting runs only when `params.spotting` is on. It starts from settled cells wh
   D_max = `spotMetresPerKmh` · V · `spotDistanceFactor` metres (the factor is 1 for every fuel as shipped).
 - **Travel time:** 4 min + 10 min · d / D_max.
 - **Crossing breaks:** jumps skip the cells in between, so embers cross a firebreak narrower than D_max.
+  `simulateFire(input, onSpot)` reports every jump it considers to an optional observer (it never changes the
+  result); `src/engine/firebreak` uses it to rebuild the spread graph of a run.
   `index.test.ts` checks that a 60 m break stops the fire without spotting and is crossed with spotting
   in a 45 km/h wind.
 

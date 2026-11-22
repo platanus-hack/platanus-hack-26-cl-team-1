@@ -104,7 +104,10 @@ for (let k = 0; k < K; k++) {
 const DEG = Math.PI / 180
 const KMH_TO_M_PER_MIN = 1000 / 60
 
-export function simulateFire(input: FireInput): FireResult {
+/** `onSpot(from, to)`, optional, is called for every ember jump the run considers: from a burning cell that
+ *  throws embers to each cell they could land on and ignite, whether or not that cell had already burned (so a
+ *  caller can rebuild the spread graph of this run: src/engine/firebreak). It does not change the result. */
+export function simulateFire(input: FireInput, onSpot?: (from: number, to: number) => void): FireResult {
   const started = performance.now()
   validateInput(input)
   const { grid, elevation, fuel, firebreak, ignitions, weather, params, defense } = input
@@ -330,9 +333,12 @@ export function simulateFire(input: FireInput): FireResult {
           const tc = Math.round(fc - lat * downR)
           if (tr < 0 || tr >= rows || tc < 0 || tc >= cols) continue
           const j = tr * cols + tc
-          if (settled[j] || !burnable[j] || !fuelLand[fuel[j]]) continue
+          if (!burnable[j] || !fuelLand[fuel[j]]) continue
+          if (settled[j] && !onSpot) continue
           const d = Math.sqrt((tr - r) * (tr - r) + (tc - c) * (tc - c)) * cellM
           if (d < minD || d > dMax) continue
+          if (onSpot) onSpot(i, j)
+          if (settled[j]) continue
           const tt = t + M.spotDelayMin + (M.spotTravelMin * d) / dMax
           if (tt < time[j]) {
             time[j] = tt

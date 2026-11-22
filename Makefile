@@ -1,5 +1,5 @@
 # Entry points. Needs uv and Node 24 + pnpm (corepack enable, or npm i -g pnpm).
-.PHONY: install dev data data-talca population bomberos test lint check validate validate-eaton plan build
+.PHONY: install dev data data-talca population bomberos test lint check validate validate-eaton plan lines build
 
 install: ## Install every part
 	cd web && pnpm install
@@ -42,3 +42,6 @@ validate-eaton: ## Out-of-sample: the Viña-calibrated model on the Eaton fire (
 
 plan: ## Re-rank the preparation plan over an ensemble of simulated fires (web/public/data/plan.json, a few minutes)
 	cd web && pnpm plan
+
+lines: ## Firebreak lines for the 2 Feb 2024 scenario: where and by when, scored on an ensemble (prints tables, several minutes)
+	cd web && pnpm lines

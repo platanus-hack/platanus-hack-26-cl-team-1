@@ -193,7 +193,7 @@ const WILDLAND = new Set<number>([FUEL.GRASS, FUEL.SHRUB, FUEL.FOREST, FUEL.CROP
 const URBAN = new Set<number>([FUEL.URBAN_LOW, FUEL.URBAN_DENSE])
 
 /** Nearest node with at least one drivable (non-PATH) edge to grid metres (x, y). */
-function nearestDrivable(P: Prepared, x: number, y: number): number {
+export function nearestDrivable(P: Prepared, x: number, y: number): number {
   let best = -1
   let bd = Infinity
   for (let n = 0; n < P.nodeCount; n++) {
@@ -214,7 +214,8 @@ function nearestDrivable(P: Prepared, x: number, y: number): number {
   return best
 }
 
-function toXY(g: GridMeta, lon: number, lat: number): [number, number] {
+/** Grid metres (x east of the west edge, y south of the north edge) of a point. */
+export function toXY(g: GridMeta, lon: number, lat: number): [number, number] {
   return [((lon - g.lonMin) / g.dLon) * g.cellM, ((g.latMax - lat) / g.dLat) * g.cellM]
 }
 
