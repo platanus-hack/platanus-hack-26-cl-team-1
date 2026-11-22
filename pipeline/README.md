@@ -84,7 +84,7 @@ Every grid stays under Viña's 245,456 cells (`grid.MAX_CELLS`).
 | `firms.json` | `FirmsPoint[]`, 2-4 Feb 2024 local | NASA FIRMS (VIIRS, MODIS) |
 | `goes.json` | `FirmsPoint[]`, GOES-16 fire pixels every 10 min, 2 Feb 12:00 - 3 Feb 04:00 local (scoring only, not loaded by the app) | NOAA GOES-16 ABI L2 FDC |
 | `ignitions.json` | `IgnitionPreset[]` | FIRMS first detections + press reports |
-| `brigades.json` | `BrigadesFile`: fire companies, trucks, dispatch, reinforcements, road cuts | **Curated by hand** (not baked): OpenStreetMap fire stations + press; see `web/src/engine/brigade/MODEL.md` |
+| `brigades.json` | `BrigadesFile`: fire companies, trucks, dispatch, reinforcements, road cuts | **Curated by hand** (not baked): Viña from OpenStreetMap fire stations + press; Eaton (`eaton-2025/brigades.json`) from LA County's LMS layer + Pasadena FD's 2025 Standards of Cover; see `web/src/engine/brigade/MODEL.md` |
 | `population_home.bin` | Float32 residents per cell | WorldPop 2024 (constrained, 100 m); Eaton: GHSL GHS-POP 2025 (3") |
 | `population_work.bin` | Float32 people per cell if every resident is at work or school | the residents + GHSL GHS-BUILT-V NRES 2025, gravity model |
 | `national/population_cl.{json,bin}` | Both layers for all of Chile, 30" (~0.9 km), sparse (`NationalPopulationMeta`) | same |

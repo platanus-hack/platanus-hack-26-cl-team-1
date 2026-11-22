@@ -657,7 +657,7 @@ function EatonNote() {
   return (
     <div className="alert info timeline-note">
       <b>Incendio Eaton</b> (Altadena y Pasadena, California), 7 de enero de 2025 desde las 18:00 hasta el mediodía del 8, hora del Pacífico. Mismos
-      datos abiertos y mismo modelo que en Viña del Mar, sin ajustes para este incendio: sirve para ver si el modelo se generaliza. Aún sin bomberos.
+      datos abiertos y mismo modelo que en Viña del Mar, sin ajustes para este incendio: sirve para ver si el modelo se generaliza.
     </div>
   )
 }
