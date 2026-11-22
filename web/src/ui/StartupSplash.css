@@ -108,8 +108,10 @@
   cursor: pointer;
 }
 
-.splash-skip:hover {
-  color: var(--text);
+@media (hover: hover) {
+  .splash-skip:hover {
+    color: var(--text);
+  }
 }
 
 .splash-skip:focus-visible {
@@ -170,4 +172,28 @@
   .splash-cut { stroke-dashoffset: 0; }
   .splash-cut-glint { opacity: 0; }
   .splash-loading-line::after { width: 100%; }
+}
+
+/* Landscape phones: a smaller mark, and the skip button in the corner, clear of the name and the message. */
+@media (max-height: 500px) {
+  .splash-mark {
+    width: clamp(88px, 30svh, 170px);
+  }
+  .splash-identity {
+    transform: none;
+  }
+  .splash-identity h1 {
+    margin-top: 6px;
+  }
+  .splash-status {
+    margin-top: 6px;
+    gap: 12px;
+  }
+  .splash-skip {
+    bottom: max(12px, env(safe-area-inset-bottom));
+    right: max(16px, env(safe-area-inset-right));
+  }
+  .splash-caption {
+    display: none;
+  }
 }

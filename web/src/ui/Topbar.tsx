@@ -21,18 +21,17 @@ export function Topbar({
     <header className="topbar">
       <div className="brand">
         <h1>Cortafuego</h1>
-        <p>{subtitle}</p>
+        <p title={subtitle}>{subtitle}</p>
       </div>
       <div className="topbar-end">
-        <div className="timeline-pick seg" role="radiogroup" aria-label="Escenario">
+        <div className="timeline-pick seg" role="group" aria-label="Escenario">
           {TIMELINE_OPTIONS.map((o) => {
             const off = offline && o.value === TIMELINE.TODAY
             return (
               <button
                 key={o.value}
                 type="button"
-                role="radio"
-                aria-checked={o.value === timeline}
+                aria-pressed={o.value === timeline}
                 className={o.value === timeline ? 'on' : ''}
                 disabled={off}
                 title={off ? 'Necesita conexión a internet para descargar el pronóstico' : undefined}
@@ -44,8 +43,21 @@ export function Topbar({
             )
           })}
         </div>
+        {/* Phones: the same choice as a native picker (four buttons do not fit next to the name). */}
+        <select
+          className="timeline-select"
+          aria-label="Escenario"
+          value={timeline}
+          onChange={(e) => onTimeline(e.target.value as TimelineId)}
+        >
+          {TIMELINE_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value} disabled={offline && o.value === TIMELINE.TODAY}>
+              {o.label}
+            </option>
+          ))}
+        </select>
         {onSources && (
-          <button type="button" className="btn ghost" onClick={onSources}>
+          <button type="button" className="btn ghost sources-btn" onClick={onSources}>
             <span className="long">Fuentes y supuestos</span>
             <span className="short">Fuentes</span>
           </button>
