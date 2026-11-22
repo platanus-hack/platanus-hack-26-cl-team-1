@@ -192,8 +192,8 @@ export function parseIgnitions(j: unknown): IgnitionPreset[] {
   })
 }
 
-export function parseFirms(j: unknown): FirmsPoint[] {
-  const f = 'firms.json'
+/** NASA FIRMS (firms.json) and GOES-16 (goes.json) fire detections share the FirmsPoint shape. */
+export function parseFirePoints(f: string, j: unknown): FirmsPoint[] {
   if (!Array.isArray(j)) throw new DataError(f, 'debe ser una lista')
   return j.map((o, i) => {
     if (!isObj(o)) throw new DataError(f, `elemento ${i} no es un objeto`)
@@ -208,6 +208,10 @@ export function parseFirms(j: unknown): FirmsPoint[] {
     return p
   })
 }
+
+export const parseFirms = (j: unknown): FirmsPoint[] => parseFirePoints('firms.json', j)
+/** goes.json is read only by the scoring script (calibrate.ts), not by the browser app. */
+export const parseGoes = (j: unknown): FirmsPoint[] => parseFirePoints('goes.json', j)
 
 // ---------------------------------------------------------------------------------------------------------
 // Fetching
