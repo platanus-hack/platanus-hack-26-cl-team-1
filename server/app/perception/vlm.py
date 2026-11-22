@@ -14,6 +14,8 @@
 - Checked tasks (`check_tasks`, D-020): next to each call, one yes/no question per expected next step asks
   whether that step's `completion_cue` is visible in the newest frame (at `check_max_side_px`). An expected
   step counts only when its result is seen; actions that aren't expected (mistakes) pass straight through.
+  The checks run beside their call, so a checked call is 1 + N requests to vLLM (N = expected next steps,
+  usually 1-2): `max_in_flight` bounds calls, not requests.
 """
 
 from __future__ import annotations
@@ -121,7 +123,10 @@ def uncertain(reason: str) -> VlmOutput:
 def parse_check(raw: str) -> bool:
     """`{"visible": true|false}`, possibly in a code fence. Anything else raises `ValueError`."""
     text = raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
-    value = json.loads(text).get("visible")
+    data = json.loads(text)
+    if not isinstance(data, dict):
+        raise ValueError(f"not a JSON object: {raw[:80]!r}")
+    value = data.get("visible")
     if not isinstance(value, bool):
         raise ValueError(f"not a yes/no answer: {raw[:80]!r}")
     return value

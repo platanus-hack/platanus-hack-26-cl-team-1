@@ -401,8 +401,9 @@ def test_checked_task_keeps_a_step_whose_result_is_seen(task, ontology):
     assert observe(make_checked(model, ontology, task), task).output.action == "wet_hands"
 
 
-def test_a_garbled_check_counts_as_not_seen(task, ontology):
-    model = CheckingModel(answer(action="wet_hands", confidence=0.9, quality="ok"), "yes")
+@pytest.mark.parametrize("raw", ["yes", "true", "null", "[true]", '{"visible": "yes"}'])
+def test_a_garbled_check_counts_as_not_seen(task, ontology, raw):
+    model = CheckingModel(answer(action="wet_hands", confidence=0.9, quality="ok"), raw)
     assert observe(make_checked(model, ontology, task), task).output.action is None
 
 
@@ -422,7 +423,13 @@ def test_the_checked_frame_is_bigger_than_the_main_frames(task, ontology):
 
 
 def test_check_tasks_come_from_the_environment(monkeypatch):
-    monkeypatch.setenv("SUP_VLM_CHECK_TASKS", "conveyor_lockout,led_flashlight")
-    assert Settings.from_env().vlm_check_tasks == frozenset({"conveyor_lockout", "led_flashlight"})
+    monkeypatch.setenv("SUP_VLM_CHECK_TASKS", "c172_takeoff, led_flashlight,")
+    assert Settings.from_env().vlm_check_tasks == frozenset({"c172_takeoff", "led_flashlight"})
     monkeypatch.delenv("SUP_VLM_CHECK_TASKS")
     assert Settings.from_env().vlm_check_tasks == frozenset()
+
+
+def test_unknown_check_tasks_fail_at_startup(monkeypatch):
+    monkeypatch.setenv("SUP_VLM_CHECK_TASKS", "conveyor-lockout")
+    with pytest.raises(ValueError, match="aren't in the library"):
+        create_app(Settings.from_env())

@@ -85,7 +85,9 @@ class Settings:
             vlm_span_ms=int(os.environ.get("SUP_VLM_SPAN_MS", cls.vlm_span_ms)),
             vlm_max_tokens=int(os.environ.get("SUP_VLM_MAX_TOKENS", cls.vlm_max_tokens)),
             vlm_frames=int(os.environ.get("SUP_VLM_FRAMES", cls.vlm_frames)),
-            vlm_check_tasks=frozenset(t for t in os.environ.get("SUP_VLM_CHECK_TASKS", "").split(",") if t),
+            vlm_check_tasks=frozenset(
+                t.strip() for t in os.environ.get("SUP_VLM_CHECK_TASKS", "").split(",") if t.strip()
+            ),
             vlm_check_max_side_px=int(os.environ.get("SUP_VLM_CHECK_MAX_SIDE_PX", cls.vlm_check_max_side_px)),
             voice=VoiceMode(os.environ.get("SUP_VOICE", "browser")),
             elevenlabs_api_key=os.environ.get("ELEVENLABS_API_KEY", ""),

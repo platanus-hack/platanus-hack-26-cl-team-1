@@ -21,6 +21,9 @@ from .voice.queue import VoiceQueue
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings.from_env()
     library = TaskLibrary.load(settings.tasks_dir)
+    unknown = settings.vlm_check_tasks - {t.id for t in library.summaries()}
+    if unknown:  # a typo would silently turn the completion checks off (D-020)
+        raise ValueError(f"SUP_VLM_CHECK_TASKS names tasks that aren't in the library: {sorted(unknown)}")
     voice = make_voice(settings)
     make_controller = make_controller_factory(settings, library)
 

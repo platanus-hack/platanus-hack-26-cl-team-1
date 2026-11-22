@@ -253,8 +253,10 @@ with a pointer to their replacement; nothing is ever deleted from §3.
   A garbled check answer counts as not seen (logged). No contract change: the output is still a `VlmOutput`.
 - **Consequences:** steps are ticked when their result shows, not when the motion starts (about 1 s later on
   the clip). Completion cues of checked tasks must describe a still, visible result ("a red padlock hangs from
-  the red handle"), not an event ("the button was pressed"). One extra call per expected step (vLLM batches
-  them: p50 865 → 921 ms). Off by default: other tasks behave as before until measured with it.
+  the red handle"), not an event ("the button was pressed"). One extra request per expected step, beside the
+  call (vLLM batches them: p50 865 → 921 ms), so `SUP_VLM_MAX_IN_FLIGHT` bounds calls, not requests. Off by
+  default: other tasks behave as before until measured with it. An id in `SUP_VLM_CHECK_TASKS` that isn't in
+  the library stops the server at startup.
 
 ## §2 Open (decide in block 1, see docs/VISION.md)
 
