@@ -1,8 +1,9 @@
 // Loads and validates the baked data files in web/public/data/ (formats in src/engine/types.ts).
 // Every malformed file throws a DataError naming the file; the UI shows it. No silent fallbacks: the synthetic
 // dataset is used only when grid.json is absent altogether (data not baked yet), and the UI says so.
-import type { FirmsPoint, GridMeta, IgnitionPreset, RoadsFile, WeatherFile } from '../engine/types'
-import { FUEL, ROAD } from '../engine/types'
+import type { BrigadesFile, BrigadeStation, FirmsPoint, GridMeta, IgnitionPreset, Reinforcement, RoadsFile, RouteCut, WeatherFile } from '../engine/types'
+import { FUEL, ROAD, UNIT_COUNT } from '../engine/types'
+import { lonLatToColRow } from './grid'
 import { wallClockMin } from './time'
 
 export interface Dataset {
@@ -15,6 +16,7 @@ export interface Dataset {
   weather: WeatherFile
   ignitions: IgnitionPreset[]
   firms: FirmsPoint[]
+  brigades: BrigadesFile
   /** true when this is the in-browser synthetic dataset (src/data/mock.ts). */
   synthetic: boolean
 }
@@ -247,6 +249,97 @@ async function fetchBin(file: string): Promise<ArrayBuffer> {
 }
 
 /** Returns null when the real data has not been baked yet (no grid.json). Throws DataError otherwise. */
+function insideGrid(file: string, g: GridMeta, lon: number, lat: number, what: string) {
+  const [c, r] = lonLatToColRow(g, lon, lat)
+  if (!(c >= 0 && c < g.cols && r >= 0 && r < g.rows)) throw new DataError(file, `${what} (${lon}, ${lat}) queda fuera de la grilla`)
+}
+function nullableStr(file: string, o: Obj, k: string): string | null {
+  if (o[k] === null) return null
+  return str(file, o, k)
+}
+function units(file: string, o: Obj, what: string): number[] {
+  const u = o.units
+  if (!Array.isArray(u) || u.length !== UNIT_COUNT || !u.every((x) => Number.isInteger(x) && x >= 0))
+    throw new DataError(file, `${what}: "units" debe ser una lista de ${UNIT_COUNT} enteros >= 0 [Bomba, Forestal, Aljibe, Escala/rescate]`)
+  return u as number[]
+}
+function list(file: string, o: Obj, k: string): Obj[] {
+  const v = o[k]
+  if (!Array.isArray(v) || !v.every(isObj)) throw new DataError(file, `"${k}" debe ser una lista de objetos`)
+  return v as Obj[]
+}
+
+/** brigades.json: hand-curated fire companies, dispatch times, reinforcements and historical road cuts. */
+export function parseBrigades(j: unknown, g: GridMeta): BrigadesFile {
+  const f = 'brigades.json'
+  if (!isObj(j)) throw new DataError(f, 'no es un objeto JSON')
+  const dispatch = list(f, j, 'dispatch').map((d) => {
+    const x = { cuerpo: str(f, d, 'cuerpo'), dispatchLocal: str(f, d, 'dispatchLocal'), source: nullableStr(f, d, 'source') }
+    checkTime(f, x.dispatchLocal)
+    return x
+  })
+  const cuerpos = new Set(dispatch.map((d) => d.cuerpo))
+  if (cuerpos.size !== dispatch.length) throw new DataError(f, 'un cuerpo aparece dos veces en "dispatch"')
+  const ids = new Set<string>()
+  const uniqueId = (id: string) => {
+    if (ids.has(id)) throw new DataError(f, `id duplicado "${id}"`)
+    ids.add(id)
+    return id
+  }
+  const stations: BrigadeStation[] = list(f, j, 'stations').map((s) => {
+    const x: BrigadeStation = {
+      id: uniqueId(str(f, s, 'id')),
+      cuerpo: str(f, s, 'cuerpo'),
+      company: str(f, s, 'company'),
+      lon: num(f, s, 'lon'),
+      lat: num(f, s, 'lat'),
+      units: units(f, s, `estación ${String(s.id)}`),
+      unitsSource: nullableStr(f, s, 'unitsSource'),
+      locationSource: str(f, s, 'locationSource'),
+    }
+    if (!cuerpos.has(x.cuerpo)) throw new DataError(f, `la estación ${x.id} es del cuerpo "${x.cuerpo}", que no tiene hora de despacho en "dispatch"`)
+    insideGrid(f, g, x.lon, x.lat, `la estación ${x.id}`)
+    return x
+  })
+  if (stations.length === 0) throw new DataError(f, 'no tiene estaciones')
+  const reinforcements: Reinforcement[] = list(f, j, 'reinforcements').map((r) => {
+    const x: Reinforcement = {
+      id: uniqueId(str(f, r, 'id')),
+      label: str(f, r, 'label'),
+      units: units(f, r, `refuerzo ${String(r.id)}`),
+      source: nullableStr(f, r, 'source'),
+      arrivalLocal: str(f, r, 'arrivalLocal'),
+      arrivalSource: nullableStr(f, r, 'arrivalSource'),
+      entries: list(f, r, 'entries').map((e) => {
+        const y = { label: str(f, e, 'label'), lon: num(f, e, 'lon'), lat: num(f, e, 'lat'), delayMin: num(f, e, 'delayMin'), source: nullableStr(f, e, 'source') }
+        if (y.delayMin < 0) throw new DataError(f, `entrada "${y.label}": delayMin < 0`)
+        insideGrid(f, g, y.lon, y.lat, `la entrada "${y.label}"`)
+        return y
+      }),
+    }
+    checkTime(f, x.arrivalLocal)
+    if (x.entries.length === 0) throw new DataError(f, `el refuerzo ${x.id} no tiene entradas`)
+    return x
+  })
+  const cuts: RouteCut[] = list(f, j, 'cuts').map((c) => {
+    const lines = c.lines
+    if (!Array.isArray(lines) || lines.length === 0 || !lines.every((l) => Array.isArray(l) && l.length >= 2 && l.every((p) => Array.isArray(p) && p.length === 2 && p.every((v) => typeof v === 'number' && Number.isFinite(v)))))
+      throw new DataError(f, `corte ${String(c.id)}: "lines" debe ser una lista de polilíneas [lon, lat] de 2 o más puntos`)
+    const x: RouteCut = {
+      id: uniqueId(str(f, c, 'id')),
+      label: str(f, c, 'label'),
+      lines: lines as [number, number][][],
+      fromLocal: str(f, c, 'fromLocal'),
+      toLocal: nullableStr(f, c, 'toLocal'),
+      source: str(f, c, 'source'),
+    }
+    checkTime(f, x.fromLocal)
+    if (x.toLocal !== null) checkTime(f, x.toLocal)
+    return x
+  })
+  return { stations, dispatch, reinforcements, cuts }
+}
+
 export async function loadRealDataset(): Promise<Dataset | null> {
   let probe: Response
   try {
@@ -264,7 +357,7 @@ export async function loadRealDataset(): Promise<Dataset | null> {
   }
   const grid = parseGrid(gridJson)
   const cells = grid.rows * grid.cols
-  const [elev, fuel, scar, bld, roads, weather, ignitions, firms] = await Promise.all([
+  const [elev, fuel, scar, bld, roads, weather, ignitions, firms, brigades] = await Promise.all([
     fetchBin('elevation.bin'),
     fetchBin('fuel.bin'),
     fetchBin('scar.bin'),
@@ -273,6 +366,7 @@ export async function loadRealDataset(): Promise<Dataset | null> {
     fetchJson('weather.json'),
     fetchJson('ignitions.json'),
     fetchJson('firms.json'),
+    fetchJson('brigades.json'),
   ])
   return {
     grid,
@@ -284,6 +378,7 @@ export async function loadRealDataset(): Promise<Dataset | null> {
     weather: parseWeather(weather),
     ignitions: parseIgnitions(ignitions),
     firms: parseFirms(firms),
+    brigades: parseBrigades(brigades, grid),
     synthetic: false,
   }
 }

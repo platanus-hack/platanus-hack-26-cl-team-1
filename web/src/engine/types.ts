@@ -143,6 +143,16 @@ export interface Ignition {
   tMin: number
 }
 
+/** Cells defended by firefighters (src/engine/brigade). Per cell: a cell the fire reaches at t with
+ *  fromMin <= t <= toMin, and whose fireline intensity at t is <= maxKwM, does not burn and stays unburnable
+ *  (the front passed while it was held). fromMin = Infinity where the cell is not defended. */
+export interface FireDefense {
+  fromMin: Float32Array
+  toMin: Float32Array
+  /** Direct-attack intensity limit, kW/m (Infinity = no limit, structure protection). */
+  maxKwM: Float32Array
+}
+
 export interface FireInput {
   grid: GridMeta
   elevation: Float32Array
@@ -152,6 +162,8 @@ export interface FireInput {
   ignitions: Ignition[]
   weather: WeatherSeries
   params: FireParams
+  /** Optional firefighter defence (absent = no firefighting, the calibrated model). */
+  defense?: FireDefense
 }
 
 export interface FireResult {
@@ -248,3 +260,75 @@ export interface EvacResult {
 //   params: Pick<EvacParams, 'safeDistanceM'>): EvacPrepared
 // export function simulateEvac(input: EvacInput): EvacResult
 // export const DEFAULT_EVAC_PARAMS: EvacParams
+
+// ---------------------------------------------------------------------------------------------------------
+// Firefighters: brigades.json (hand-curated, read by src/data/load.ts) and the brigade engine
+// ---------------------------------------------------------------------------------------------------------
+
+/** Truck (unit) type, closed set. Index into every `units` array. */
+export const UNIT = {
+  BOMBA: 0, // carro bomba: water, structure protection
+  FORESTAL: 1, // carro forestal: small tank, direct attack on wildland fronts
+  ALJIBE: 2, // carro aljibe: water supply for the units at its site
+  RESCATE: 3, // escala / rescate: no water, rescues households
+} as const
+export type UnitType = (typeof UNIT)[keyof typeof UNIT]
+export const UNIT_COUNT = 4
+export const UNIT_LABEL_ES: Record<UnitType, string> = { 0: 'Bomba', 1: 'Forestal', 2: 'Aljibe', 3: 'Escala / rescate' }
+export const UNIT_SHORT_ES: Record<UnitType, string> = { 0: 'B', 1: 'F', 2: 'Z', 3: 'R' }
+
+/** A company (compañía) at its cuartel. units: count per UnitType. A null source means "supuesto". */
+export interface BrigadeStation {
+  id: string
+  cuerpo: string
+  company: string
+  lon: number
+  lat: number
+  units: number[]
+  unitsSource: string | null
+  locationSource: string
+}
+
+/** When a cuerpo's companies leave their cuarteles (local time ISO without offset). */
+export interface CuerpoDispatch {
+  cuerpo: string
+  dispatchLocal: string
+  source: string | null
+}
+
+/** A road into the grid for a reinforcement group; delayMin is added to the group's arrival time. */
+export interface ReinforcementEntry {
+  label: string
+  lon: number
+  lat: number
+  delayMin: number
+  source: string | null
+}
+
+/** Units from outside the area that enter the grid at arrivalLocal (+ entry delay). */
+export interface Reinforcement {
+  id: string
+  label: string
+  units: number[]
+  source: string | null
+  arrivalLocal: string
+  arrivalSource: string | null
+  entries: ReinforcementEntry[]
+}
+
+/** A documented road cut: road edges along `lines` are unusable from fromLocal until toLocal (null = never reopens). */
+export interface RouteCut {
+  id: string
+  label: string
+  lines: [number, number][][]
+  fromLocal: string
+  toLocal: string | null
+  source: string
+}
+
+export interface BrigadesFile {
+  stations: BrigadeStation[]
+  dispatch: CuerpoDispatch[]
+  reinforcements: Reinforcement[]
+  cuts: RouteCut[]
+}
