@@ -51,9 +51,10 @@
 - At the user's request, brought in the minimal-logo, app-icon and splash-animation work that another session
   left uncommitted in the shared checkout (its session logs are included unchanged). Merged the splash into
   this App.tsx (unknown-link notice and per-day explorer key kept); its decision is D-029 (its logs say D-026)
-  and D-025 moved to §3. Not brought in: that checkout's edit to the jsonc description (not part of the
-  request). Checked in the browser: splash, header mark, favicon/ICO/touch icon/manifest served, no console
+  and D-025 moved to §3. Checked in the browser: splash, header mark, favicon/ICO/touch icon/manifest served, no console
   errors, no overflow at 375 px. 15 test files / 148 tests, typecheck and build green.
+- Then, at the user's request, also brought in that checkout's edit to `platanus-hack-project.jsonc`: the
+  Spanish description no longer ends with the "Es una herramienta de prevención y planificación…" sentence.
 
 ## Decisions
 - → D-028 (D-026 is Bomberos, #54; D-027 the pace recalibration, #53).
