@@ -2,6 +2,23 @@
 
 Owner in brackets once someone takes an item. Blocks refer to the plan in `docs/VISION.md`.
 
+## Demo plan proposed 2026-11-22 01:40 (Cote; the team confirms)
+Main demo: **lockout before clearing a conveyor jam**, in a mining plant that doesn't exist (generated video), then the
+**flashlight live** as proof it works on real things. The C172 stays deployed as a hands-on side demo, off the pitch.
+Why: the deadly mistake is caught 6/6 on generated clips (#47), the cockpit is at ~6/16 per pass, and the cockpit
+fine-tune doesn't fit before 05:30. Pitch: "you can't film a thousand accidents to train an AI, but you can simulate them".
+- [ ] Merge #47 (completion checks, D-020) and #49 (`conveyor_lockout` task + 2 Veo clips + frames). [Cote]
+- [ ] Clip player with two branch buttons ("¿qué hace el operario?": pone el candado / mete las manos), playing
+  `sim/video/conveyor_lockout/clips/*.mp4` into the session like the camera (canvas frames, `source: sim`). It sends
+  `skip_step` twice first (the clips start with the belt stopped and the switch OFF) and never tells the server which
+  branch plays. [Anaís]
+- [ ] Demo server env: `SUP_VLM_CHECK_TASKS=conveyor_lockout`, ElevenLabs voice. [Alonso + Cote]
+- [ ] Full run ×2 per branch with voice; record the backup video. [team]
+- [ ] Pitch + `project-description.md`: lockout → reveal ("nada de esto existe") → flashlight live. Numbers only from
+  #47 / `sim/video/conveyor_lockout/README.md`. [team]
+- [ ] Optional, if credits allow (~65k ElevenLabs credits left on Creator; the API needs Pro): one clip of the
+  whole correct sequence (start test + clearing the jam) with audio on. Prompts in `sim/video/conveyor_lockout/prompts.md`.
+
 ## Now (status 2026-11-21 16:55; critical path to the 18:00 webcam loop)
 - [ ] **Confirm the demo task.** Default: `tasks/robot_assembly/servo_scout_robot.json`. New candidate with a much cheaper kit: `tasks/circuit_assembly/led_flashlight.json` (LED, 220 Ω resistor, push button, AA battery pack and jumper wires on a breadboard; weights trained). Optional: port the Arduino task from draft PR #19. [team]
 - [x] **Simulator page** (D-016): `/simulador/`, C172 takeoff cockpit (`tasks/aviation/c172_takeoff.json`), practice live through the session, expert recording mocked (downloads `.webm` + `ClipRecord` JSONL). [Anaís]
