@@ -96,6 +96,34 @@ Recall per mistake kind (%):
 | high | rules | 68.5 | 16.7 | 55.5 | 22.3 |
 | high | learned | 25.2 | 42.7 | 12.4 | 18.4 |
 
+## conveyor_lockout (v1)
+
+| noise | controller | step acc % | final ok % | mistake P % | R % | F1 % | FA/run | FA/min | delay ms |
+|---|---|---|---|---|---|---|---|---|---|
+| clean | rules | 100.0 | 100.0 | 100.0 | 69.6 | 82.1 | 0.00 | 0.00 | 0 |
+| clean | learned | 98.0 | 100.0 | 97.7 | 92.5 | 95.0 | 0.01 | 0.02 | 0 |
+| low | rules | 88.5 | 92.3 | 51.1 | 60.4 | 55.4 | 0.31 | 0.57 | 0 |
+| low | learned | 89.3 | 98.3 | 72.9 | 76.6 | 74.7 | 0.15 | 0.28 | 0 |
+| medium | rules | 65.8 | 63.5 | 21.0 | 53.6 | 30.2 | 1.08 | 2.00 | 0 |
+| medium | learned | 75.5 | 93.1 | 51.2 | 46.7 | 48.9 | 0.24 | 0.44 | 0 |
+| high | rules | 38.9 | 31.0 | 12.2 | 47.3 | 19.4 | 1.81 | 3.35 | 1572 |
+| high | learned | 63.2 | 86.1 | 28.5 | 23.3 | 25.6 | 0.31 | 0.58 | 1536 |
+
+597 test runs per noise level.
+
+Recall per mistake kind (%):
+
+| noise | controller | out_of_order | wrong_action | incomplete | repeated |
+|---|---|---|---|---|---|
+| clean | rules | 100.0 | n/a | 100.0 | 0.0 |
+| clean | learned | 93.5 | n/a | 99.2 | 82.5 |
+| low | rules | 96.8 | n/a | 76.2 | 5.2 |
+| low | learned | 86.0 | n/a | 73.0 | 72.2 |
+| medium | rules | 86.2 | n/a | 60.5 | 13.3 |
+| medium | learned | 60.6 | n/a | 41.9 | 39.8 |
+| high | rules | 70.7 | n/a | 51.2 | 20.4 |
+| high | learned | 35.9 | n/a | 18.1 | 18.4 |
+
 ## servo_scout_robot (v1)
 
 | noise | controller | step acc % | final ok % | mistake P % | R % | F1 % | FA/run | FA/min | delay ms |

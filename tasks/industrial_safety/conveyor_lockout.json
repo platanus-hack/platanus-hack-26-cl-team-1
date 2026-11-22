@@ -1,0 +1,81 @@
+{
+  "id": "conveyor_lockout",
+  "version": 1,
+  "title_es": "Bloqueo de la correa antes de desatascarla",
+  "description": "Clear a rock jammed in an ore conveyor safely: stop the belt, open the isolation switch, put your personal padlock and tag on it, test that the belt cannot start, and only then reach in. Seen from a fixed security camera: isolation switch box on the left, conveyor on the right.",
+  "domain": "industrial_safety",
+  "ontology_version": 1,
+  "objects": [
+    "conveyor_belt",
+    "emergency_stop",
+    "isolation_switch",
+    "padlock",
+    "jammed_rock"
+  ],
+  "actions": [
+    "stop_conveyor",
+    "turn_isolator_off",
+    "apply_padlock",
+    "test_start",
+    "clear_jam"
+  ],
+  "steps": [
+    {
+      "id": "stop_belt",
+      "title_es": "Detener la correa",
+      "instruction_es": "Detén la correa con la parada de emergencia.",
+      "action": "stop_conveyor",
+      "completion_cue": "the belt is not moving"
+    },
+    {
+      "id": "isolate",
+      "title_es": "Abrir el interruptor",
+      "instruction_es": "Gira la manilla roja del interruptor a OFF.",
+      "action": "turn_isolator_off",
+      "requires": [
+        "stop_belt"
+      ],
+      "completion_cue": "the red rotary handle on the grey box is horizontal (OFF)"
+    },
+    {
+      "id": "lock",
+      "title_es": "Candado y tarjeta",
+      "instruction_es": "Pon tu candado y tu tarjeta en la manilla.",
+      "action": "apply_padlock",
+      "requires": [
+        "isolate"
+      ],
+      "completion_cue": "a red padlock hangs from the big red rotary handle on the grey box at the left (attached to the handle itself, not held in a hand)"
+    },
+    {
+      "id": "verify",
+      "title_es": "Probar el arranque",
+      "instruction_es": "Prueba el arranque: la correa no debe moverse.",
+      "action": "test_start",
+      "requires": [
+        "lock"
+      ],
+      "completion_cue": "the worker's gloved finger is pressing a green START button next to the conveyor"
+    },
+    {
+      "id": "clear",
+      "title_es": "Sacar la roca",
+      "instruction_es": "Ahora sí, saca la roca atascada.",
+      "action": "clear_jam",
+      "requires": [
+        "verify"
+      ],
+      "completion_cue": "the rock is out of the belt"
+    }
+  ],
+  "mistakes": [
+    {
+      "id": "hand_in_unlocked",
+      "kind": "out_of_order",
+      "step": "clear",
+      "description": "The worker reaches into the conveyor before locking out and testing the isolation switch.",
+      "visual_cue": "the worker reaches into the conveyor or grips the jammed rock while NO padlock hangs from the red handle of the isolation switch",
+      "correction_es": "¡Alto! No metas las manos: la correa no está bloqueada. Pon tu candado primero."
+    }
+  ]
+}

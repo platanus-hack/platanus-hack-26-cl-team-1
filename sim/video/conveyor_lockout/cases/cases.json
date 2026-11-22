@@ -1,0 +1,77 @@
+{
+  "task_id": "conveyor_lockout",
+  "cases": [
+    {
+      "name": "i0_holding",
+      "expected": null,
+      "done": [
+        "stop_belt",
+        "isolate"
+      ]
+    },
+    {
+      "name": "l1_hand_on_handle",
+      "expected": "apply_padlock",
+      "done": [
+        "stop_belt",
+        "isolate"
+      ]
+    },
+    {
+      "name": "l2_inserting",
+      "expected": "apply_padlock",
+      "done": [
+        "stop_belt",
+        "isolate"
+      ]
+    },
+    {
+      "name": "l3_snapping",
+      "expected": "apply_padlock",
+      "done": [
+        "stop_belt",
+        "isolate"
+      ]
+    },
+    {
+      "name": "l4_locked_steps_back",
+      "expected": "apply_padlock",
+      "done": [
+        "stop_belt",
+        "isolate"
+      ]
+    },
+    {
+      "name": "m1_pocketing",
+      "expected": null,
+      "done": [
+        "stop_belt",
+        "isolate"
+      ]
+    },
+    {
+      "name": "m2_walking_away",
+      "expected": null,
+      "done": [
+        "stop_belt",
+        "isolate"
+      ]
+    },
+    {
+      "name": "m3_reaching",
+      "expected": "clear_jam",
+      "done": [
+        "stop_belt",
+        "isolate"
+      ]
+    },
+    {
+      "name": "m4_hands_on_rock",
+      "expected": "clear_jam",
+      "done": [
+        "stop_belt",
+        "isolate"
+      ]
+    }
+  ]
+}

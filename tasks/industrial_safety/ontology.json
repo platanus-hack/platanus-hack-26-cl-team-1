@@ -1,0 +1,72 @@
+{
+  "domain": "industrial_safety",
+  "version": 1,
+  "objects": [
+    {
+      "id": "conveyor_belt",
+      "label_es": "correa transportadora",
+      "description": "long black rubber conveyor belt on the right carrying crushed grey ore, with a big rock jammed between the belt and a roller"
+    },
+    {
+      "id": "emergency_stop",
+      "label_es": "parada de emergencia",
+      "description": "red mushroom emergency-stop button next to the conveyor"
+    },
+    {
+      "id": "isolation_switch",
+      "label_es": "interruptor de aislamiento",
+      "description": "large grey electrical box on a steel pillar at the left with a big red rotary handle and a yellow 'PUNTO DE BLOQUEO' sign below it"
+    },
+    {
+      "id": "padlock",
+      "label_es": "candado de bloqueo",
+      "description": "red safety padlock with a red-and-white 'PELIGRO' tag"
+    },
+    {
+      "id": "jammed_rock",
+      "label_es": "roca atascada",
+      "description": "the large dark rock stuck between the conveyor belt and its roller"
+    }
+  ],
+  "actions": [
+    {
+      "id": "stop_conveyor",
+      "verb": "stop",
+      "object": "conveyor_belt",
+      "target": "emergency_stop",
+      "label_es": "detener la correa",
+      "visual_cue": "the worker presses the red emergency-stop button and the moving belt comes to a stop"
+    },
+    {
+      "id": "turn_isolator_off",
+      "verb": "turn_off",
+      "object": "isolation_switch",
+      "label_es": "abrir el interruptor de aislamiento",
+      "visual_cue": "the worker turns the big red rotary handle on the grey box at the left from vertical (ON) to horizontal (OFF)"
+    },
+    {
+      "id": "apply_padlock",
+      "verb": "lock",
+      "object": "isolation_switch",
+      "target": "padlock",
+      "label_es": "poner candado y tarjeta",
+      "visual_cue": "the red padlock is IN CONTACT WITH THE RED ROTARY HANDLE in the newest frame: its shackle is being hooked through the handle and snapped shut, or the padlock and its red-and-white tag already hang from the handle. A padlock that is only held in the hand, carried, raised toward the box or put in a pocket, without touching the handle, is NOT this action: answer null"
+    },
+    {
+      "id": "test_start",
+      "verb": "test",
+      "object": "conveyor_belt",
+      "target": "emergency_stop",
+      "label_es": "probar el arranque",
+      "visual_cue": "with the padlock on the handle, the worker presses the start button and the belt does not move"
+    },
+    {
+      "id": "clear_jam",
+      "verb": "remove",
+      "object": "jammed_rock",
+      "target": "conveyor_belt",
+      "label_es": "sacar la roca atascada",
+      "visual_cue": "the worker stands at the conveyor on the right, bent over the belt, reaching into it with gloved hands or gripping the jammed rock between the belt and the roller"
+    }
+  ]
+}
