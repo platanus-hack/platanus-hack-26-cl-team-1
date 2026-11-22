@@ -32,7 +32,7 @@ import { MapView } from './ui/MapView'
 import type { LayerToggles, Tool } from './ui/MapView'
 import { Panel } from './ui/Panel'
 import type { Summary, Timings } from './ui/Panel'
-import type { EmberRangeState } from './ui/FirebreakEmberRange'
+import { nextEmberState, type EmberState } from './ui/EmberEnsemble'
 import { Timebar } from './ui/Timebar'
 import { LayersCard } from './ui/LayersCard'
 import { SourcesModal } from './ui/SourcesModal'
@@ -375,8 +375,8 @@ function Explorer({
   const [simError, setSimError] = useState<string | null>(null)
   const [timings, setTimings] = useState<Timings | null>(null)
   const [baseline, setBaseline] = useState<Summary | null>(null)
-  /** Drawn firebreaks under several ember distances (worker/emberRange.ts); null until the worker sends one. */
-  const [emberRange, setEmberRange] = useState<EmberRangeState | null>(null)
+  /** Probabilistic-ember ensemble for the drawn firebreaks (worker/embers.ts), for the last result shown. */
+  const [embers, setEmbers] = useState<EmberState | null>(null)
   /** Which day the population model assumes (who is home, who is at work or school). UI-only: the worker's
    *  fire and evacuation do not depend on it. */
   const [populationDay, setPopulationDay] = useState<PopulationDay>(POPULATION_DAY.REAL)
@@ -399,7 +399,10 @@ function Explorer({
   scenarioRef.current = scenario
   /** Weather notes the panel already shows (set below), so only the worker's other notes go to the map. */
   const weatherNotesRef = useRef<string[]>([])
+  /** Id of the last result shown: ensemble messages for any other run are ignored. */
+  const lastResultIdRef = useRef<number | null>(null)
   useEffect(() => {
+    lastResultIdRef.current = null // a new worker numbers its runs from 1 again
     const c = new SimClient({
       onReady: () => performance.mark('cf:ready'),
       onResult: (r, roundTripMs) => {
@@ -412,8 +415,11 @@ function Explorer({
           r.safeNodes.length !== data.roads.nodes.length
         if (mismatch) {
           setSimError('Los datos del simulador no coinciden con los del mapa (¿se regeneraron los archivos?). Recarga la página.')
+          lastResultIdRef.current = null
+          setEmbers(null)
           return
         }
+        lastResultIdRef.current = r.id
         if (r.fire) setFire(r.fire)
         setEvac(r.evac)
         setBrigadesOut(r.brigades ?? null)
@@ -426,11 +432,13 @@ function Explorer({
       },
       onError: (m) => {
         setSimError(m)
-        // The range below the firebreaks belonged to the last good run: say so instead of showing it or "Calculando…".
-        setEmberRange({ rows: null, error: 'el escenario actual no se pudo simular' })
+        // The worker stopped the ensemble with the run: never leave the panel waiting on it.
+        setEmbers(null)
       },
       onBusy: setBusy,
-      onEmberRange: (m) => setEmberRange({ rows: m.rows, error: m.error }),
+      onEmbers: (m) => {
+        if (m.id === lastResultIdRef.current) setEmbers((prev) => nextEmberState(prev, m))
+      },
     })
     c.init(data.synthetic, choice)
     // A new worker starts with the current scenario (the debounced effect below only fires on changes).
@@ -636,7 +644,7 @@ function Explorer({
     summary,
     baseline,
     setBaseline,
-    emberRange,
+    embers,
     timings,
     busy,
     simError,

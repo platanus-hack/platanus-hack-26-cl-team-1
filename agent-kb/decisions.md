@@ -329,23 +329,6 @@ D-026 to D-028 were taken by #54, #53 and the today scenario._
   The UI shows these numbers as they are. Rerun `pnpm plan` whenever the data or the fire calibration change.
   Not included: firebreak, street-link and alert optimizers (reasons in the session log).
 
-### D-034 — Drawn firebreaks shown under several ember distances (2026-11-22)
-- **Context:** exploring a tool where firefighting experts draw firebreaks on a scenario (Talca, D-032), we found
-  that with the shipped embers (25 m per km/h, deterministic) a 60-120 m line barely matters on Talca (-1 to -5 %
-  households cut off), while with embers off the same line removes 27-96 %. The answer to "does my line hold?" is
-  set mostly by one knob calibrated only on Viña 2024.
-- **Decision (no contract change in `types.ts`; worker protocol gains an `emberRange` message):** when the scenario
-  has drawn firebreaks, the worker, after sending the normal result, runs the scenario without firefighters at its own
-  ember setting (embers off included, so one row matches the main result) and at 12, 15 and 25 m per km/h (the
-  distances the calibration tried), without and with the lines, one fire or one pair of evacuations per task so the
-  next change interrupts it. Fires are cached per setting under `emberRangeFireKey`, evacuations under
-  `emberRangeEvacKey`. After a failed run the panel says the range could not be computed. The Cortafuegos panel shows households cut off and
-  burned area per distance and the range, and says the distances were calibrated only on Viña. The main result is
-  unchanged. `scripts/firebreak-embers.ts` measures one line with the same helper.
-- **Consequences:** on Talca an 8 km x 120 m line 1 km ahead of the fire reads -5.5 % to -35.5 % (fire `MODEL.md`
-  section 5). Each change with firebreaks costs about 6 extra fire and evacuation runs in the background
-  (about 1 s on Talca). Making embers probabilistic, so a line reduces rather than all-or-nothing, is the model
-  fix; not done.
 ### D-035 — Live placement never stops the simulation: clicks outside the area refused, fire starts snapped to vegetation (2026-11-22)
 - **Context:** an adversarial demo check (99 reviewer agents, every finding reproduced by a second one) found four ways a
   presenter could stop the simulation with one click: a fire start outside the simulated area (the base map extends
@@ -380,6 +363,40 @@ D-026 to D-028 were taken by #54, #53 and the today scenario._
 - **Consequences:** the default landing is still Viña's today (D-028); the demo opens `?escenario=hoy-talca`. Needs
   the forecast API, like D-028 (offline mode disables both today options).
 
+### D-037 — Probabilistic ember landings say whether drawn firebreaks are crossed; supersedes D-034 (2026-11-22)
+- **Context:** a review of D-034's range (PR #64) found that every row crosses every drawable line. At 60 m cells
+  the shortest ember jump is 180 m and embers only fly at 15 km/h or more, so even 12 m per km/h reaches past a
+  120 m line. The 12 and 15 rows came from settings the calibration had rejected or never scored, and the only
+  rows offered were shorter than the shipped 25, so the range leaned towards making lines look effective. The user
+  asked for probabilistic embers instead. Three prototyped designs were judged; the RandomFront 2.3 landing
+  formulas give distances of 5.6 cm or 5.6 km depending on units, and Sardoy-shaped landings would change the main
+  result (fire `MODEL.md` section 5).
+- **Decision (contract: `FireParams.emberSeed`, `FireInput.lineMask`, `FireLineReport`, `FireResult.line`; worker
+  protocol: an `embers` message replaces `emberRange`):**
+  - The main result keeps deterministic spotting (`emberSeed: null`, bit for bit the shipped engine), so the pitch
+    numbers (Dice 0.639, 4,061 households) do not move.
+  - With a seed, each ember jump edge exists with probability 1 − exp(−λ). λ spreads the brands a source lofts
+    (`FIRE_MODEL.spotBrandsPerHa` = 356 per ha, the only fitted scalar, `calibrate.ts --embers`) evenly over the
+    calibrated band, times Schroeder's (1969) ignition probability from temperature and grass moisture. The
+    draw is `hashPair(source, target, seed)`, so the runs with and without the lines share every random number.
+    Gates, band, D_max and travel time are unchanged.
+  - With embers on and lines drawn, the worker runs seeds 1–8 without and with the lines (no firefighters), one
+    simulation per task, cached per side and seed, with households cached per evacuation key. The panel says in
+    how many runs embers cross the lines (`lineMask` reports jumps over the drawn lines only, not the plan belt), the
+    median times, and the paired difference in households and area with its P10–P90.
+  - D-034's ember range, `scripts/firebreak-embers.ts` and the `emberRange` message are removed.
+- **Consequences:**
+  - On Viña the 32-member ensemble scores Dice 0.649 (deterministic 0.639) and cuts off 3,763 households (−7.3 %).
+  - On Talca an 8 km line 1 km ahead of the fire is crossed in 32 of 32 runs at every width. It saves 527
+    [480–531] households at 30 m (−5.0 %) and 580 [537–586] at 120 m (−5.5 %).
+  - Whether a line is crossed is a step function of the inherited wind and source-ROS gates: on Talca it flips
+    between wind ×0.6 (0 of 32) and ×0.65 (32 of 32). Probabilistic landings do not make lines hold. What they add
+    is an honest count and a paired effect.
+  - Each change with lines costs up to 16 fires and 16 evacuations in the background (about 1.2–1.9 s on Node).
+    Evacuation-only changes rerun only the evacuations, and line edits rerun only the with-lines side.
+  - In humid air the 8-run median is unstable: Talca at RH +30 points gives 497–733 saved by 8-seed block. The
+    panel's P10–P90 range is wide there too.
+
 ## §2 Open
 
 - Viña's scar (`scar.bin`) applies a −0.1 reflectance offset that the Earth Search COGs do not need (15.6 % / 19.6 %
@@ -389,7 +406,25 @@ D-026 to D-028 were taken by #54, #53 and the today scenario._
 
 ## §3 Superseded
 
-_Moved here by D-019 (pivot to Cortafuego): D-001, D-005, D-008 to D-018. Moved by D-020: D-006, D-007. Moved by D-029: D-025._
+_Moved here by D-019 (pivot to Cortafuego): D-001, D-005, D-008 to D-018. Moved by D-020: D-006, D-007. Moved by D-029: D-025. Moved by D-037: D-034._
+
+### D-034 — Drawn firebreaks shown under several ember distances (2026-11-22)
+- **Context:** exploring a tool where firefighting experts draw firebreaks on a scenario (Talca, D-032), we found
+  that with the shipped embers (25 m per km/h, deterministic) a 60-120 m line barely matters on Talca (-1 to -5 %
+  households cut off), while with embers off the same line removes 27-96 %. The answer to "does my line hold?" is
+  set mostly by one knob calibrated only on Viña 2024.
+- **Decision (no contract change in `types.ts`; worker protocol gains an `emberRange` message):** when the scenario
+  has drawn firebreaks, the worker, after sending the normal result, runs the scenario without firefighters at its own
+  ember setting (embers off included, so one row matches the main result) and at 12, 15 and 25 m per km/h (the
+  distances the calibration tried), without and with the lines, one fire or one pair of evacuations per task so the
+  next change interrupts it. Fires are cached per setting under `emberRangeFireKey`, evacuations under
+  `emberRangeEvacKey`. After a failed run the panel says the range could not be computed. The Cortafuegos panel shows households cut off and
+  burned area per distance and the range, and says the distances were calibrated only on Viña. The main result is
+  unchanged. `scripts/firebreak-embers.ts` measures one line with the same helper.
+- **Consequences:** on Talca an 8 km x 120 m line 1 km ahead of the fire reads -5.5 % to -35.5 % (fire `MODEL.md`
+  section 5). Each change with firebreaks costs about 6 extra fire and evacuation runs in the background
+  (about 1 s on Talca). Making embers probabilistic, so a line reduces rather than all-or-nothing, is the model
+  fix; not done.
 
 ### D-025 — Cortafuego logo: flame and protective masonry barrier (2026-11-22)
 - **Context:** the user requested a clean, professional, firewall-related SVG and reiterated the README's

@@ -3,7 +3,7 @@ import type { WeatherSeries } from '../engine/types'
 import type { PlannedUnit } from '../engine/brigade'
 import type { Scenario } from './scenario'
 import type { TimelineChoice } from '../data/timeline'
-import type { EmberRangeRow } from './emberRange'
+import type { EmberMemberOut } from './embers'
 
 /** init: the worker loads the same dataset the UI uses (real files, or the deterministic synthetic set) and sees
  *  it from the same timeline (src/data/timeline.ts). */
@@ -55,10 +55,25 @@ export interface RunResult {
   workerMs: number
 }
 
+/** The probabilistic-ember ensemble for the drawn firebreaks (embers.ts). One follows each successful run's result,
+ *  with that run's id; while it is 'running' another follows each completed member, then 'done' or 'error'. A newer
+ *  run stops the sequence with no final message (the UI ignores ids other than its last result's). A run that fails
+ *  posts only its 'error' result.
+ *  - off: embers are off (or at distance 0) or there are no drawn firebreaks; nothing is computed.
+ *  - running: `members` are the members already up to date for this scenario (from the cache or just computed).
+ *  - done: all `total` members.
+ *  - error: `error` says why; the cache was cleared. */
+export interface EmbersMessage {
+  type: 'embers'
+  id: number
+  status: 'off' | 'running' | 'done' | 'error'
+  total: number
+  members: EmberMemberOut[]
+  error: string | null
+}
+
 export type FromWorker =
   | { type: 'ready'; loadMs: number; prepareMs: number }
   | { type: 'result'; result: RunResult }
   | { type: 'error'; id: number | null; message: string }
-  /** Drawn firebreaks under several ember distances (emberRange.ts), sent after the run's result when the scenario
-   *  has firebreaks: rows null while it is being computed, then the rows (or an error). */
-  | { type: 'emberRange'; id: number; rows: EmberRangeRow[] | null; error: string | null }
+  | EmbersMessage

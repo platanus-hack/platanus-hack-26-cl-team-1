@@ -1,21 +1,23 @@
 /// <reference lib="webworker" />
 // Simulation worker: loads its own copy of the dataset (fetching and parsing here is much faster than a
 // structured clone of ~200k small arrays from the UI thread), prepares the evacuation graph once, then on each
-// request reruns the fire only when its inputs changed and always reruns the (cheap) evacuation.
+// request reruns the fire only when its inputs changed and always reruns the (cheap) evacuation. With embers on and
+// drawn firebreaks, it then runs the probabilistic-ember ensemble (embers.ts) in the background, one simulation per
+// task, so a new request never waits for more than one of them.
 import { simulateFire, DEFAULT_FIRE_PARAMS } from '../engine/fire'
 import { prepareEvac, simulateEvac, DEFAULT_EVAC_PARAMS } from '../engine/evac'
 import { applyRescue, planBrigades, type BrigadePlan } from '../engine/brigade'
 import { applyBelt, buildBelt, checkPlanAgainstData, programmeFor, type Belt } from '../engine/plan'
-import type { EvacParams, EvacPrepared, FireInput, FireResult } from '../engine/types'
-import type { BrigadesOut, FromWorker, RunResult, ToWorker } from './protocol'
+import type { EvacParams, EvacPrepared, FireInput, FireResult, Ignition } from '../engine/types'
+import type { BrigadesOut, EmbersMessage, FromWorker, RunResult, ToWorker } from './protocol'
 import { localToMin } from '../data/time'
 import type { Dataset } from '../data/load'
 import { loadRealDataset } from '../data/load'
 import { makeMockDataset } from '../data/mock'
 import { timelineDataset, type TimelineChoice } from '../data/timeline'
 import { checkEvent, EVENTS, eventOfTimeline } from '../data/events'
-import { emberFire, emberLabel, emberRangeEvacKey, emberRangeFireKey, emberSettings, type EmberRangeRow } from './emberRange'
-import { brigadeKey, buildIgnitions, buildWeatherSeries, fireKey, rasteriseFirebreaks, safeNodes, snapIgnitions, wildlandDistanceM, type Scenario } from './scenario'
+import { brigadeKey, buildIgnitions, buildWeatherSeries, fireKey, rasteriseFirebreaks, safeNodes, snapIgnitions, wildlandDistanceM } from './scenario'
+import { EMBER_MEMBERS, emberKeys, emptyEmberCache, readyEmberMembers, runNextEmberTask, type EmberCache, type EmberFire, type EmberKeys, type EmberSide } from './embers'
 
 const ctx = self as unknown as DedicatedWorkerGlobalScope
 
@@ -30,21 +32,20 @@ let fireNotes: string[] = []
 let lastFireKey = ''
 let lastFire: FireResult | null = null
 let lastFireInput: FireInput | null = null
-/** The last fire's firebreak mask without the drawn lines (the plan's belt only), for the ember range. */
+/** For the last fire: the drawn lines alone (the ensemble's FireInput.lineMask), and the firebreak mask without them
+ *  (the plan belt only, zeros without a plan) with the fire starts snapped against it, which the ensemble's runs
+ *  without the lines use (snapped against the lines, a start could move with them, and the runs without the lines
+ *  must not depend on the lines). */
+let lastLineMask: Uint8Array | null = null
+let lastNoLinesIgnitions: Ignition[] | null = null
 let lastNoLinesFirebreak: Uint8Array | null = null
 /** Pass 2 (defended fire) cache, keyed by fireKey + brigadeKey. */
 let lastDefKey = ''
 let lastDef: { fire: FireResult; plan: BrigadePlan; planMs: number } | null = null
 let lastSentKey = ''
-/** Ember range (emberRange.ts): computed after the result, one fire or one pair of evacuations per task so a new run
- *  can start in between. Fires are kept per emberRangeFireKey and rows per emberRangeEvacKey too, by setting, so a
- *  change that only affects the evacuation reruns the evacuations, and moving the ember slider adds one setting. */
-type RangeFire = { arrivalMin: Float32Array; burnedCells: number }
-let rangeTimer: ReturnType<typeof setTimeout> | null = null
-let rangeFireKey = ''
-let rangeEvacKey = ''
-const rangeFires = new Map<string, { without?: RangeFire; with?: RangeFire }>()
-const rangeRows = new Map<string, EmberRangeRow>()
+/** Probabilistic-ember ensemble (embers.ts): the pending background step, and the runs kept per seed and side. */
+let emberTimer: ReturnType<typeof setTimeout> | null = null
+let emberCache: EmberCache = emptyEmberCache()
 
 function post(msg: FromWorker, transfer: Transferable[] = []) {
   ctx.postMessage(msg, transfer)
@@ -66,11 +67,23 @@ async function init(synthetic: boolean, timeline: TimelineChoice) {
   lastDefKey = ''
   lastDef = null
   lastSentKey = ''
-  rangeFireKey = ''
-  rangeEvacKey = ''
-  rangeFires.clear()
-  rangeRows.clear()
+  resetEmbers()
   post({ type: 'ready', loadMs, prepareMs: performance.now() - t - loadMs })
+}
+
+function clearEmberTimer() {
+  if (emberTimer !== null) {
+    clearTimeout(emberTimer)
+    emberTimer = null
+  }
+}
+
+function resetEmbers() {
+  clearEmberTimer()
+  emberCache = emptyEmberCache()
+  lastLineMask = null
+  lastNoLinesFirebreak = null
+  lastNoLinesIgnitions = null
 }
 
 /** Loading the files can fail on a flaky network (a scenario switch at a demo venue): retry after 1, 2 and 4 s
@@ -90,13 +103,12 @@ async function initWithRetry(synthetic: boolean, timeline: TimelineChoice) {
 
 ctx.onmessage = (ev: MessageEvent<ToWorker>) => {
   const msg = ev.data
+  // Any message stops the ensemble's background step first: a step left over from before would run on old inputs.
+  clearEmberTimer()
   if (msg.type === 'init') {
+    resetEmbers()
     initWithRetry(msg.synthetic, msg.timeline).catch((e: unknown) => post({ type: 'error', id: null, message: e instanceof Error ? e.message : String(e) }))
     return
-  }
-  if (rangeTimer !== null) {
-    clearTimeout(rangeTimer)
-    rangeTimer = null
   }
   try {
     if (!data || !prepared || !wildDist || !belt) throw new Error('El simulador aún no tiene datos')
@@ -107,17 +119,19 @@ ctx.onmessage = (ev: MessageEvent<ToWorker>) => {
     if (key !== lastFireKey || !lastFire) {
       const ignitions = buildIgnitions(data.grid, data.ignitions, s)
       let fuel = data.fuel
-      let firebreak = rasteriseFirebreaks(data.grid, s.firebreaks)
-      let noLines: Uint8Array = new Uint8Array(firebreak.length)
+      const lines = rasteriseFirebreaks(data.grid, s.firebreaks)
+      let firebreak = lines
+      let noLines: Uint8Array = new Uint8Array(lines.length)
       // Notes and cache are set only once the fire succeeds: a failed run must leave the last good fire, its input
-      // (reused by the firefighters' pass) and its notes untouched.
+      // (reused by the firefighters' pass and the ember ensemble) and its notes untouched.
       const notes: string[] = []
       if (s.planTiles.length > 0) {
         // Plan de preparación: the belt cleared in the chosen tiles (src/engine/plan).
-        const a = applyBelt(belt, s.planTiles, fuel, firebreak, ignitions.map((g) => g.cell))
+        const ignitionCells = ignitions.map((g) => g.cell)
+        const a = applyBelt(belt, s.planTiles, fuel, firebreak, ignitionCells)
         fuel = a.fuel
         firebreak = a.firebreak
-        noLines = applyBelt(belt, s.planTiles, data.fuel, noLines, ignitions.map((g) => g.cell)).firebreak
+        noLines = applyBelt(belt, s.planTiles, data.fuel, noLines, ignitionCells).firebreak
         if (a.skippedIgnitionCells > 0)
           notes.push(
             a.skippedIgnitionCells === 1
@@ -128,6 +142,7 @@ ctx.onmessage = (ev: MessageEvent<ToWorker>) => {
       // A start point on water, pavement or a firebreak moves to the nearest vegetation (and the panel says so).
       const snapped = snapIgnitions(data.grid, fuel, firebreak, ignitions)
       notes.push(...snapped.notes)
+      const snappedNoLines = snapIgnitions(data.grid, fuel, noLines, ignitions).ignitions
       const input: FireInput = {
         grid: data.grid,
         elevation: data.elevation,
@@ -147,8 +162,10 @@ ctx.onmessage = (ev: MessageEvent<ToWorker>) => {
       lastFireInput = input
       lastFire = newFire
       fireNotes = notes
-      lastNoLinesFirebreak = noLines
+      lastNoLinesIgnitions = snappedNoLines
       lastFireKey = key
+      lastLineMask = lines
+      lastNoLinesFirebreak = noLines
     }
     const evacParams: EvacParams = {
       ...DEFAULT_EVAC_PARAMS,
@@ -250,68 +267,73 @@ ctx.onmessage = (ev: MessageEvent<ToWorker>) => {
     }
     result.workerMs = performance.now() - t
     post({ type: 'result', result }, transfer)
-    if (s.firebreaks.length > 0) {
+    // Embers at distance 0 never jump: treated as off, like the panel (nothing would differ between members).
+    if (s.spotting && s.spotMetresPerKmh > 0 && s.firebreaks.length > 0) {
       const pr = prepared
-      scheduleEmberRange(msg.id, s, lastFireInput!, lastNoLinesFirebreak!, (arrivalMin) =>
-        simulateEvac({ prepared: pr, arrivalMin, params: evacParams, edits, programme }).expectedTrappedHouseholds,
-      )
+      const base = lastFireInput!
+      const lineMask = lastLineMask!
+      const noLines = lastNoLinesFirebreak!
+      const noLinesIgnitions = lastNoLinesIgnitions!
+      // The scenario's fire with random ember landings for one seed: with the drawn lines (reporting on them), or
+      // with the plan belt only. No firefighters. The evacuation is the main run's, without firefighters.
+      const fire = (side: EmberSide, seed: number): EmberFire => {
+        const params = { ...base.params, emberSeed: seed }
+        return side === 'with'
+          ? simulateFire({ ...base, params, lineMask, defense: undefined })
+          : simulateFire({ ...base, firebreak: noLines, ignitions: noLinesIgnitions, params, lineMask: undefined, defense: undefined })
+      }
+      const households = (arrivalMin: Float32Array) => simulateEvac({ prepared: pr, arrivalMin, params: evacParams, edits, programme }).expectedTrappedHouseholds
+      scheduleEmbers(msg.id, emberKeys(s), fire, households)
+    } else {
+      post(embersMessage(msg.id, 'off', [], null))
     }
   } catch (e) {
     post({ type: 'error', id: msg.id, message: e instanceof Error ? e.message : String(e) })
   }
 }
 
-/** Drawn firebreaks under each ember setting (emberRange.ts), after the result: cached rows are sent at once, missing
- *  ones are computed one fire (or one pair of evacuations) per task; a new run cancels the timer and keeps what is
- *  still valid for its keys. */
-function scheduleEmberRange(id: number, s: Scenario, input: FireInput, noLines: Uint8Array, trapped: (arrivalMin: Float32Array) => number) {
-  const fk = emberRangeFireKey(s)
-  const ek = emberRangeEvacKey(s)
-  if (fk !== rangeFireKey) {
-    rangeFireKey = fk
-    rangeFires.clear()
-    rangeRows.clear()
+function embersMessage(id: number, status: EmbersMessage['status'], members: EmbersMessage['members'], error: string | null): EmbersMessage {
+  return { type: 'embers', id, status, total: EMBER_MEMBERS, members, error }
+}
+
+/** The ensemble for run `id`: posts the members already up to date at once ('done' if all are), then runs the
+ *  missing simulations one per task, posting 'running' after each completed member and 'done' at the end. A new
+ *  message cancels the timer; the next request resumes from the cache (runs whose keys still match are kept). */
+function scheduleEmbers(id: number, keys: EmberKeys, fire: (side: EmberSide, seed: number) => EmberFire, households: (arrivalMin: Float32Array) => number) {
+  const fail = (e: unknown) => {
+    emberCache = emptyEmberCache()
+    post(embersMessage(id, 'error', [], e instanceof Error ? e.message : String(e)))
   }
-  if (ek !== rangeEvacKey) {
-    rangeEvacKey = ek
-    rangeRows.clear()
-  }
-  const settings = emberSettings(s)
-  const labels = new Set(settings.map(emberLabel))
-  // Keep only the settings shown now (the ember slider can visit many values).
-  for (const k of [...rangeFires.keys()]) if (!labels.has(k)) rangeFires.delete(k)
-  for (const k of [...rangeRows.keys()]) if (!labels.has(k)) rangeRows.delete(k)
-  const done = () => settings.every((e) => rangeRows.has(emberLabel(e)))
-  const send = () => post({ type: 'emberRange', id, rows: settings.map((e) => rangeRows.get(emberLabel(e))!), error: null })
-  if (done()) {
-    send()
-    return
-  }
-  post({ type: 'emberRange', id, rows: null, error: null })
-  const step = () => {
-    rangeTimer = null
-    try {
-      const e = settings.find((x) => !rangeRows.has(emberLabel(x)))!
-      const L = emberLabel(e)
-      let f = rangeFires.get(L)
-      if (!f) rangeFires.set(L, (f = {}))
-      if (!f.without) f.without = emberFire(input, noLines, e)
-      else if (!f.with) f.with = emberFire(input, input.firebreak, e)
-      else
-        rangeRows.set(L, {
-          spotMetresPerKmh: e,
-          without: { burnedCells: f.without.burnedCells, households: trapped(f.without.arrivalMin) },
-          with: { burnedCells: f.with.burnedCells, households: trapped(f.with.arrivalMin) },
-        })
-    } catch (err) {
-      rangeFireKey = ''
-      rangeFires.clear()
-      rangeRows.clear()
-      post({ type: 'emberRange', id, rows: null, error: err instanceof Error ? err.message : String(err) })
+  let done: number
+  try {
+    const members = readyEmberMembers(emberCache, keys)
+    done = members.length
+    if (done === EMBER_MEMBERS) {
+      post(embersMessage(id, 'done', members, null))
       return
     }
-    if (done()) send()
-    else rangeTimer = setTimeout(step, 0)
+    post(embersMessage(id, 'running', members, null))
+  } catch (e) {
+    fail(e)
+    return
   }
-  rangeTimer = setTimeout(step, 0)
+  const step = () => {
+    emberTimer = null
+    try {
+      if (!runNextEmberTask(emberCache, keys, fire, households)) throw new Error('El conjunto de simulaciones con pavesas quedó incompleto sin tareas pendientes')
+      const members = readyEmberMembers(emberCache, keys)
+      if (members.length === EMBER_MEMBERS) {
+        post(embersMessage(id, 'done', members, null))
+        return
+      }
+      if (members.length !== done) {
+        done = members.length
+        post(embersMessage(id, 'running', members, null))
+      }
+      emberTimer = setTimeout(step, 0)
+    } catch (e) {
+      fail(e)
+    }
+  }
+  emberTimer = setTimeout(step, 0)
 }

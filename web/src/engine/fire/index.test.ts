@@ -1,17 +1,19 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { FUEL, type FireInput, type FireParams, type FuelCode, type GridMeta, type WeatherSample } from '../types'
-import { DEFAULT_FIRE_PARAMS, FIRE_MODEL, nearestBurnableCell, simulateFire } from './index'
+import { DEFAULT_FIRE_PARAMS, FIRE_MODEL, hashPair, nearestBurnableCell, simulateFire } from './index'
 import { eccentricity, flatRosKmh, lengthToBreadth } from './model'
 
 const ANCHOR_DEFAULT = FIRE_MODEL.anchorMaxCells
 const SPOT_EXP_DEFAULT = FIRE_MODEL.spotIntensityExponent
 const SPOT_REF_DEFAULT = FIRE_MODEL.spotRefRosMPerMin
+const BRANDS_DEFAULT = FIRE_MODEL.spotBrandsPerHa
 afterEach(() => {
   FIRE_MODEL.anchorMaxCells = ANCHOR_DEFAULT
   FIRE_MODEL.spotIntensityExponent = SPOT_EXP_DEFAULT
   FIRE_MODEL.spotRefRosMPerMin = SPOT_REF_DEFAULT
   FIRE_MODEL.spotJitterSigma = 0
   FIRE_MODEL.spotJitterSeed = 0
+  FIRE_MODEL.spotBrandsPerHa = BRANDS_DEFAULT
 })
 
 interface Opts {
@@ -355,6 +357,167 @@ describe('firebreaks and spotting', () => {
     let above = 0
     for (let r = 0; r < 61; r++) for (let c = r + 1; c < 61; c++) if (Number.isFinite(at(inp, res.arrivalMin, r, c))) above++
     expect(above).toBe(0)
+  })
+
+  describe('probabilistic ember landings (emberSeed) and the line report (lineMask)', () => {
+    // The base forest, 45 km/h and 2-cell break with D_max = 12 m/(km/h) * 45 km/h = 540 m (18 cells). At 30 m cells
+    // and FIRE_MODEL.spotBrandsPerHa = 356, a source drops 32 brands over a band of 48 cells; with Schroeder's
+    // P_ign of ~0.66 at 34 deg C / 15 % each band cell ignites with p ~ 0.36.
+    const spotting = { spotting: true, spotMetresPerKmh: 12, horizonMin: 600 }
+    const seeded = (emberSeed: number | null) => makeInput({ ...base, params: { ...spotting, emberSeed } })
+    /** The input with its whole firebreak reported as the drawn line. */
+    const withLine = (inp: FireInput): FireInput => ({ ...inp, lineMask: inp.firebreak.slice() })
+    const differs = (x: Float32Array, y: Float32Array) => x.some((v, i) => v !== y[i])
+    /** Earliest arrival over the cells (r, c) with pick(c) true. */
+    const firstIn = (inp: FireInput, a: Float32Array, pick: (c: number) => boolean) => {
+      let t = Infinity
+      for (let r = 0; r < inp.grid.rows; r++) for (let c = 0; c < inp.grid.cols; c++) if (pick(c)) t = Math.min(t, at(inp, a, r, c))
+      return t
+    }
+
+    it('defaults to deterministic spotting, and a line mask only reports: it never changes the fire', () => {
+      expect(DEFAULT_FIRE_PARAMS.emberSeed).toBeNull()
+      for (const emberSeed of [null, 1]) {
+        const inp = seeded(emberSeed)
+        const plain = simulateFire(inp)
+        expect(plain.line).toBeUndefined()
+        const reported = simulateFire(withLine(inp))
+        expect(reported.line).toBeDefined()
+        expect(Array.from(reported.arrivalMin)).toEqual(Array.from(plain.arrivalMin))
+      }
+    })
+
+    it('as brands per hectare grow without bound, a seeded run equals the deterministic run cell for cell', () => {
+      const det = simulateFire(seeded(null)).arrivalMin
+      FIRE_MODEL.spotBrandsPerHa = 1e12 // p = -expm1(-lambda) is exactly 1, and every hashPair draw is < 1
+      for (const emberSeed of [1, 7]) expect(Array.from(simulateFire(seeded(emberSeed)).arrivalMin)).toEqual(Array.from(det))
+    })
+
+    it('the same seed gives the same arrivals; different seeds, and the deterministic run, differ', () => {
+      FIRE_MODEL.spotBrandsPerHa = 356
+      const a1 = simulateFire(seeded(1)).arrivalMin
+      expect(Array.from(simulateFire(seeded(1)).arrivalMin)).toEqual(Array.from(a1))
+      expect(differs(a1, simulateFire(seeded(2)).arrivalMin)).toBe(true)
+      expect(differs(a1, simulateFire(seeded(null)).arrivalMin)).toBe(true)
+    })
+
+    it('common random numbers: a firebreak one fire never reaches leaves that fire bit-identical under the same seed', () => {
+      // Two fires in one grid, split by a 5-row band without fuel: surface spread cannot cross it, and with the
+      // wind due east a jump moves at most 1 row sideways. The southern fire has its own 2-cell break in both runs,
+      // so what it burns beyond it depends on ember draws. Adding a break in the northern half changes the northern
+      // fire; the southern fire draws the same uniforms for the same (source, target) pairs, so it must not change
+      // at all. (A stateful generator, checked on a scratch copy of the engine, changes 1,270 southern cells.)
+      const rows = 81
+      const cols = 81
+      const split: Opts = {
+        rows,
+        cols,
+        cellM: 30,
+        fuel: (r) => (r >= 38 && r <= 42 ? FUEL.NONE : FUEL.FOREST),
+        weather: base.weather,
+        firebreak: (r, c) => r > 42 && (c === 30 || c === 31),
+        ignitions: [
+          { r: 20, c: 10 },
+          { r: 60, c: 10 },
+        ],
+        params: { ...spotting, emberSeed: 3 },
+      }
+      const a = simulateFire(makeInput(split)).arrivalMin
+      const b = simulateFire(makeInput({ ...split, firebreak: (_r, c) => c === 30 || c === 31 })).arrivalMin
+      const south = (x: Float32Array) => Array.from(x.subarray(43 * cols))
+      const north = (x: Float32Array) => Array.from(x.subarray(0, 38 * cols))
+      expect(south(a).filter((t, k) => k % cols >= 32 && Number.isFinite(t)).length).toBeGreaterThan(500) // crossed by embers
+      expect(south(b)).toEqual(south(a))
+      expect(north(b)).not.toEqual(north(a))
+    })
+
+    it('reports when the fire reaches a drawn line and when embers first cross it', () => {
+      // Deterministic spotting: the first cell to burn east of the 2-cell break can only be a spot fire whose jump
+      // passed over it, and the line is first touched from column 29 or 32.
+      const det = withLine(seeded(null))
+      const res = simulateFire(det)
+      const line = res.line!
+      expect(line.crossedCells).toBeGreaterThan(0)
+      expect(line.crossedCells).toBeLessThanOrEqual(eastBurned(det, res.arrivalMin))
+      expect(Math.fround(line.firstCrossMin)).toBe(firstIn(det, res.arrivalMin, (c) => c >= 32)) // arrivalMin is Float32
+      expect(Math.fround(line.reachedMin)).toBe(firstIn(det, res.arrivalMin, (c) => c === 29 || c === 32))
+      expect(Number.isFinite(line.reachedMin) && Number.isFinite(line.firstCrossMin)).toBe(true)
+      // Spotting off: the line is reached, never crossed.
+      const off = simulateFire(withLine(makeInput({ ...base, params: { spotting: false, horizonMin: 600 } }))).line!
+      expect(off.crossedCells).toBe(0)
+      expect(off.firstCrossMin).toBe(Infinity)
+      expect(off.reachedMin).toBeLessThan(Infinity)
+      // A far line (part of the firebreak) behind the break that stops the fire: never reached.
+      const far = makeInput({ ...base, firebreak: (_r, c) => c === 30 || c === 31 || c === 70, params: { spotting: false, horizonMin: 600 } })
+      const farMask = new Uint8Array(far.firebreak.length)
+      for (let r = 0; r < far.grid.rows; r++) farMask[r * far.grid.cols + 70] = 1
+      const farLine = simulateFire({ ...far, lineMask: farMask }).line!
+      expect(farLine).toEqual({ reachedMin: Infinity, firstCrossMin: Infinity, crossedCells: 0 })
+    })
+
+    it('counts only jumps over the reported line, not over another firebreak', () => {
+      // Two full-height breaks (columns 30-31 and 60-61), only the second reported. Spot fires that jump the first
+      // break must not count; the first crossing is the first cell to burn east of the second break, and a spot cell
+      // later reached by surface spread stops counting (at most a couple per row in this due-east wind).
+      const inp = makeInput({ ...base, firebreak: (_r, c) => c === 30 || c === 31 || c === 60 || c === 61, params: spotting })
+      const mask = new Uint8Array(inp.firebreak.length)
+      for (let r = 0; r < inp.grid.rows; r++) mask[r * inp.grid.cols + 60] = mask[r * inp.grid.cols + 61] = 1
+      const res = simulateFire({ ...inp, lineMask: mask })
+      const line = res.line!
+      expect(line.crossedCells).toBeGreaterThan(0)
+      expect(line.crossedCells).toBeLessThanOrEqual(2 * inp.grid.rows)
+      expect(Math.fround(line.firstCrossMin)).toBe(firstIn(inp, res.arrivalMin, (c) => c >= 62))
+      expect(line.firstCrossMin).toBeGreaterThan(firstIn(inp, res.arrivalMin, (c) => c >= 32)) // the first break is jumped earlier
+    })
+
+    it('at a tiny ember yield only some of 20 seeds cross the line; at a large one every seed does', () => {
+      const crossings = (brandsPerHa: number) => {
+        FIRE_MODEL.spotBrandsPerHa = brandsPerHa
+        let k = 0
+        for (let s = 1; s <= 20; s++) if (simulateFire(withLine(seeded(s))).line!.crossedCells > 0) k++
+        return k
+      }
+      const tiny = crossings(0.02) // ~0.002 brands per source cell
+      const large = crossings(356)
+      expect(tiny).toBeGreaterThan(0)
+      expect(tiny).toBeLessThan(20)
+      expect(tiny).toBeLessThan(large)
+      expect(large).toBe(20)
+    })
+
+    it('rejects a bad ember seed, a bad ember yield or a bad line mask', () => {
+      const inp = makeInput({ rows: 10, cols: 10, ignitions: [{ r: 5, c: 5 }] })
+      for (const emberSeed of [-1, 1.5, NaN, 2 ** 31]) expect(() => simulateFire({ ...inp, params: { ...inp.params, emberSeed } })).toThrow(/emberSeed/)
+      FIRE_MODEL.spotBrandsPerHa = 0
+      expect(() => simulateFire({ ...inp, params: { ...inp.params, emberSeed: 1 } })).toThrow(/spotBrandsPerHa/)
+      expect(simulateFire(inp).burnedCells).toBeGreaterThan(0) // the yield is not read by the deterministic run
+      FIRE_MODEL.spotBrandsPerHa = BRANDS_DEFAULT
+      expect(() => simulateFire({ ...inp, lineMask: new Uint8Array(99) })).toThrow(/lineMask must be a Uint8Array of 100 cells/)
+      const notSubset = new Uint8Array(100)
+      notSubset[3] = 1
+      expect(() => simulateFire({ ...inp, lineMask: notSubset })).toThrow(/subset of firebreak/)
+      const notBinary = new Uint8Array(100)
+      notBinary[3] = 2
+      expect(() => simulateFire({ ...inp, lineMask: notBinary })).toThrow(/0\/1/)
+    })
+
+    it('hashPair is uniform: each decile holds 10 % +- 0.5 % of 100,000 source-target pairs', () => {
+      const N = 100_000
+      const counts = new Array<number>(10).fill(0)
+      let lo = 1
+      let hi = 0
+      for (let k = 0; k < N; k++) {
+        // Pairs shaped like jump edges on a 529-column grid: target 3-18 rows downwind, +-1 column.
+        const a = (k * 7919) % 245_456
+        const u = hashPair(a, a + (3 + (k % 16)) * 529 + ((k % 3) - 1), 1)
+        lo = Math.min(lo, u)
+        hi = Math.max(hi, u)
+        counts[Math.floor(u * 10)]++
+      }
+      expect(lo).toBeGreaterThan(0)
+      expect(hi).toBeLessThan(1)
+      for (const c of counts) expect(Math.abs(c / N - 0.1)).toBeLessThanOrEqual(0.005)
+    })
   })
 })
 

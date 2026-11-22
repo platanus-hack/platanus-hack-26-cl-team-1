@@ -1743,6 +1743,16 @@ input[type='range']:focus-visible {
   border-left: 2px solid var(--line);
 }
 
+/* Probabilistic-ember ensemble under the firebreaks (ui/EmberEnsemble.tsx): numbers from before the last change stay
+   dimmed until the new ones arrive. */
+.ember-outcome {
+  display: grid;
+  gap: 2px;
+}
+.ember-outcome.stale {
+  opacity: 0.5;
+}
+
 /* Touch, after every base rule it overrides (same specificity, so it must come later in the file). */
 @media (pointer: coarse) {
   .stepper {

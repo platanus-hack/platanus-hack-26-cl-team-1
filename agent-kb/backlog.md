@@ -49,7 +49,13 @@ Owner in brackets once someone takes an item. Project: Cortafuego (D-019). The O
 - [ ] Better job proxy for old mixed-use centres (business POIs, the origin-destination surveys, SII employment by
   comuna); public holidays and February vacations in the presence model.
 - [ ] Congestion on evacuation routes (today free flow).
-- [ ] Ensemble (perturbed wind and spotting) for a burn-probability map and a range on the counts.
+- [ ] Ensemble for a burn-probability map and a range on the counts: probabilistic ember landings exist (D-037,
+  `emberSeed`); still missing perturbed wind and ember reach, and a map layer.
+- [ ] Sardoy-shaped ember landing distances (López-De-Castro et al. 2024, eqs 6–8) as a candidate full recalibration
+  of the main model: in a scratch prototype, better Dice in and out of sample (0.676 / ≈0.41) but −34 % households and
+  lower building recall (fire `MODEL.md` section 5, "Considered and not adopted").
+- [ ] The 15 m/min source-ROS ember gate (≈ 9 MW/m in forest) is above the 1.5–2 MW/m onset of significant spotting
+  in Alexander (2001); it is what decides whether a drawn line is crossed (D-037).
 - [ ] **Fit on both fires** (Viña + Eaton, D-030): out of sample the Viña calibration overburns Eaton ~2.6×; tune
   the spread factors on both together, keep a fit only if Viña does not get worse. [Anaís + agent]
 - [ ] Score Eaton buildings against CAL FIRE DINS (`dins.json`, 9,419 destroyed) instead of scar cells.
