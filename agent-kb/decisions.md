@@ -78,10 +78,33 @@ with a pointer to their replacement; nothing is ever deleted from §3.
   absolute numbers are an exposure ceiling (no firefighting, no rescue); the pitch compares scenarios. Scar and
   FIRMS are used only to score and to pick global scalars (in-sample, disclosed).
 
+### D-022 — Render Static Site behind Cloudflare on cortafuego.app (2026-11-22)
+- **Context:** the user selected Render for the public static deployment and Cloudflare for the custom domain,
+  and requested Firefox for dashboard changes. The current app needs no backend or secrets.
+- **Decision:** deploy the public organizational repository's `main` branch as the Render Static Site
+  `cortafuego` (`srv-dc170amc6qcc73covp10`), root `web`, publish directory `dist`, Node 24. Build with
+  `npx --yes pnpm@10.34.9 install --frozen-lockfile && npx --yes pnpm@10.34.9 build` and
+  `SKIP_INSTALL_DEPS=true` to avoid a second, implicit dependency installation.
+  - `cortafuego.app` and `www.cortafuego.app` are proxied Cloudflare CNAMEs to `cortafuego.onrender.com`.
+    Both were DNS-only until Render reported **Verified / Certificate Issued**. Render redirects `www` to apex.
+  - Cloudflare: Full (Strict), Always Use HTTPS, minimum TLS 1.2, TLS 1.3, HTTP/2, HTTP/2 to origin, HTTP/3,
+    Early Hints, Standard caching, and Browser Cache TTL **Respect Existing Headers**. Rocket Loader stays off;
+    no paid upgrades or analytics beacon were enabled.
+  - Render headers: `/assets/*` gets `Cache-Control: public, max-age=31536000, immutable`; `/`, `/index.html`
+    and `/data/*` get `Cache-Control: no-cache`. All paths get `X-Content-Type-Options: nosniff` and
+    `Referrer-Policy: strict-origin-when-cross-origin`.
+- **Consequences:** https://cortafuego.app is the public link; https://cortafuego.onrender.com remains available.
+  Public Git source avoids granting a GitHub integration access or creating a mirror. The creation form says
+  public-repository auto-deploy and PR previews require Blueprints; automatic release delivery has **not** been
+  verified. Use Render **Manual Deploy → Deploy latest commit** for subsequent releases until CD is configured.
+  Do not cache unversioned dataset files long-term or enable blanket Cache Everything: an older data grid can
+  conflict with a newer engine. First deploy of `842d870` succeeded; Firefox loaded the map and worker results
+  over HTTPS, including after navigating through `www`.
+
 ## §2 Open
 
-- **D-?? Public deploy target** for the static site (`web/dist`): Vercel or Render (both event sponsors) from
-  a personal mirror, or GitHub Pages (needs a repo admin to enable Pages).
+- Automatic release delivery for the public Git deployment (Blueprint or a CI deploy hook); current fallback is
+  Render Manual Deploy. Never commit the private deploy-hook URL.
 
 ## §3 Superseded
 
