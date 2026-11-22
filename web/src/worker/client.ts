@@ -1,5 +1,6 @@
 // Typed wrapper around the simulation worker. Runs are coalesced: while one is in flight, only the newest
 // requested scenario is kept and sent when the worker is free.
+import type { EventId } from '../data/events'
 import type { FromWorker, RunResult, ToWorker } from './protocol'
 import type { Scenario } from './scenario'
 
@@ -28,10 +29,10 @@ export class SimClient {
     }
   }
 
-  /** The worker loads the dataset itself; `synthetic` must match what the UI loaded. */
-  init(synthetic: boolean) {
+  /** The worker loads the dataset itself; `synthetic` and `event` must match what the UI loaded. */
+  init(synthetic: boolean, event: EventId) {
     this.ready = false
-    this.send({ type: 'init', synthetic })
+    this.send({ type: 'init', synthetic, event })
   }
 
   run(scenario: Scenario) {

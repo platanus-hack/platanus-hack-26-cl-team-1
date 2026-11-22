@@ -8,8 +8,14 @@ import { localToMin } from '../../data/time'
 import { DEFAULT_EVAC_PARAMS, prepareEvac, simulateEvac } from '../evac'
 import { DEFAULT_FIRE_PARAMS, simulateFire } from '../fire'
 import type { FireInput } from '../types'
-import { buildIgnitions, buildWeatherSeries, defaultBrigades, HORIZON_MIN, type BrigadeScenario, type Scenario } from '../../worker/scenario'
+import { buildIgnitions, buildWeatherSeries, defaultBrigades, type BrigadeScenario, type Scenario } from '../../worker/scenario'
+import { EVENTS } from '../../data/events'
+
 import { applyRescue, planBrigades } from './index'
+
+// Viña del Mar only: this script reads the root data folder (brigades.json ships only there).
+const EVENT = EVENTS['vina-2024']
+const HORIZON_MIN = EVENT.horizonMin
 
 const dir = fileURLToPath(new URL('../../../public/data/', import.meta.url))
 const bin = (f: string) => {
@@ -37,7 +43,7 @@ const fireInput: FireInput = {
   fuel,
   firebreak: new Uint8Array(cells),
   ignitions: buildIgnitions(grid, presets, scen),
-  weather: buildWeatherSeries(weatherFile, grid.t0, neutral).series,
+  weather: buildWeatherSeries(weatherFile, grid.t0, neutral, EVENT.windDirCorrectionDeg).series,
   params: { ...DEFAULT_FIRE_PARAMS, horizonMin: HORIZON_MIN },
 }
 const evacParams = { ...DEFAULT_EVAC_PARAMS, alertMin: localToMin(grid.t0, '2024-02-02T18:00') }

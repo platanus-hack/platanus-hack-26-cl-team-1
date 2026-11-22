@@ -1,15 +1,16 @@
 import type { Dataset } from '../data/load'
 import VALIDATION from '../../public/data/validation.json'
+import EATON_VALIDATION from '../../public/data/eaton-2025/validation.json'
+import type { EventId } from '../data/events'
 import type { PopulationDay, WeatherSeries } from '../engine/types'
 import { POPULATION_DAY } from '../engine/types'
 import { STUDENT_SHARE, WORKER_SHARE, type BurnedAreaPeople } from '../engine/population'
-import { ERA5_WIND_DIR_CORRECTION_DEG } from '../engine/fire/model'
 import { LAG_CAP_MIN } from '../engine/fire/pacing'
-import { minToHHMM, localToMin } from '../data/time'
+import { localToMin, minToDateLabel, minToHHMM } from '../data/time'
 import type { BrigadesOut, EvacOut, FireOut } from '../worker/protocol'
 import { BrigadesSection } from './BrigadesSection'
 import type { FirebreakWidth, Scenario, WeatherSettings } from '../worker/scenario'
-import { FIREBREAK_WIDTHS, HORIZON_MIN, sampleAt } from '../worker/scenario'
+import { FIREBREAK_WIDTHS, sampleAt } from '../worker/scenario'
 import { Compass, compassLabel, fmtInt, fmtSigned, Section, Segmented, Slider, Toggle } from './controls'
 import { RiskChart, WeatherChart } from './charts'
 import type { LayerToggles, Tool } from './MapView'
@@ -20,7 +21,8 @@ export interface Summary {
   trappedHouseholds: number
   trappedPeople: number
   /** People present where the fire arrives, at the time it arrives (src/engine/population). */
-  peopleReached: number
+  /** null when the event has no population layer (EventDef.layers.population). */
+  peopleReached: number | null
 }
 
 export interface Timings {
@@ -143,7 +145,7 @@ export function Results(p: Props) {
           </div>
         </div>
         <div className="stat">
-          <div className="stat-label">Al final ({minToHHMM(t0, HORIZON_MIN)})</div>
+          <div className="stat-label">Al final ({minToHHMM(t0, p.data.event.horizonMin)})</div>
           <div className="stat-value">
             {s ? fmtInt(s.burnedHaEnd) : '—'}
             <small> ha</small>
@@ -163,14 +165,15 @@ export function Results(p: Props) {
         </div>
         <div className="stat wide">
           <div className="stat-label">Personas donde llega el fuego, a la hora en que llega</div>
-          <div className="stat-value">{s ? fmtInt(s.peopleReached) : '—'}</div>
+          <div className="stat-value">{s && s.peopleReached !== null ? fmtInt(s.peopleReached) : '—'}</div>
+          {!p.data.population && <div className="stat-sub">Aún no hay capa de población para este incendio.</div>}
           {s && p.people && (
             <div className="stat-sub">
               {fmtInt(p.people.residents)} viven ahí (de noche o un fin de semana). A las {minToHHMM(t0, p.clock)}, {pct(p.awayNow)} de la
               población está en su trabajo o estudio.
             </div>
           )}
-          {s && b && <Delta now={s.peopleReached} base={b.peopleReached} />}
+          {s && b && s.peopleReached !== null && b.peopleReached !== null && <Delta now={s.peopleReached} base={b.peopleReached} />}
         </div>
       </div>
       <div className="muted small">
@@ -204,7 +207,7 @@ function RiskBlock(p: Props) {
       <div className="chart-title">
         Hogares con la salida cortada según la hora de la alerta <span className="muted">(línea: alerta a las {minToHHMM(t0, p.scenario.alertMin)})</span>
       </div>
-      <RiskChart curve={p.evac.riskByAlert} alertMin={p.scenario.alertMin} t0={t0} onPick={(alertMin) => p.update({ alertMin })} />
+      <RiskChart curve={p.evac.riskByAlert} alertMin={p.scenario.alertMin} t0={t0} horizonMin={p.data.event.horizonMin} onPick={(alertMin) => p.update({ alertMin })} />
       <div className="muted small">Haz clic en el gráfico para probar otra hora de alerta.</div>
     </div>
   )
@@ -229,7 +232,7 @@ function ClimaSection(p: Props) {
         value={w.mode}
         onChange={(mode) => p.updateWeather({ mode })}
         options={[
-          { value: 'real', label: 'Clima real del 2 feb 2024 (ERA5)' },
+          { value: 'real', label: `Clima real del ${minToDateLabel(t0, 0)} (ERA5)` },
           { value: 'constante', label: 'Clima constante' },
         ]}
       />
@@ -255,7 +258,7 @@ function ClimaSection(p: Props) {
             onChange={(v) => p.updateWeather({ windDirOffsetDeg: v })}
             extra={<Compass fromDeg={used.windFromDeg} />}
             hint={hint(
-              `${compassLabel(raw.windFromDeg)} (${raw.windFromDeg.toFixed(0)}°, ERA5 con corrección calibrada de ${fmtSigned(ERA5_WIND_DIR_CORRECTION_DEG)}°)`,
+              `${compassLabel(raw.windFromDeg)} (${raw.windFromDeg.toFixed(0)}°, ${p.data.event.windDirCorrectionDeg === 0 ? 'ERA5 sin corrección' : `ERA5 con corrección calibrada de ${fmtSigned(p.data.event.windDirCorrectionDeg)}°`})`,
               `${compassLabel(used.windFromDeg)} (${used.windFromDeg.toFixed(0)}°)`,
             )}
           />
@@ -315,7 +318,7 @@ function ClimaSection(p: Props) {
       <div className="chart-title">
         <span className="key wind" /> Viento (km/h) <span className="key rh" /> Humedad (%) <span className="muted">usados por el modelo</span>
       </div>
-      <WeatherChart series={p.appliedSeries} t0={t0} clock={p.clock} />
+      <WeatherChart series={p.appliedSeries} t0={t0} clock={p.clock} horizonMin={p.data.event.horizonMin} />
       <div className="muted small">Fuente: {p.data.weather.source}</div>
     </Section>
   )
@@ -429,7 +432,7 @@ function EvacuacionSection(p: Props) {
         label="Hora de la alerta"
         value={s.alertMin}
         min={0}
-        max={HORIZON_MIN}
+        max={p.data.event.horizonMin}
         step={5}
         display={minToHHMM(t0, s.alertMin)}
         onChange={(v) => p.update({ alertMin: v })}
@@ -493,13 +496,19 @@ function EvacuacionSection(p: Props) {
       </div>
       <Toggle label="Mostrar rutas de evacuación" checked={p.showRoutes} onChange={p.setShowRoutes} sub="Grosor según hogares que pasan por cada calle" />
       <div className="sub-title">Dónde está la gente</div>
+      {p.data.population ? (
+        <>
       <Segmented label="Día que se supone para la población" options={POPULATION_DAY_OPTIONS} value={p.populationDay} onChange={p.setPopulationDay} />
       <div className="muted small">
         De noche y los fines de semana todos en casa; un día hábil, quienes trabajan ({pct(WORKER_SHARE)}) y estudian ({pct(STUDENT_SHARE)},
-        solo en periodo de clases) pasan el día en su trabajo o estudio. La fecha real del escenario fue un viernes de vacaciones de verano. Cambia el
+        solo en periodo de clases) pasan el día en su trabajo o estudio. {p.data.event.calendarNote ?? ''} Cambia el
         conteo de personas donde llega el fuego, no la evacuación de los hogares.
       </div>
       <Toggle label="Mostrar personas a esta hora" checked={p.layers.poblacion} onChange={(v) => p.setLayer('poblacion', v)} sub="Personas por celda de 60 m a la hora del reloj" />
+        </>
+      ) : (
+        <div className="muted small">Aún no hay capa de población por hora para este incendio. La evacuación usa los hogares de las edificaciones, como en Viña del Mar.</div>
+      )}
     </Section>
   )
 }
@@ -520,6 +529,53 @@ function ValidacionSection(p: Props) {
         onChange={(v) => p.setLayer('firms', v)}
         sub={`${p.firmsShown} de ${p.data.firms.length} detecciones hasta la hora actual`}
       />
+      {p.data.event.id === 'vina-2024' ? <VinaValidation /> : <OutOfSampleValidation event={p.data.event.id} t0={p.data.grid.t0} />}
+    </Section>
+  )
+}
+
+/** Out-of-sample results per event (src/engine/fire/validate-event.ts writes them). */
+const OUT_OF_SAMPLE: Partial<Record<EventId, typeof EATON_VALIDATION>> = { 'eaton-2025': EATON_VALIDATION }
+const pctOf = (x: number) => `${Math.round(x * 100)} %`
+
+function OutOfSampleValidation({ event, t0 }: { event: EventId; t0: string }) {
+  const v = OUT_OF_SAMPLE[event]
+  if (!v) return <p className="small">Sin validación para este incendio (falta correr validate-event.ts).</p>
+  const when = (iso: string) => `${iso.slice(11, 16)} del ${minToDateLabel(t0, localToMin(t0, iso))}`
+  const alt = v.vinaWindCorrection
+  return (
+    <>
+      <p className="small">
+        <strong>Prueba fuera de muestra:</strong> el modelo de fuego es el calibrado solo con el incendio de Viña del Mar 2024, sin ningún ajuste
+        para este incendio. Clima real (ERA5) {v.windDirCorrectionDeg === 0 ? 'sin corrección de dirección' : `con corrección de ${fmtSigned(v.windDirCorrectionDeg)}°`},
+        focos predefinidos, sin combate del fuego.
+      </p>
+      {v.own.at.map((a) => (
+        <p key={a.timeLocal} className="small">
+          A las {when(a.timeLocal)}: coincidencia con la cicatriz Sentinel-2 (Dice) <strong>{pctOf(a.scar.dice)}</strong>; el modelo quema{' '}
+          {a.scar.modelHa.toLocaleString('es-CL')} ha y Sentinel-2 midió {a.scar.observedHa.toLocaleString('es-CL')} ha
+          {a.perimeter && (
+            <>
+              ; con el perímetro oficial, Dice {pctOf(a.perimeter.dice)} ({a.perimeter.observedHa.toLocaleString('es-CL')} ha)
+            </>
+          )}
+          . Edificaciones dentro de la cicatriz alcanzadas: {a.buildings.inScar.toLocaleString('es-CL')} de {a.buildings.scarTotal.toLocaleString('es-CL')} (
+          {pctOf(a.buildings.recall)}). Detecciones NASA FIRMS alcanzadas: {a.firms.reached} de {a.firms.total}.
+        </p>
+      ))}
+      {alt && (
+        <p className="small muted">
+          Con la corrección de viento ajustada en Viña ({fmtSigned(alt.windDirCorrectionDeg)}°), a las {when(alt.at[alt.at.length - 1].timeLocal)}: Dice{' '}
+          {pctOf(alt.at[alt.at.length - 1].scar.dice)} con la cicatriz.
+        </p>
+      )}
+    </>
+  )
+}
+
+function VinaValidation() {
+  return (
+    <>
       <p className="small">
         Coincidencia con la cicatriz real (Dice, a las {VALIDATION.evalTime.slice(11)} del 3 feb):{' '}
         <strong>{Math.round(VALIDATION.dice * 100)}%</strong>. El modelo quema {VALIDATION.modelHa.toLocaleString('es-CL')} ha;
@@ -569,7 +625,7 @@ function ValidacionSection(p: Props) {
         . Calibrado sobre este mismo incendio: factores de combustible ajustados al ritmo satelital y una corrección de{' '}
         {VALIDATION.windDirCorrectionDeg}° a la dirección del viento de ERA5.
       </p>
-    </Section>
+    </>
   )
 }
 

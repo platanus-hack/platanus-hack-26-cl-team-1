@@ -1,5 +1,5 @@
 # Entry points. Needs uv and Node 24 + pnpm (corepack enable, or npm i -g pnpm).
-.PHONY: install dev data population test lint check validate build
+.PHONY: install dev data population test lint check validate validate-eaton build
 
 install: ## Install every part
 	cd web && pnpm install
@@ -30,3 +30,6 @@ check: lint test build ## What CI runs
 
 validate: ## Model vs the real Sentinel-2 burn scar
 	cd web && pnpm validate
+
+validate-eaton: ## Out-of-sample: the Viña-calibrated model on the Eaton fire (California, 2025)
+	cd web && pnpm validate:eaton

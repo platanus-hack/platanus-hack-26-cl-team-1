@@ -21,10 +21,13 @@ export function LayersCard({
   layers,
   setLayer,
   showRoutes,
+  unavailable,
 }: {
   layers: LayerToggles
   setLayer: (k: keyof LayerToggles, v: boolean) => void
   showRoutes: boolean
+  /** Layers this event has no data for (EventDef.layers): listed but disabled. */
+  unavailable: ReadonlySet<keyof LayerToggles>
 }) {
   const [open, setOpen] = useState(() => window.matchMedia('(min-width: 900px)').matches)
   return (
@@ -37,13 +40,21 @@ export function LayersCard({
       </button>
       {open && (
         <div className="layers-body">
-          {ITEMS.map((it) => (
-            <label key={it.key} className="layer-row">
-              <input type="checkbox" checked={layers[it.key]} onChange={(e) => setLayer(it.key, e.target.checked)} />
-              <span className={`swatch ${it.swatch}`} aria-hidden="true" />
-              {it.label}
-            </label>
-          ))}
+          {ITEMS.map((it) =>
+            unavailable.has(it.key) ? (
+              <label key={it.key} className="layer-row muted" title="Aún no hay datos de esta capa para este incendio">
+                <input type="checkbox" checked={false} disabled />
+                <span className={`swatch ${it.swatch}`} aria-hidden="true" />
+                {it.label} (sin datos)
+              </label>
+            ) : (
+              <label key={it.key} className="layer-row">
+                <input type="checkbox" checked={layers[it.key]} onChange={(e) => setLayer(it.key, e.target.checked)} />
+                <span className={`swatch ${it.swatch}`} aria-hidden="true" />
+                {it.label}
+              </label>
+            ),
+          )}
           <div className="legend">
             {layers.fuego && (
               <div className="legend-row">
@@ -69,7 +80,7 @@ export function LayersCard({
                 )}
               </div>
             )}
-            {layers.poblacion && (
+            {layers.poblacion && !unavailable.has('poblacion') && (
               <div className="legend-row wrap">
                 <span className="lg pop-ramp" /> 1 a {POPULATION_FULL_AT}+ personas por celda de 60 m (estimación)
               </div>

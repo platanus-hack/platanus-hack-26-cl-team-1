@@ -3,6 +3,7 @@
 import type { BrigadesFile, FirmsPoint, GridMeta, IgnitionPreset, RoadClass, RoadsFile, WeatherFile } from '../engine/types'
 import { FUEL, ROAD } from '../engine/types'
 import type { Dataset } from './load'
+import { DEFAULT_EVENT, EVENTS } from './events'
 
 function mulberry32(seed: number) {
   let a = seed >>> 0
@@ -200,5 +201,5 @@ export function makeMockDataset(): Dataset {
     ],
     cuts: [],
   }
-  return { grid, elevation, fuel, scar, buildings, roads, weather, ignitions, firms, populationHome, populationWork, brigades, synthetic: true }
+  return { grid, elevation, fuel, scar, buildings, roads, weather, ignitions, firms, event: EVENTS[DEFAULT_EVENT], population: { home: populationHome, work: populationWork }, brigades, synthetic: true }
 }

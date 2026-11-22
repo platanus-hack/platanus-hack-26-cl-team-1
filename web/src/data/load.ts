@@ -3,6 +3,7 @@
 // dataset is used only when grid.json is absent altogether (data not baked yet), and the UI says so.
 import type { BrigadesFile, BrigadeStation, FirmsPoint, GridMeta, IgnitionPreset, NationalPopulation, NationalPopulationMeta, Reinforcement, RoadsFile, RouteCut, WeatherFile } from '../engine/types'
 import { FUEL, ROAD, UNIT_COUNT } from '../engine/types'
+import type { EventDef } from './events'
 import { lonLatToColRow } from './grid'
 import { wallClockMin } from './time'
 
@@ -16,11 +17,14 @@ export interface Dataset {
   weather: WeatherFile
   ignitions: IgnitionPreset[]
   firms: FirmsPoint[]
-  brigades: BrigadesFile
+  /** The historical event these files belong to (src/data/events.ts). */
+  event: EventDef
+  /** null when the event does not ship brigades.json (EventDef.layers); the UI says so. */
+  brigades: BrigadesFile | null
   /** Residents per cell (population_home.bin) and people per cell when everyone is at work or school
-   *  (population_work.bin); src/engine/population combines them by time of day. */
-  populationHome: Float32Array
-  populationWork: Float32Array
+   *  (population_work.bin); src/engine/population combines them by time of day. Both null when the event
+   *  does not ship them (EventDef.layers); the UI says so. */
+  population: { home: Float32Array; work: Float32Array } | null
   /** true when this is the in-browser synthetic dataset (src/data/mock.ts). */
   synthetic: boolean
 }
@@ -290,28 +294,28 @@ export const parseGoes = (j: unknown): FirmsPoint[] => parseFirePoints('goes.jso
 // Fetching
 // ---------------------------------------------------------------------------------------------------------
 
-/** URL of a data file (read lazily so this module also imports under Node for tests and scripts). */
-const dataUrl = (file: string) => `${import.meta.env.BASE_URL}data/${file}`
+/** URL of a data file of an event (read lazily so this module also imports under Node for tests and scripts). */
+const dataUrl = (dir: string, file: string) => `${import.meta.env.BASE_URL}data/${dir}${file}`
 
 /** Dev servers answer unknown paths with index.html (status 200), so an HTML answer also means "missing". */
 function isMissing(res: Response): boolean {
   return res.status === 404 || (res.headers.get('content-type') ?? '').includes('text/html')
 }
 
-async function fetchOk(file: string): Promise<Response> {
+async function fetchOk(file: string, dir = ''): Promise<Response> {
   let res: Response
   try {
-    res = await fetch(dataUrl(file))
+    res = await fetch(dataUrl(dir, file))
   } catch (e) {
     throw new DataError(file, `no se pudo descargar (${(e as Error).message})`)
   }
-  if (isMissing(res)) throw new DataError(file, 'no existe en /data/')
+  if (isMissing(res)) throw new DataError(file, `no existe en /data/${dir}`)
   if (!res.ok) throw new DataError(file, `HTTP ${res.status}`)
   return res
 }
 
-async function fetchJson(file: string): Promise<unknown> {
-  const res = await fetchOk(file)
+async function fetchJson(file: string, dir = ''): Promise<unknown> {
+  const res = await fetchOk(file, dir)
   try {
     return await res.json()
   } catch (e) {
@@ -319,8 +323,8 @@ async function fetchJson(file: string): Promise<unknown> {
   }
 }
 
-async function fetchBin(file: string): Promise<ArrayBuffer> {
-  return (await fetchOk(file)).arrayBuffer()
+async function fetchBin(file: string, dir = ''): Promise<ArrayBuffer> {
+  return (await fetchOk(file, dir)).arrayBuffer()
 }
 
 /** Returns null when the real data has not been baked yet (no grid.json). Throws DataError otherwise. */
@@ -416,10 +420,13 @@ export function parseBrigades(j: unknown, g: GridMeta): BrigadesFile {
   return { stations, dispatch, reinforcements, cuts }
 }
 
-export async function loadRealDataset(): Promise<Dataset | null> {
+/** Loads one event's files. Returns null when its data has not been baked yet (no grid.json); throws DataError
+ *  otherwise. The optional layers are fetched only when the event ships them (EventDef.layers). */
+export async function loadRealDataset(event: EventDef): Promise<Dataset | null> {
+  const dir = event.dir
   let probe: Response
   try {
-    probe = await fetch(dataUrl('grid.json'))
+    probe = await fetch(dataUrl(dir, 'grid.json'))
   } catch (e) {
     throw new DataError('grid.json', `no se pudo descargar (${(e as Error).message})`)
   }
@@ -433,18 +440,17 @@ export async function loadRealDataset(): Promise<Dataset | null> {
   }
   const grid = parseGrid(gridJson)
   const cells = grid.rows * grid.cols
-  const [elev, fuel, scar, bld, roads, weather, ignitions, firms, popHome, popWork, brigades] = await Promise.all([
-    fetchBin('elevation.bin'),
-    fetchBin('fuel.bin'),
-    fetchBin('scar.bin'),
-    fetchBin('buildings.bin'),
-    fetchJson('roads.json'),
-    fetchJson('weather.json'),
-    fetchJson('ignitions.json'),
-    fetchJson('firms.json'),
-    fetchBin('population_home.bin'),
-    fetchBin('population_work.bin'),
-    fetchJson('brigades.json'),
+  const [elev, fuel, scar, bld, roads, weather, ignitions, firms, population, brigades] = await Promise.all([
+    fetchBin('elevation.bin', dir),
+    fetchBin('fuel.bin', dir),
+    fetchBin('scar.bin', dir),
+    fetchBin('buildings.bin', dir),
+    fetchJson('roads.json', dir),
+    fetchJson('weather.json', dir),
+    fetchJson('ignitions.json', dir),
+    fetchJson('firms.json', dir),
+    event.layers.population ? Promise.all([fetchBin('population_home.bin', dir), fetchBin('population_work.bin', dir)]) : null,
+    event.layers.brigades ? fetchJson('brigades.json', dir) : null,
   ])
   return {
     grid,
@@ -456,9 +462,12 @@ export async function loadRealDataset(): Promise<Dataset | null> {
     weather: parseWeather(weather),
     ignitions: parseIgnitions(ignitions),
     firms: parseFirms(firms),
-    brigades: parseBrigades(brigades, grid),
-    populationHome: parsePopulationLayer('population_home.bin', popHome, cells),
-    populationWork: parsePopulationLayer('population_work.bin', popWork, cells),
+    event,
+    brigades: brigades === null ? null : parseBrigades(brigades, grid),
+    population:
+      population === null
+        ? null
+        : { home: parsePopulationLayer('population_home.bin', population[0], cells), work: parsePopulationLayer('population_work.bin', population[1], cells) },
     synthetic: false,
   }
 }

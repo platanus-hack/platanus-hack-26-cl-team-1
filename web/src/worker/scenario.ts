@@ -1,4 +1,3 @@
-import { DEFAULT_FIRE_PARAMS, ERA5_WIND_DIR_CORRECTION_DEG } from '../engine/fire'
 // The user's scenario (everything the control panel can change) and the pure functions that turn it into
 // engine inputs. Shared by the UI thread and the simulation worker.
 import type { BrigadesFile, GridMeta, IgnitionPreset, Ignition, WeatherFile, WeatherSample, WeatherSeries } from '../engine/types'
@@ -6,9 +5,6 @@ import type { BrigadeSettings } from '../engine/brigade'
 import { FUEL } from '../engine/types'
 import { lonLatToCell, lonLatToColRow } from '../data/grid'
 import { localToMin } from '../data/time'
-
-/** Simulation horizon (minutes since t0 = 12:00): the fire engine's default, midnight. */
-export const HORIZON_MIN = DEFAULT_FIRE_PARAMS.horizonMin
 
 export type WeatherMode = 'real' | 'constante'
 
@@ -82,6 +78,11 @@ export function defaultBrigades(file: BrigadesFile, t0: string): BrigadeScenario
   }
 }
 
+/** Firefighter settings for an event without brigades.json (EventDef.layers.brigades false): off, nothing to plan. */
+export function noBrigades(): BrigadeScenario {
+  return { enabled: false, units: {}, dispatchMin: {}, reinforcementUnits: {}, reinforcementMin: {}, historicalCuts: false }
+}
+
 /** Max trucks of one type per company (the panel's stepper limit). */
 export const MAX_UNITS = 99
 
@@ -123,8 +124,9 @@ export interface WeatherBuild {
   notes: string[]
 }
 
-/** Builds the engine's WeatherSeries from weather.json and the user's settings. */
-export function buildWeatherSeries(file: WeatherFile, t0: string, w: WeatherSettings): WeatherBuild {
+/** Builds the engine's WeatherSeries from weather.json and the user's settings. `dirCorrectionDeg` is the event's
+ *  fitted correction of the historical wind direction (EventDef.windDirCorrectionDeg). */
+export function buildWeatherSeries(file: WeatherFile, t0: string, w: WeatherSettings, dirCorrectionDeg: number): WeatherBuild {
   if (w.mode === 'constante') {
     if (w.rh < RH_MIN || w.rh > RH_MAX) throw new Error(`Humedad relativa fuera de rango: ${w.rh} %`)
     return {
@@ -144,8 +146,8 @@ export function buildWeatherSeries(file: WeatherFile, t0: string, w: WeatherSett
       tempC: file.tempC[i] + w.tempOffsetC,
       rh,
       windKmh: file.windKmh[i] * w.windFactor,
-      // ERA5 direction calibrated on the scar (see engine/fire/MODEL.md), then the user's offset.
-      windFromDeg: norm360(file.windFromDeg[i] + ERA5_WIND_DIR_CORRECTION_DEG + w.windDirOffsetDeg),
+      // ERA5 direction with the event's fitted correction (see engine/fire/MODEL.md), then the user's offset.
+      windFromDeg: norm360(file.windFromDeg[i] + dirCorrectionDeg + w.windDirOffsetDeg),
     }
   })
   const notes = clamped > 0 ? [`La humedad ajustada quedó fuera de 1–100 % en ${clamped} de ${samples.length} horas; se limitó a ese rango.`] : []

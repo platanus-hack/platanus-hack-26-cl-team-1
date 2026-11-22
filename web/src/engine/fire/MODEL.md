@@ -191,7 +191,8 @@ Numbers measured on 2026-11-22 00:25, last row at 02:30 (scar 9,467 ha; Dice = F
 - **ERA5 wind direction −10°** (`ERA5_WIND_DIR_CORRECTION_DEG`, applied to the historical series only, shown
   in the wind hint of the panel). This is **one fitted scalar, not an observation**: it stands in for terrain
   channelling along the N–S quebradas that a 0.25° reanalysis cannot resolve, and the only nearby station
-  contradicts it (see above).
+  contradicts it (see above). Being a site fit, it belongs to the event, not to the model: it lives in
+  `EventDef.windDirCorrectionDeg` (`src/data/events.ts`) and is 0 for any other event (section 6b).
 
 **Before / after** (`pnpm validate`, horizon 00:00, scar 9,467 ha; anchors = first arrival within 300 m):
 
@@ -319,6 +320,18 @@ frame down to the cap. `calibrate.ts` reports both parts (`pacing.fit.rmsAdvance
 ~40 min late at 19:05), and both fires keep spreading after ~19:30 when the real ones stopped (no suppression).
 The pace grows worse with wind ×1.1 (RMS 83 / 98 min). Everything here is in-sample except the VIIRS/MODIS
 test, and the test passes all fall before 16:30 except one.
+
+## 6b. Out of sample: the Eaton fire, California, 7–8 January 2025 (`validate-event.ts`)
+
+Everything above was fitted on one fire. `pnpm validate:eaton` (`make validate-eaton`) runs the model exactly as
+shipped (`FIRE_MODEL`, `DEFAULT_FIRE_PARAMS`, no knob touched) on the Eaton fire's data, baked by the same
+pipeline from the same global sources (`pipeline/bake.py --event eaton-2025`), and scores it against the
+Sentinel-2 scar (same dNBR method) and the official final perimeter, at 12 h after the start (Viña's span) and
+at the event's horizon (18 h: 18:00 on 7 Jan to 12:00 on 8 Jan, Pacific time). It runs with the event's own
+wind-direction correction (0°, no site fit) and, for comparison, with Viña's −10°. It writes
+`public/data/eaton-2025/validation.json`, shown in the app's "Validación" section.
+
+RESULTS_PENDING
 
 ## 7. Performance (`bench.ts`)
 

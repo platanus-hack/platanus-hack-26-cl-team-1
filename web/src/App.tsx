@@ -5,12 +5,14 @@ import { awayShare, DEFAULT_PRESENCE_PARAMS, peopleInBurnedArea } from './engine
 import { POPULATION_DAY, type PopulationDay } from './engine/types'
 import type { Dataset } from './data/load'
 import { loadRealDataset } from './data/load'
+import { checkEvent, DEFAULT_EVENT, eventFromSearch } from './data/events'
+import { EventPicker } from './ui/EventPicker'
 import { makeMockDataset } from './data/mock'
 import { localToMin, minToHHMM, wallClockMin } from './data/time'
 import { SimClient } from './worker/client'
 import type { BrigadesOut, EvacOut, FireOut } from './worker/protocol'
 import type { FirebreakWidth, Scenario, WeatherSettings } from './worker/scenario'
-import { buildWeatherSeries, countAtOrBefore, defaultBrigades, HORIZON_MIN, sampleAt, sortedArrivals } from './worker/scenario'
+import { buildWeatherSeries, countAtOrBefore, defaultBrigades, noBrigades, sampleAt, sortedArrivals } from './worker/scenario'
 import { MapView } from './ui/MapView'
 import type { LayerToggles, Tool } from './ui/MapView'
 import { Panel } from './ui/Panel'
@@ -32,8 +34,9 @@ const NEUTRAL_WEATHER: WeatherSettings = {
 }
 
 function defaultScenario(data: Dataset): Scenario {
-  const raw = buildWeatherSeries(data.weather, data.grid.t0, NEUTRAL_WEATHER).series
-  // Constant-mode defaults: the real conditions at 15:00 (3 h after t0), rounded to the sliders' steps.
+  const ev = data.event
+  const raw = buildWeatherSeries(data.weather, data.grid.t0, NEUTRAL_WEATHER, ev.windDirCorrectionDeg).series
+  // Constant-mode defaults: the real conditions 3 h after t0, rounded to the sliders' steps.
   const s = sampleAt(raw, 180)
   return {
     weather: {
@@ -49,14 +52,14 @@ function defaultScenario(data: Dataset): Scenario {
     presetIgnitions: data.ignitions.map((g) => g.id),
     userIgnitions: [],
     firebreaks: [],
-    alertMin: DEFAULT_EVAC_PARAMS.alertMin,
+    alertMin: ev.evac.alertMin.value,
     cueShare: DEFAULT_EVAC_PARAMS.cueShare,
     cueRadiusM: DEFAULT_EVAC_PARAMS.cueRadiusM,
     prepMedianMin: DEFAULT_EVAC_PARAMS.prepMedianMin,
-    footShare: DEFAULT_EVAC_PARAMS.footShare,
+    footShare: ev.evac.footShare.value,
     closedEdges: [],
     addedLinks: [],
-    brigades: defaultBrigades(data.brigades, data.grid.t0),
+    brigades: data.brigades ? defaultBrigades(data.brigades, data.grid.t0) : noBrigades(),
   }
 }
 
@@ -88,9 +91,18 @@ export default function App() {
   const [fatal, setFatal] = useState<string | null>(null)
   useEffect(() => {
     const forceMock = new URLSearchParams(window.location.search).has('mock')
-    ;(forceMock ? Promise.resolve(null) : loadRealDataset())
+    let event
+    try {
+      event = checkEvent(eventFromSearch(window.location.search))
+    } catch (e) {
+      setFatal(e instanceof Error ? e.message : String(e))
+      return
+    }
+    ;(forceMock ? Promise.resolve(null) : loadRealDataset(event))
       .then((real) => {
         performance.mark('cf:data')
+        // The synthetic set stands in for Viña only (its default event); another event without data is an error.
+        if (!real && event.id !== DEFAULT_EVENT && !forceMock) throw new Error(`no están los datos del evento en /data/${event.dir} (grid.json)`)
         setData(real ?? makeMockDataset())
       })
       .catch((e: unknown) => setFatal(e instanceof Error ? e.message : String(e)))
@@ -117,8 +129,10 @@ const OFFLINE = ['offline', 'sin-conexion'].some((k) => new URLSearchParams(wind
 
 function Explorer({ data }: { data: Dataset }) {
   const t0 = data.grid.t0
+  const event = data.event
+  const HORIZON_MIN = event.horizonMin
   const [scenario, setScenario] = useState<Scenario>(() => defaultScenario(data))
-  const [clock, setClock] = useState(6 * 60)
+  const [clock, setClock] = useState(() => Math.min(event.horizonMin, event.evac.alertMin.value))
   const [playing, setPlaying] = useState(false)
   const [speed, setSpeed] = useState(15)
   const [terrain3d, setTerrain3d] = useState(false)
@@ -182,7 +196,7 @@ function Explorer({ data }: { data: Dataset }) {
       onError: (m) => setSimError(m),
       onBusy: setBusy,
     })
-    c.init(data.synthetic)
+    c.init(data.synthetic, data.event.id)
     client.current = c
     return () => {
       c.dispose()
@@ -197,14 +211,14 @@ function Explorer({ data }: { data: Dataset }) {
   }, [scenario])
 
   // ------------------------------------------------------------ weather (same functions the worker uses)
-  const rawSeries = useMemo(() => buildWeatherSeries(data.weather, t0, NEUTRAL_WEATHER).series, [data, t0])
+  const rawSeries = useMemo(() => buildWeatherSeries(data.weather, t0, NEUTRAL_WEATHER, event.windDirCorrectionDeg).series, [data, t0, event])
   const applied = useMemo(() => {
     try {
-      return buildWeatherSeries(data.weather, t0, scenario.weather)
+      return buildWeatherSeries(data.weather, t0, scenario.weather, event.windDirCorrectionDeg)
     } catch (e) {
       return { series: rawSeries, notes: [`Clima inválido: ${(e as Error).message}`] }
     }
-  }, [data, t0, scenario.weather, rawSeries])
+  }, [data, t0, scenario.weather, rawSeries, event])
 
   // ------------------------------------------------------------ results
   const sorted = useMemo(() => (fire ? sortedArrivals(fire.arrivalMin) : null), [fire])
@@ -213,18 +227,18 @@ function Explorer({ data }: { data: Dataset }) {
   // Where people are, by time of day (src/engine/population): each burned cell counted at its arrival time.
   const wall0 = useMemo(() => wallClockMin(t0), [t0])
   const people = useMemo(
-    () => (fire ? peopleInBurnedArea(fire.arrivalMin, data.populationHome, data.populationWork, wall0, DEFAULT_PRESENCE_PARAMS, populationDay) : null),
+    () => (fire && data.population ? peopleInBurnedArea(fire.arrivalMin, data.population.home, data.population.work, wall0, DEFAULT_PRESENCE_PARAMS, populationDay) : null),
     [fire, data, wall0, populationDay],
   )
   const awayNow = awayShare(wall0 + Math.floor(clock), DEFAULT_PRESENCE_PARAMS, populationDay)
   const summary: Summary | null =
-    fire && evac && people
+    fire && evac && (people || !data.population)
       ? {
           burnedHaEnd: fire.burnedCells * cellHa,
           buildingsReached: evac.buildingsReached,
           trappedHouseholds: Math.round(evac.expectedTrappedHouseholds),
           trappedPeople: Math.round(evac.expectedTrappedPeople),
-          peopleReached: Math.round(people.present),
+          peopleReached: people ? Math.round(people.present) : null,
         }
       : null
   const firmsShown = useMemo(() => data.firms.filter((f) => localToMin(t0, f.timeLocal) <= clock).length, [data, t0, clock])
@@ -256,7 +270,7 @@ function Explorer({ data }: { data: Dataset }) {
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
-  }, [playing, speed])
+  }, [playing, speed, HORIZON_MIN])
 
   // ------------------------------------------------------------ tools
   useEffect(() => {
@@ -274,6 +288,10 @@ function Explorer({ data }: { data: Dataset }) {
   }, [])
   useEffect(() => onNote('tool', null), [tool, onNote])
 
+  const unavailableLayers = useMemo(
+    () => new Set<keyof LayerToggles>([...(data.population ? [] : (['poblacion'] as const)), ...(data.brigades ? [] : (['bomberos'] as const))]),
+    [data],
+  )
   const effectiveLayers = useMemo(
     // the street tools and the evacuation routes need the street layer on
     () => (tool === 'closeRoad' || tool === 'link' || showRoutes ? { ...layers, calles: true } : layers),
@@ -349,8 +367,9 @@ function Explorer({ data }: { data: Dataset }) {
       <header className="topbar">
         <div className="brand">
           <h1>Cortafuego</h1>
-          <p>Explorador de escenarios del incendio del 2 de febrero de 2024 · Viña del Mar, Quilpué y Villa Alemana</p>
+          <p>{event.subtitle}</p>
         </div>
+        <EventPicker current={event.id} />
         <button type="button" className="btn ghost" onClick={() => setShowSources(true)}>
           Fuentes y supuestos
         </button>
@@ -383,7 +402,7 @@ function Explorer({ data }: { data: Dataset }) {
             onLinkStart={setLinkStart}
             onNote={onNote}
           />
-          <LayersCard layers={effectiveLayers} setLayer={setLayer} showRoutes={showRoutes} />
+          <LayersCard layers={effectiveLayers} setLayer={setLayer} showRoutes={showRoutes} unavailable={unavailableLayers} />
           <div className="map-notes">
             {hint && (
               <div className="tool-hint" role="status">
@@ -414,6 +433,7 @@ function Explorer({ data }: { data: Dataset }) {
             setTerrain3d={setTerrain3d}
             terrainAvailable={!OFFLINE}
             alertMin={scenario.alertMin}
+            horizonMin={HORIZON_MIN}
           />
         </div>
         <aside className="panel" aria-label="Controles del escenario">

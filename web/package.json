@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "typecheck": "tsc",
     "test": "vitest run",
-    "validate": "tsx src/engine/fire/calibrate.ts"
+    "validate": "tsx src/engine/fire/calibrate.ts",
+    "validate:eaton": "tsx src/engine/fire/validate-event.ts eaton-2025"
   },
   "dependencies": {
     "maplibre-gl": "^5.24.1",

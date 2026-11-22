@@ -1,10 +1,11 @@
 // Messages between the UI thread (client.ts) and the simulation worker (sim.worker.ts).
 import type { WeatherSeries } from '../engine/types'
+import type { EventId } from '../data/events'
 import type { PlannedUnit } from '../engine/brigade'
 import type { Scenario } from './scenario'
 
-/** init: the worker loads the same dataset the UI uses (real files, or the deterministic synthetic set). */
-export type ToWorker = { type: 'init'; synthetic: boolean } | { type: 'run'; id: number; scenario: Scenario }
+/** init: the worker loads the same dataset the UI uses (the event's real files, or the deterministic synthetic set). */
+export type ToWorker = { type: 'init'; synthetic: boolean; event: EventId } | { type: 'run'; id: number; scenario: Scenario }
 
 export interface FireOut {
   arrivalMin: Float32Array

@@ -104,6 +104,16 @@ input {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.event-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.event-picker select {
+  max-width: 340px;
+}
 .banner {
   grid-row: 2;
   padding: 6px 18px;
