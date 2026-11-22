@@ -203,14 +203,14 @@ function pacing(arrivals: Float32Array[], horizonMin: number) {
       return [{
         time: p.timeLocal.slice(11),
         satellite: p.satellite,
-        fire: f.label,
+        fire: f.id,
         obsKm: d,
         modelKm: modelFrontKm(curve, BIN_KM, p.tMin),
         lagMin: frontLagMin(curve, BIN_KM, d, p.tMin, HALF_PIXEL_KM[p.sensor]),
         overrunHa: overrunHa(arrivals[i], grid, f.clusters[p.sensor], p.tMin, FOOTPRINT_M[p.sensor]),
       }]
     })
-    return { label: f.label, lags, rmsLagMin, test }
+    return { id: f.id, label: f.label, lags, rmsLagMin, test }
   })
   const lagScore = fires.reduce((s, f) => s + Math.max(0, 1 - f.rmsLagMin / 120), 0) / fires.length
   const testAbsLag = fires.flatMap((f) => f.test.map((x) => Math.abs(x.lagMin)))
@@ -398,7 +398,7 @@ if (!process.argv.includes('--scan')) {
     anchors: shipped.anchors.map((a) => ({ name: a.name, reported: a.observed, satellite: hhmm(a.satelliteMin), model: hhmm(a.modelMin) })),
     pacing: {
       note: 'Front lag = minutes the model is late (+) or early (-) at reaching the farthest satellite detection of each fire, 12:00-24:00. Fit: GOES-16 every 10 min (in sample). Test: VIIRS / MODIS passes (not used to fit).',
-      fit: { sensor: 'GOES-16 ABI', rmsLagMin: Object.fromEntries(shipped.pace.fires.map((f) => [f.label, Math.round(f.rmsLagMin)])) },
+      fit: { sensor: 'GOES-16 ABI', rmsLagMin: Object.fromEntries(shipped.pace.fires.map((f) => [f.id, Math.round(f.rmsLagMin)])) },
       test: shipped.pace.fires.flatMap((f) => f.test.map((x) => ({ ...x, obsKm: Number(x.obsKm.toFixed(1)), modelKm: Number(x.modelKm.toFixed(1)), lagMin: Math.round(x.lagMin), overrunHa: Math.round(x.overrunHa) }))),
       testMeanAbsLagMin: Math.round(shipped.pace.testMeanAbsLagMin),
     },
