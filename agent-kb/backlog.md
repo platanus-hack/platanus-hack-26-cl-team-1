@@ -8,12 +8,15 @@ Owner in brackets once someone takes an item. Project: Cortafuego (D-019). The O
   in the browser. [Alonso + agents]
 - [ ] **Calibrate and validate** against the Sentinel-2 scar: `make validate` prints the overlap (Dice) used in
   the pitch; tune `rosMultiplier` and the per-fuel factors, in-sample, and say so. [Alonso + agents]
+  Pace against satellite passes (GOES-16 + VIIRS/MODIS) done (D-024) [Anaís + agent].
 - [ ] **Submission files:** `project-description.md`, the one-liner and description in the jsonc, a 1000×1000
   logo (≤ 500 KB), a short README written by the team. [team]
 - [ ] **Pitch (3 min):** sober opening on 2 Feb 2024, live demo (wind, humidity, firebreak, alert time), the
   validation number, who pays (comunas under Ley 21.364, forestry companies, distributors, insurers). [team]
 
 ## Next
+- [ ] Western stall of 14:05–16:25 (satellite) not reproduced: needs a cause the data shows (initial attack?
+  local wind?); see `web/src/engine/fire/MODEL.md` section 6.
 - [ ] Congestion on evacuation routes (today free flow).
 - [ ] Ensemble (perturbed wind and spotting) for a burn-probability map and a range on the counts.
 - [ ] A second event (Penco / Lirquén, January 2026) to show it generalises.
