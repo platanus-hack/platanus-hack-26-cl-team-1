@@ -392,6 +392,10 @@ On the real dataset a run takes 20–130 ms.
   replay keeps its validated 12 h) and feeds the engine today's Open-Meteo forecast at the same point
   **without** that correction: it was fitted on 2 Feb 2024's ERA5 and says nothing about a forecast model.
   Fuels are still the pre-2024 layer (no regrowth in the scar) and the drought factor starts at 10.
+- The grid is a hard boundary: spread and embers that would leave it are dropped, since there is no terrain,
+  fuel or weather beyond it. From the first contact on, burned area, buildings and households leave out what the
+  fire would reach on the other side. `edge.ts` finds when and where the fire reaches the outer ring of cells;
+  the explorer says so on the map and under the final burned area, and draws the simulated area's outline.
 - Spotting is deterministic: there is no ember probability and no long-range spotting beyond D_max.
 - Structures are modelled as a grass fraction, in two classes (intermix / consolidated). There is no
   building-to-building ignition model.
