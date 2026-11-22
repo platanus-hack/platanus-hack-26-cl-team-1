@@ -1,0 +1,137 @@
+{
+ "event": "eaton-2025",
+ "note": "Out of sample: the fire model and its defaults as calibrated on Viña del Mar 2024, unchanged; real ERA5 weather (x1), spotting on, preset ignitions. Burned by each checkpoint vs the Sentinel-2 scar (final footprint, no-data cells ignored) and vs the official final perimeter. No firefighting in the model.",
+ "windDirCorrectionDeg": 0,
+ "own": {
+  "windDirCorrectionDeg": 0,
+  "elapsedMs": 63,
+  "at": [
+   {
+    "timeLocal": "2025-01-08T06:00",
+    "scar": {
+     "dice": 0.235,
+     "iou": 0.133,
+     "recall": 0.418,
+     "precision": 0.164,
+     "modelHa": 10827,
+     "observedHa": 4246
+    },
+    "perimeter": {
+     "dice": 0.313,
+     "iou": 0.186,
+     "recall": 0.455,
+     "precision": 0.239,
+     "modelHa": 10827,
+     "observedHa": 5689
+    },
+    "buildings": {
+     "reached": 100191,
+     "inScar": 3632,
+     "scarTotal": 6706,
+     "recall": 0.542,
+     "precision": 0.036
+    },
+    "firms": {
+     "reached": 243,
+     "total": 394
+    }
+   },
+   {
+    "timeLocal": "2025-01-08T12:00",
+    "scar": {
+     "dice": 0.344,
+     "iou": 0.208,
+     "recall": 0.777,
+     "precision": 0.221,
+     "modelHa": 14942,
+     "observedHa": 4246
+    },
+    "perimeter": {
+     "dice": 0.429,
+     "iou": 0.273,
+     "recall": 0.778,
+     "precision": 0.296,
+     "modelHa": 14942,
+     "observedHa": 5689
+    },
+    "buildings": {
+     "reached": 119849,
+     "inScar": 6382,
+     "scarTotal": 6706,
+     "recall": 0.952,
+     "precision": 0.053
+    },
+    "firms": {
+     "reached": 256,
+     "total": 413
+    }
+   }
+  ]
+ },
+ "vinaWindCorrection": {
+  "windDirCorrectionDeg": -10,
+  "elapsedMs": 51,
+  "at": [
+   {
+    "timeLocal": "2025-01-08T06:00",
+    "scar": {
+     "dice": 0.264,
+     "iou": 0.152,
+     "recall": 0.424,
+     "precision": 0.192,
+     "modelHa": 9386,
+     "observedHa": 4246
+    },
+    "perimeter": {
+     "dice": 0.319,
+     "iou": 0.19,
+     "recall": 0.423,
+     "precision": 0.256,
+     "modelHa": 9386,
+     "observedHa": 5689
+    },
+    "buildings": {
+     "reached": 73646,
+     "inScar": 754,
+     "scarTotal": 6706,
+     "recall": 0.112,
+     "precision": 0.01
+    },
+    "firms": {
+     "reached": 197,
+     "total": 394
+    }
+   },
+   {
+    "timeLocal": "2025-01-08T12:00",
+    "scar": {
+     "dice": 0.341,
+     "iou": 0.206,
+     "recall": 0.677,
+     "precision": 0.228,
+     "modelHa": 12609,
+     "observedHa": 4246
+    },
+    "perimeter": {
+     "dice": 0.424,
+     "iou": 0.269,
+     "recall": 0.682,
+     "precision": 0.308,
+     "modelHa": 12609,
+     "observedHa": 5689
+    },
+    "buildings": {
+     "reached": 96871,
+     "inScar": 5016,
+     "scarTotal": 6706,
+     "recall": 0.748,
+     "precision": 0.052
+    },
+    "firms": {
+     "reached": 209,
+     "total": 413
+    }
+   }
+  ]
+ }
+}

@@ -235,8 +235,34 @@ D-026 to D-028 were taken by #54, #53 and the today scenario._
   overlay. Reduced motion bypasses animation; startup errors show immediately, and a skip control avoids
   waiting for the intro. No fake progress percentage, audio, or endlessly animated flame.
 
+### D-030 — A second baked event: the Eaton fire (California, 2025) as an out-of-sample test (2026-11-22)
+- **Context:** every model number was fitted on one fire (Viña 2024). The team asked for a second real event in the
+  scenario list and to use its data to improve the model. Asked and answered before building: Eaton (not
+  Palisades); Viña's global sources plus US data only to score; test first, then fit on both fires; the picker
+  of D-028; firefighters and population for Eaton later, after the core.
+- **Decision (contract: `types.ts` `TIMELINE.EATON_2025`):**
+  - The pipeline bakes one event at a time: `pipeline/steps/events.py` (grid, clock, time zone, sources, cache dir
+    per event), `bake.py --event <id>`. Viña's outputs stay byte-identical at the root of `web/public/data/`; Eaton's
+    go to `web/public/data/eaton-2025/` (306 × 337 cells of 60 m, t0 7 Jan 2025 18:00 PST, 18 h horizon), plus the
+    official WFIGS perimeter (`perimeter.bin`) and CAL FIRE damage inspection points (`dins.json`), scoring only.
+  - `web/src/data/events.ts` holds what differs per baked event: data folder, horizon, wind-direction correction
+    (Viña's −10° is a site fit, 0 for Eaton), optional layers, evacuation defaults with their sources. Eaton: alert
+    19:25 (first orders, east of Lake Ave; west of Lake 03:25), 2.70 persons per household (ACS B25010, Altadena),
+    4 % on foot (households with no vehicle, ACS B08201; derived assumption). The today timeline stays on Viña.
+  - Eaton is the third option of the scenario picker (`?escenario=eaton-2025`). Brigades and population are
+    nullable in `Dataset` and the UI says "aún no hay datos" where an event lacks them.
+  - `validate-event.ts` (`make validate-eaton`) runs the model as shipped, nothing tuned, and writes the score the
+    "Validación" section shows.
+- **Consequences:** out of sample the model overburns Eaton ~2.6× (14,942 ha by noon vs 5,689 ha perimeter; Dice
+  0.34 vs the scar, 0.43 vs the perimeter, against 0.64 in-sample on Viña), reaching 95 % of the buildings in the
+  scar but spreading through consolidated Pasadena. Next: fit on both fires (backlog). The bake found that Viña's
+  scar uses a −0.1 reflectance offset its COGs do not need; kept for byte-identity, open in §2.
+
 ## §2 Open
 
+- Viña's scar (`scar.bin`) applies a −0.1 reflectance offset that the Earth Search COGs do not need (15.6 % / 19.6 %
+  of valid pixels come out negative, biasing dNBR). Fixing it changes the scar and every in-sample number fitted
+  on it (D-030; `pipeline/README.md`): decide before re-baking.
 - Verify the first CI-gated Render deployment after merging the deployment workflow (D-023).
 
 ## §3 Superseded

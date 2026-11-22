@@ -1,4 +1,7 @@
-"""ignitions.json: preset ignition points for 2 Feb 2024.
+"""ignitions.json: preset ignition points.
+
+Events with documented start points (grid.EVENT.ignitions, e.g. Eaton 2025 from CAL FIRE) write them as they
+are. For Viña del Mar 2024 (grid.EVENT.ignitions is None) they are derived as follows.
 
 Documented facts (press, Feb 2024 onwards) are thin on exact points, so the LOCATIONS come from the first
 satellite detections (FIRMS VIIRS pass at 14:47 local), and each preset says so:
@@ -48,6 +51,8 @@ def _clusters(pts: list[dict]) -> list[list[dict]]:
 
 
 def bake(firms_points: list[dict]) -> list[dict]:
+    if grid.EVENT.ignitions is not None:
+        return _write([dict(p) for p in grid.EVENT.ignitions])
     first = [p for p in firms_points if p["timeLocal"] == FIRST_PASS and p["satellite"].startswith("VIIRS")]
     if not first:
         raise RuntimeError(f"no VIIRS detections at {FIRST_PASS}: cannot place the ignition presets")
@@ -77,6 +82,12 @@ def bake(firms_points: list[dict]) -> list[dict]:
             "source": EAST_SOURCE,
         },
     ]
+    return _write(presets)
+
+
+def _write(presets: list[dict]) -> list[dict]:
+    if not presets:
+        raise RuntimeError("no ignition presets")
     for p in presets:
         if grid.cell_index(p["lon"], p["lat"]) < 0:
             raise RuntimeError(f"ignition preset {p['id']} falls outside the grid")

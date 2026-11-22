@@ -1,13 +1,14 @@
 # Cortafuego data pipeline
 
-Bakes the static data files the browser simulator reads from `web/public/data/`. The formats, units
-and enums are defined once in [`web/src/engine/types.ts`](../web/src/engine/types.ts); this pipeline
-writes exactly that and re-reads every file at the end to check it against the contract.
+Bakes the static data files the browser simulator reads from `web/public/data/`, one fire event at a time.
+The formats, units and enums are defined once in [`web/src/engine/types.ts`](../web/src/engine/types.ts);
+this pipeline writes exactly that and re-reads every file at the end to check it against the contract.
 
 ```bash
 cd pipeline
-uv run python bake.py            # ~8 s with a warm cache; ~3-4 min from scratch (see below)
-uv run python bake.py --refresh  # wipe the download cache first and re-download everything
+uv run python bake.py            # Viña del Mar 2024 -> web/public/data/ (~8 s warm; ~3-4 min from scratch)
+uv run python bake.py --event eaton-2025  # Eaton 2025 -> web/public/data/eaton-2025/ (~2 min warm, ~11 cold)
+uv run python bake.py --refresh  # wipe the event's download cache first and re-download everything
 uv run python bake_population.py # national population product + the grid's two layers (~25 s warm, ~80 MB cold)
 uv run python population_report.py  # totals and day/night checks quoted in the population MODEL.md
 uv run pytest                    # unit tests for the non-trivial logic (no network)
@@ -16,17 +17,48 @@ uv run pytest                    # unit tests for the non-trivial logic (no netw
 Needs only `uv` (Python 3.12/3.13 and wheels for numpy, rasterio + GDAL, scipy and duckdb are pulled
 automatically). Downloads are cached in `pipeline/.cache/` (gitignored, ~90 MB), so reruns are offline
 and give byte-identical outputs (checked: two runs, same checksums; a from-scratch re-download gave
-byte-identical rasters, Overture and Sentinel-2 caches). From scratch, the slow parts are Overture (~60 s)
+byte-identical rasters, Overture and Sentinel-2 caches; on 2026-11-22 a from-scratch Viña bake, Overpass
+and population downloads included, reproduced every committed file byte for byte, before and after the
+pipeline was made per-event). From scratch, the slow parts are Overture (~60 s)
 and the Overpass street query (~45 s on a free server; one measured run took 650 s in all because two
 public Overpass servers were saturated and the client moved on to a mirror). Any failure raises with a clear message: there are no silent fallbacks,
 except Overture -> OSM for buildings, which is printed and recorded in the summary.
 
+## Events
+
+Every event-specific value lives in one table, [`steps/events.py`](steps/events.py): the grid, the clock
+origin `t0`, the IANA time zone and its UTC offset over the baked window, the output and cache directories,
+and the source parameters each step needs (DEM and WorldCover tiles, Sentinel-2 scenes, FIRMS country / year /
+dates, GOES satellite and window, weather point and dates, ignition presets, the Spanish `sources` citations of
+`grid.json`, whether population is baked, the official perimeter and damage inspections). `bake.py --event <id>` calls
+`grid.select(id)`, which re-points the `grid` module attributes; every step reads them as `grid.X` at call time
+and its parameters from `grid.EVENT`, so the selection reaches all of them. Importing `steps.grid` selects the
+default, `vina-2024`, so `bake_population.py`, `population_report.py` and the tests keep their meaning.
+
+| Event | Output | Download cache | Outputs |
+|---|---|---|---|
+| `vina-2024` (default) | `web/public/data/` | `pipeline/.cache/` | everything below except the `eaton-2025/` validation files |
+| `eaton-2025` | `web/public/data/eaton-2025/` | `pipeline/.cache/eaton-2025/` | the ten base files + `perimeter.bin` + `dins.json`; no population, no brigades (later) |
+
+Both events use the same global sources, so they are comparable; US-only data (the official perimeter, CAL FIRE
+damage inspections) is used for validation only. `--refresh` wipes only the selected event's cache (Viña's keeps the other events'
+sub-directories).
+
 ## Grid
 
-Fixed: `latMax = -32.965`, `lonMin = -71.625`, 60 m cells, `dLat = 60/111320`,
+Viña del Mar 2024 (`vina-2024`): `latMax = -32.965`, `lonMin = -71.625`, 60 m cells, `dLat = 60/111320`,
 `dLon = 60/(111320 cos 33.09°)`, 464 rows x 529 cols (to about lat -33.215, lon -71.285): Viña del Mar,
 Quilpué, Villa Alemana and the Lago Peñuelas reserve. Row 0 is the north edge, row-major.
 Clock origin `t0 = 2024-02-02T12:00:00-03:00`.
+
+Eaton 2025 (`eaton-2025`): `latMax = 34.27`, `lonMin = -118.20`, 60 m cells, `dLat = 60/111320`,
+`dLon = 60/(111320 cos 34.1875°)` (the grid's centre latitude), 306 rows x 337 cols = 103,122 cells (to about
+lat 34.1051, lon -117.9804): Altadena, the San Gabriel foothills burned by the Eaton fire, Sierra Madre and
+Pasadena. The official final perimeter (lon -118.162..-118.013, lat 34.162..34.238) has margins of 3.6 km
+(north), 3.5 km (west), 3.0 km (east: the grid's east edge is the east edge of Sentinel-2 tile 11SLT at the
+grid's north edge) and 6.3 km (south, to take in Pasadena as evacuation destinations). Clock origin
+`t0 = 2025-01-07T18:00:00-08:00`; local times are America/Los_Angeles (PST, UTC-8, no DST change in January).
+Every grid stays under Viña's 245,456 cells (`grid.MAX_CELLS`).
 
 ## Outputs
 
@@ -46,8 +78,12 @@ Clock origin `t0 = 2024-02-02T12:00:00-03:00`.
 | `population_home.bin` | Float32 residents per cell | WorldPop 2024 (constrained, 100 m) |
 | `population_work.bin` | Float32 people per cell if every resident is at work or school | WorldPop 2024 + GHSL GHS-BUILT-V NRES 2025, gravity model |
 | `national/population_cl.{json,bin}` | Both layers for all of Chile, 30" (~0.9 km), sparse (`NationalPopulationMeta`) | same |
+| `eaton-2025/perimeter.bin` | Uint8 per cell: 1 inside the official final perimeter, 0 outside (**validation only**, not loaded by the app) | NIFC / WFIGS Interagency Fire Perimeters |
+| `eaton-2025/dins.json` | `[lon, lat, damage]` per inspected structure, damage in `none / affected / minor / major / destroyed / inaccessible` (**validation only**) | CAL FIRE Damage Inspection (DINS) |
 
-Binary files are little-endian, `rows * cols` values (except `buildings.bin`).
+The table describes Viña's files in `web/public/data/`; Eaton writes the same ten base files (dates, scenes and
+satellites in "Eaton 2025" below) plus the two validation files into `web/public/data/eaton-2025/`, and no
+population or brigades files. Binary files are little-endian, `rows * cols` values (except `buildings.bin`).
 
 ## Method per file
 
@@ -119,7 +155,11 @@ America/Santiago time, and checks it like `weather.json`.
 
 **scar.bin.** Sentinel-2 L2A from the Element84 Earth Search STAC (no auth): pre-fire
 `S2B_19HBD_20240118` (0.62 % cloud), post-fire `S2A_19HBD_20240212` (0.06 % cloud); tile 19HBD covers the
-whole grid. Reflectance = DN x 0.0001 - 0.1; B08 averaged to the 20 m grid of B12 / SCL.
+whole grid. Reflectance = DN x 0.0001 + the event's `scar_offset`: -0.1 for Viña, the shipped value, kept so
+the scar and everything calibrated on it do not change. Earth Search already removed the baseline-04.00 +1000
+offset from these COGs (as `steps/wui.py` found), so -0.1 makes 15.6 % (pre) and 19.6 % (post) of Viña's valid
+pixels negative and biases dNBR; new events use the true reflectance (offset 0.0), and the bake stops when more
+valid pixels than the event's limit come out negative. B08 averaged to the 20 m grid of B12 / SCL.
 NBR = (B08 - B12) / (B08 + B12), dNBR = NBR_pre - NBR_post, burned pixel if dNBR > 0.27 (0.15 in
 built-up cells: roofs and paving have low pre-fire NBR; away from the fire 99 % of built-up pixels have
 dNBR < 0.18). Pixels flagged by SCL in either scene as no data, saturated, cloud shadow, water, cloud or
@@ -175,6 +215,47 @@ Chile; the time-of-day part runs in the browser (`web/src/engine/population/MODE
 - `bake_population.py` re-bakes both. It also rewrites `grid.json`, which is deterministic from constants, to
   carry the new source.
 
+## Eaton 2025 (`--event eaton-2025`)
+
+Same steps and methods as above; only the parameters in `steps/events.py` change. Measured on the bake of
+2026-11-22 (11 min from scratch, 7 of them the Overpass street query; 2 min with a warm cache, almost all of it
+reading the 198 GOES files).
+
+- **Grid and clock**: see "Grid". The fire's start is 7 Jan 2025 18:18 local; `t0` is 18:00.
+- **elevation.bin**: GLO-30 tiles `N34_00_W119_00` and `N34_00_W118_00` (the grid straddles lon -118); 56-1,865 m.
+- **fuel.bin**: WorldCover tile `N33W120`; NDVI from `S2A_11SLT_20250102` (5 days before the fire, 0 % invalid
+  pixels over the grid). Same WUI rule and thresholds: 21,673 intermix and 11,924 consolidated cells.
+- **buildings.bin**: Overture `2026-11-18.0`, 184,603 buildings (11,162 with their centroid inside the official
+  perimeter). Older releases are no longer in the bucket, so these are post-fire footprints: some destroyed
+  houses may be missing or already rebuilt.
+- **roads.json**: current OSM, 62,947 nodes and 84,641 edges after clipping (simplified at 1 m, 9.1 MB).
+- **weather.json**: Open-Meteo at 34.19, -118.12 (the archive answers with its grid point 34.20, -118.20),
+  America/Los_Angeles, 7-9 Jan 2025 (72 h). 7 Jan 18:00 - 8 Jan 06:00: wind 18-37 km/h from the NNE-NE (10-43°),
+  gusts up to 97 km/h; from 07:00 the reanalysis wind drops under 11 km/h. RH 13-35 %, 9-17 °C until noon.
+- **scar.bin**: `S2A_11SLT_20250102` (pre) and `S2C_11SLT_20250221` (post: the first scene after containment on
+  31 Jan with 0 % invalid pixels over the grid; 1 Feb has 13 % invalid, 6 and 11 Feb are cloudy). Tile 11SLT;
+  the read window is clipped to the tile's east edge. Same thresholds (0.27, 0.15 built-up), same patch and
+  FIRMS rules (VIIRS of 7-10 Jan), but true surface reflectance (offset 0.0, see the scar paragraph and
+  `steps/scar.py`): Viña's -0.1 would make 48 % / 27 % of these pixels negative. Result: 42.5 km2 burned
+  (3.4 km2 of it built-up), 99.4 % of it inside the official perimeter, covering 74 % of the perimeter's
+  56.9 km2 (Dice 0.85); 97.5 % of the 1,091 VIIRS detections fall within 400 m of the scar. Burned
+  neighbourhoods are under-detected, as in Viña (cell rule > 50 % of pixels): 7,042 of the 9,419 structures
+  CAL FIRE marks destroyed fall in scar cells.
+- **firms.json**: FIRMS yearly archives for the United States 2025 (`..._2025_United_States.csv`, 86 MB in all),
+  7 Jan 16:00 - 10 Jan 23:59 local, UTC - 8 h: 1,214 detections. The window starts at 16:00 (as GOES) to leave
+  out two detections of 7 Jan 01:45 / 02:07 at the grid's west edge, before the fire.
+- **goes.json**: GOES-18 (GOES-West) from `s3://noaa-goes18`, 198 full-disk files (~1 MB each), 8 Jan 00:00 UTC
+  to 9 Jan 08:59 UTC = 7 Jan 16:00 - 9 Jan 01:00 local, every hour complete: 1,144 fire pixels, the first at
+  18:35 local (101 without FRP).
+- **ignitions.json**: one preset, the CAL FIRE incident page's start (7 Jan 2025 18:18) and point
+  (34.203483, -118.069155), https://www.fire.ca.gov/incidents/2025/1/7/eaton-fire. Nothing about its cause.
+- **perimeter.bin** (`steps/perimeter.py`, validation only): the WFIGS Interagency Fire Perimeters feature
+  service, record `2025-CALAC-009087`, category "Wildfire Final Fire Perimeter" (14,021 acres = 56.74 km2),
+  rasterised by cell centre: 15,804 cells = 56.89 km2. The bake stops if the perimeter touches the grid edge.
+- **dins.json** (`steps/dins.py`, validation only): CAL FIRE DINS public view of the Eaton fire, 18,428 inspected
+  structures, all inside the grid: 9,419 destroyed, 70 major, 148 minor, 858 affected, 7,893 no damage,
+  40 inaccessible (the service's closed `DAMAGE` domain; any other value stops the bake).
+
 ## Sources and licences
 
 - Copernicus DEM GLO-30: © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018, provided
@@ -187,7 +268,10 @@ Chile; the time-of-day part runs in the browser (`web/src/engine/population/MODE
 - Open-Meteo: CC BY 4.0; ERA5 © ECMWF / Copernicus Climate Change Service. https://open-meteo.com/
 - Sentinel-2 L2A: contains modified Copernicus Sentinel data (2024). Earth Search by Element 84.
 - NASA FIRMS: NASA open data, attribution requested. https://firms.modaps.eosdis.nasa.gov/
-- NOAA GOES-16 ABI L2 FDC: NOAA open data (public domain), NOAA Open Data Dissemination on AWS. https://registry.opendata.aws/noaa-goes/
+- NOAA GOES-16 / GOES-18 ABI L2 FDC: NOAA open data (public domain), NOAA Open Data Dissemination on AWS. https://registry.opendata.aws/noaa-goes/
+- Eaton validation only: NIFC / WFIGS Interagency Fire Perimeters (public, US government data),
+  https://data-nifc.opendata.arcgis.com/ ; CAL FIRE Damage Inspection (DINS) public view; CAL FIRE incident page
+  (start time and point), https://www.fire.ca.gov/incidents/2025/1/7/eaton-fire
 - WorldPop 2024 (R2025A v1): CC BY 4.0. https://www.worldpop.org/
 - GHSL GHS-BUILT-V R2023A (European Commission, Joint Research Centre): CC BY 4.0.
   https://human-settlement.emergency.copernicus.eu/
@@ -205,7 +289,10 @@ Chile; the time-of-day part runs in the browser (`web/src/engine/population/MODE
   FOREST).
 - The burn scar marks only cells where most pixels changed: lightly burned edges and isolated burned
   houses inside unburned blocks are missed; burned built-up area is under-detected (225 ha marked).
-- Ignition presets are approximate (see above); they are not official findings.
+- Ignition presets are approximate (see above); they are not official findings. Eaton's is CAL FIRE's
+  published start time and point.
+- Eaton: the reanalysis point is ~7 km west of Altadena and smooths the downslope wind storm of that night;
+  treat its winds and gusts as a baseline, not as what stations in the foothills recorded.
 - Population is a model: WorldPop is itself an estimate (19.7 M, against 18.5 M counted by Censo 2024), and
   building volume is a proxy for jobs that under-weights old mixed-use centres (Santiago, Concepción). See
   `web/src/engine/population/MODEL.md`.

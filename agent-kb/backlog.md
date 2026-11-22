@@ -35,7 +35,15 @@ Owner in brackets once someone takes an item. Project: Cortafuego (D-019). The O
   comuna); public holidays and February vacations in the presence model.
 - [ ] Congestion on evacuation routes (today free flow).
 - [ ] Ensemble (perturbed wind and spotting) for a burn-probability map and a range on the counts.
-- [ ] A second event (Penco / Lirquén, January 2026) to show it generalises.
+- [ ] **Fit on both fires** (Viña + Eaton, D-030): out of sample the Viña calibration overburns Eaton ~2.6×; tune
+  the spread factors on both together, keep a fit only if Viña does not get worse. [Anaís + agent]
+- [ ] Eaton population layer (WorldPop USA + GHSL; US time-of-day assumptions: ATUS, ACS B08302; LAUSD and PUSD
+  were in session on 7 Jan 2025). [Anaís + agent]
+- [ ] Eaton firefighters (LA County LMS stations; Pasadena FD apparatus from its 2025 Standards of Cover; LACoFD
+  publishes counts only). [Anaís + agent]
+- [ ] Score Eaton buildings against CAL FIRE DINS (`dins.json`, 9,419 destroyed) instead of scar cells.
+- [ ] Viña scar reflectance offset (decisions §2).
+- [ ] A third event (Penco / Lirquén, January 2026).
 
 ## Later
 - [ ] Any comuna: bake the data for another bounding box from the same pipeline.

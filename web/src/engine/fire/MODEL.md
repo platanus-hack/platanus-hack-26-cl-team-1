@@ -331,7 +331,25 @@ at the event's horizon (18 h: 18:00 on 7 Jan to 12:00 on 8 Jan, Pacific time). I
 wind-direction correction (0°, no site fit) and, for comparison, with Viña's −10°. It writes
 `public/data/eaton-2025/validation.json`, shown in the app's "Validación" section.
 
-RESULTS_PENDING
+**Result** (`pnpm validate:eaton`, real ERA5 ×1, spotting on, CAL FIRE ignition at 18:18; Sentinel-2 scar 4,246 ha,
+official perimeter 5,689 ha; for comparison Viña's in-sample Dice is 0.639):
+
+| Checkpoint | Model burns | Dice vs scar | Dice vs perimeter | Recall / precision (perimeter) | Buildings in the scar reached | FIRMS reached |
+| --- | --- | --- | --- | --- | --- | --- |
+| 06:00 on 8 Jan (12 h) | 10,827 ha | 0.235 | 0.313 | 0.455 / 0.239 | 3,632 / 6,706 | 243 / 394 |
+| 12:00 on 8 Jan (18 h) | 14,942 ha | 0.344 | 0.429 | 0.778 / 0.296 | 6,382 / 6,706 | 256 / 413 |
+| same, Viña's −10° wind | 12,609 ha | 0.341 | 0.424 | 0.682 / 0.308 | 5,016 / 6,706 | 209 / 413 |
+
+- **The model calibrated on Viña overburns Eaton about 2.6×** (14,942 ha vs 5,689 ha by noon; by 06:00 it already
+  burns 1.9× the final perimeter), although ERA5 smooths the downslope windstorm (18–37 km/h, gusts to 97 km/h at the
+  reanalysis point 7 km west of Altadena). It reaches 95 % of the buildings inside the scar, but 119,849 of the grid's
+  184,603 buildings in all (11,162 lie inside the perimeter): the run spreads south through consolidated Pasadena.
+- Likely causes, not yet tested: the McArthur ×4 factor (fitted on Viña, above Project Vesta's 2–3×), urban spread
+  and embers into consolidated city, and no suppression. This is the case for fitting on both fires together
+  (backlog), keeping a fit only if Viña does not get worse.
+- The Eaton scar uses true surface reflectance; Viña's keeps a −0.1 offset that its COGs do not need (see
+  `pipeline/README.md`), so the two scars are not computed identically. The official perimeter is the
+  method-independent check.
 
 ## 7. Performance (`bench.ts`)
 
