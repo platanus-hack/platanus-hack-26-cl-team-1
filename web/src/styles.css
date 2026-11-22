@@ -630,7 +630,7 @@ input[type='range']:focus-visible {
   color: var(--text-2);
 }
 .timeline-note {
-  margin-bottom: 12px;
+  margin: 12px 16px;
   line-height: 1.45;
 }
 
@@ -929,7 +929,8 @@ input[type='range']:focus-visible {
   position: absolute;
   left: 12px;
   right: 12px;
-  bottom: 30px;
+  /* clear of MapLibre's scale bar and attribution under it */
+  bottom: 40px;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -1096,6 +1097,20 @@ input[type='range']:focus-visible {
   background: rgba(17, 22, 30, 0.8) !important;
   color: var(--text-2) !important;
   border-color: var(--text-2) !important;
+}
+
+/* Laptop-height windows: the fixed results block left the controls a 170-240 px strip. The whole panel
+   scrolls as one column instead, results first (tall screens keep the results fixed). */
+@media (min-width: 900px) and (max-height: 900px) {
+  .panel {
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--line) transparent;
+  }
+  .panel-scroll {
+    flex: none;
+    overflow: visible;
+  }
 }
 
 /* ------------------------------------------------------------------ touch and narrow screens */
@@ -1567,6 +1582,19 @@ input[type='range']:focus-visible {
   cursor: pointer;
   list-style: none;
   flex-wrap: wrap;
+}
+/* a flex summary draws no marker: show that these rows open */
+.brig-cuerpo > summary > span:first-child::before {
+  content: '▸';
+  display: inline-block;
+  width: 1em;
+  color: var(--muted);
+}
+.brig-cuerpo[open] > summary > span:first-child::before {
+  content: '▾';
+}
+.brig-cuerpo > summary:hover > span:first-child {
+  color: var(--accent);
 }
 .brig-table {
   width: 100%;

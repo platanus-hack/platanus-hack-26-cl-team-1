@@ -54,6 +54,7 @@ export function Timebar(props: {
           step={1}
           value={clock}
           aria-label="Hora de la simulación"
+          aria-valuetext={`${minToHHMM(t0, clock)}, ${minToDateLabel(t0, clock)}`}
           onChange={(e) => props.setClock(Number(e.target.value))}
         />
         {/* the thumb is --thumb wide (styles.css), so the track spans half a thumb in from each end */}

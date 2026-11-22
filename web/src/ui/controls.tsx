@@ -1,4 +1,5 @@
 // Small form controls shared by the panel.
+import { useId } from 'react'
 import type { ReactNode } from 'react'
 
 export function Section({ title, children, defaultOpen = true }: { title: string; children: ReactNode; defaultOpen?: boolean }) {
@@ -27,21 +28,23 @@ export function Slider(props: {
   disabled?: boolean
   extra?: ReactNode
 }) {
+  const id = useId()
   return (
     <div className={`field${props.disabled ? ' disabled' : ''}`}>
       <div className="field-head">
-        <label>{props.label}</label>
+        <label htmlFor={id}>{props.label}</label>
         <span className="value">{props.display}</span>
       </div>
       <div className="field-row">
         <input
+          id={id}
           type="range"
           min={props.min}
           max={props.max}
           step={props.step}
           value={props.value}
           disabled={props.disabled}
-          aria-label={props.label}
+          aria-valuetext={props.display}
           onChange={(e) => props.onChange(Number(e.target.value))}
         />
         {props.extra}
@@ -88,9 +91,9 @@ export function Segmented<T extends string | number>({
   label: string
 }) {
   return (
-    <div className="seg" role="radiogroup" aria-label={label}>
+    <div className="seg" role="group" aria-label={label}>
       {options.map((o) => (
-        <button key={String(o.value)} type="button" role="radio" aria-checked={o.value === value} className={o.value === value ? 'on' : ''} onClick={() => onChange(o.value)}>
+        <button key={String(o.value)} type="button" aria-pressed={o.value === value} className={o.value === value ? 'on' : ''} onClick={() => onChange(o.value)}>
           {o.label}
         </button>
       ))}

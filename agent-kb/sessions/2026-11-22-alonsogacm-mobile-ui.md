@@ -22,12 +22,29 @@
   line being drawn, and finishing needed a double click or Enter (impossible on a phone). The hint now counts the
   points and has **Guardar** (saves the line and leaves the tool; `MapView` `finishFirebreak`) and **Cancelar (Esc)**.
 - Play button tooltip names the space-bar shortcut.
+- **Desktop and accessibility fixes from a code audit (3 auditors + skeptical verifiers):**
+  - laptop-height windows (≤ 900 px tall): the panel scrolls as one column; before, the fixed results block left
+    the controls a 170–240 px strip at 1280×720;
+  - map notes and tool hints sit between the layers card and the zoom buttons (they covered the card at
+    1024–1440 px); the floating time bar moved up 10 px, clear of the scale bar and attribution;
+  - "Al final (24:00 del 2 feb 2024)" instead of "Al final (00:00)" (`minToEndLabel`, tested);
+  - real-weather sliders say what they adjust: "Viento (factor)", "Dirección del viento (giro)",
+    "Humedad relativa (ajuste, pts)", "Temperatura (ajuste, °C)";
+  - nested disclosures (cuerpos, refuerzos, supuestos) show ▸/▾; the scenario note gets the panel's inset;
+    the top-bar subtitle shows in full on hover;
+  - sliders: `aria-valuetext` with the shown value and `<label htmlFor>`; segmented pickers are toggle
+    buttons (`aria-pressed`, no radio roles without arrow keys); tool buttons drop `aria-pressed` (their label
+    already changes); the sources dialog is named; MapLibre's controls in Spanish (`locale`).
 - Checked in the browser pane at 375×812, 812×375, 768×1024 and 1440×900 (desktop DOM and layout as before).
 
 ## Decisions
 - None new. The phone layout keeps the same width split (900 px) the app already used.
 
 ## Open / blocked
+- Audit items left for the team: household colours rely on red/green alone (a colour-blind-safe "Sale a tiempo"
+  colour changes the map's visual language); results are not announced to screen readers (no live region);
+  the Calles checkbox looks clickable while routes or a street tool force it on; mixed decimal separators
+  (`toFixed` vs es-CL) in the Clima section.
 - Not tried on a real iPhone/Android: drag physics and safe areas were checked with emulation and synthetic
   pointer events only.
 

@@ -584,7 +584,7 @@ export function MapView(props: Props) {
     // button (top), the zoom buttons (right) and the bottom sheet over the map.
     const fitPadding = () =>
       window.innerWidth >= 900
-        ? { top: 20, bottom: 90, left: 270, right: 20 }
+        ? { top: 20, bottom: 110, left: 270, right: 20 }
         : { top: 52, bottom: p.current.padBottom + 12, left: 10, right: 48 }
     const map = new maplibregl.Map({
       container: el.current,
@@ -593,6 +593,15 @@ export function MapView(props: Props) {
       fitBoundsOptions: { padding: fitPadding() },
       maxPitch: 75,
       attributionControl: { compact: true },
+      // MapLibre's own controls and the map region, in the app's language (keys: maplibre-gl default_locale)
+      locale: {
+        'Map.Title': 'Mapa del escenario',
+        'NavigationControl.ZoomIn': 'Acercar',
+        'NavigationControl.ZoomOut': 'Alejar',
+        'NavigationControl.ResetBearing': 'Arrastra para rotar el mapa; clic para volver al norte',
+        'AttributionControl.ToggleAttribution': 'Mostrar u ocultar la atribución',
+        'Popup.Close': 'Cerrar',
+      },
     })
     mapRef.current = map
     if (import.meta.env.DEV) (window as unknown as { __map: MlMap }).__map = map
