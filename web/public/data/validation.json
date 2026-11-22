@@ -24,23 +24,103 @@
     {
       "name": "Jardín Botánico",
       "reported": "17:00",
+      "satellite": "17:55",
       "model": "18:23"
     },
     {
       "name": "Pompeya Sur",
       "reported": "18:10",
+      "satellite": "17:55",
       "model": "18:04"
     },
     {
       "name": "El Olivar",
       "reported": "18:30",
+      "satellite": "18:25",
       "model": "19:14"
     },
     {
       "name": "Villa Independencia",
       "reported": "18:30",
+      "satellite": "18:25",
       "model": "19:36"
     }
   ],
+  "pacing": {
+    "note": "Front lag = minutes the model is late (+) or early (-) at reaching the farthest satellite detection of each fire, 12:00-24:00. Fit: GOES-16 every 10 min (in sample). Test: VIIRS / MODIS passes (not used to fit).",
+    "fit": {
+      "sensor": "GOES-16 ABI",
+      "rmsLagMin": {
+        "west (Las Tablas)": 47,
+        "east (Lo Moscoso)": 110
+      }
+    },
+    "test": [
+      {
+        "time": "14:47",
+        "satellite": "VIIRS NOAA-20",
+        "fire": "west (Las Tablas)",
+        "obsKm": 4.8,
+        "modelKm": 6,
+        "lagMin": -23,
+        "overrunHa": 262
+      },
+      {
+        "time": "15:38",
+        "satellite": "VIIRS S-NPP",
+        "fire": "west (Las Tablas)",
+        "obsKm": 5.3,
+        "modelKm": 8.3,
+        "lagMin": -64,
+        "overrunHa": 1026
+      },
+      {
+        "time": "16:27",
+        "satellite": "VIIRS NOAA-20",
+        "fire": "west (Las Tablas)",
+        "obsKm": 5.9,
+        "modelKm": 10.7,
+        "lagMin": -100,
+        "overrunHa": 1825
+      },
+      {
+        "time": "23:18",
+        "satellite": "MODIS Terra",
+        "fire": "west (Las Tablas)",
+        "obsKm": 20.5,
+        "modelKm": 23,
+        "lagMin": -180,
+        "overrunHa": 6155
+      },
+      {
+        "time": "14:47",
+        "satellite": "VIIRS NOAA-20",
+        "fire": "east (Lo Moscoso)",
+        "obsKm": 0.6,
+        "modelKm": 0.8,
+        "lagMin": -4,
+        "overrunHa": 0
+      },
+      {
+        "time": "15:38",
+        "satellite": "VIIRS S-NPP",
+        "fire": "east (Lo Moscoso)",
+        "obsKm": 1.4,
+        "modelKm": 3.3,
+        "lagMin": -38,
+        "overrunHa": 193
+      },
+      {
+        "time": "16:27",
+        "satellite": "VIIRS NOAA-20",
+        "fire": "east (Lo Moscoso)",
+        "obsKm": 4.4,
+        "modelKm": 5.7,
+        "lagMin": -25,
+        "overrunHa": 427
+      }
+    ],
+    "testMeanAbsLagMin": 62
+  },
   "windDirCorrectionDeg": -10
 }

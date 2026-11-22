@@ -1,7 +1,9 @@
-// Calibration against the Sentinel-2 burn scar: runs the engine on the baked dataset (web/public/data) with the
-// historical weather and the preset ignitions, and scores the burned area against scar.bin (cells marked 255,
-// "no data", are ignored), the buildings reached inside / outside the scar, the NASA FIRMS detections and the
-// times reported for four neighbourhoods. The scar, FIRMS and the reported times are used only to score and
+// Calibration against satellite observations: runs the engine on the baked dataset (web/public/data) with the
+// historical weather and the preset ignitions, and scores (1) the pace of each fire against GOES-16 fire pixels
+// every 10 min (fit) and the VIIRS / MODIS passes (test, out of sample), in both directions (pacing.ts); (2) the
+// burned area against the Sentinel-2 scar.bin (cells marked 255, "no data", are ignored); (3) the buildings
+// reached inside / outside the scar. The times reported by the press for four neighbourhoods are printed next to
+// the satellite and model times, as a contrast only. The scar, FIRMS and the reported times are used only to score and
 // to fit a handful of global scalars, never to build inputs. Every calibration number quoted in MODEL.md
 // comes from this script.
 //
@@ -10,11 +12,12 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { lonLatToCell } from '../../data/grid'
-import { parseBuildings, parseElevation, parseFirms, parseFuel, parseGrid, parseIgnitions, parseScar, parseWeather } from '../../data/load'
+import { parseBuildings, parseElevation, parseFirms, parseFuel, parseGoes, parseGrid, parseIgnitions, parseScar, parseWeather } from '../../data/load'
 import { localToMin } from '../../data/time'
 import type { FireParams, WeatherSeries } from '../types'
 import { FUEL } from '../types'
 import { DEFAULT_FIRE_PARAMS, ERA5_WIND_DIR_CORRECTION_DEG, FIRE_MODEL, SPREAD_MODEL, simulateFire } from './index'
+import { FOOTPRINT_M, HALF_PIXEL_KM, LINK_KM, distanceKm, fireCluster, frontCurve, frontLagMin, modelFrontKm, observedFrontKm, overrunHa, type Obs } from './pacing'
 
 const dir = fileURLToPath(new URL('../../../public/data/', import.meta.url))
 const bin = (f: string) => {
@@ -33,6 +36,7 @@ const presets = parseIgnitions(json('ignitions.json'))
 const firebreak = new Uint8Array(n)
 const firms = parseFirms(json('firms.json'))
 const buildingXY = parseBuildings(bin('buildings.bin'))
+const goes = parseGoes(json('goes.json'))
 
 /** Cell of every building, and the scar dilated by DILATE_CELLS (the 10-20 m Sentinel-2 dNBR misses burned
  *  houses inside built-up cells: Copernicus EMSR715 grades 333 ha of residential damage where the scar marks
@@ -89,6 +93,8 @@ const ANCHORS = [
   { name: 'Villa Independencia', lat: -33.021, lon: -71.491, observed: '2024-02-02T18:30', source: 'CIPER 2024-02-09; CIGIDEN' },
 ]
 const ANCHOR_RADIUS_CELLS = 5
+/** Satellite time of an anchor: first GOES-16 pixel of the western fire within this distance (one pixel). */
+const ANCHOR_SAT_KM = 2
 function anchorTimes(arrival: Float32Array) {
   return ANCHORS.map((a) => {
     const cell = lonLatToCell(grid, a.lon, a.lat)
@@ -103,16 +109,18 @@ function anchorTimes(arrival: Float32Array) {
         if (dr * dr + dc * dc <= ANCHOR_RADIUS_CELLS ** 2 && r >= 0 && c >= 0 && r < grid.rows && c < grid.cols) t = Math.min(t, arrival[r * grid.cols + c])
       }
     const obs = localToMin(grid.t0, a.observed)
-    return { name: a.name, observed: a.observed.slice(11), modelMin: t, deltaMin: t - obs }
+    const sat = Math.min(...FIRES[0].clusters.goes.filter((o) => distanceKm([a.lon, a.lat], o.lon, o.lat) <= ANCHOR_SAT_KM).map((o) => o.tMin))
+    return { name: a.name, observed: a.observed.slice(11), satelliteMin: sat, modelMin: t, deltaMin: t - obs }
   })
 }
 const hhmm = (tMin: number) => (Number.isFinite(tMin) ? `${String(Math.floor(12 + tMin / 60) % 24).padStart(2, '0')}:${String(Math.round(tMin % 60)).padStart(2, '0')}` : 'never')
 
-/** Combined objective (higher is better): mean of Dice, building F1, FIRMS share reached and a timing score
- *  (1 at the reported time, 0 at 2 h off or never). */
-function objective(dice: number, b: ReturnType<typeof buildingScore>, f: { reached: number; total: number }, a: ReturnType<typeof anchorTimes>) {
+/** Combined objective (higher is better): mean of the GOES-16 pace score (1 when the RMS front lag is 0, 0 at 2 h,
+ *  averaged over both fires), Dice vs the scar and building F1. Press times are not in it (satellite is the
+ *  reference); their timing score is printed for contrast (1 at the reported time, 0 at 2 h off or never). */
+function objective(dice: number, b: ReturnType<typeof buildingScore>, pace: ReturnType<typeof pacing>, a: ReturnType<typeof anchorTimes>) {
   const timing = a.reduce((s, x) => s + (Number.isFinite(x.deltaMin) ? Math.max(0, 1 - Math.abs(x.deltaMin) / 120) : 0), 0) / a.length
-  return { objective: (dice + b.f1 + f.reached / f.total + timing) / 4, timing }
+  return { objective: (pace.lagScore + dice + b.f1) / 3, timing }
 }
 
 /** Share of the 2 Feb NASA FIRMS detections (VIIRS/MODIS, 375 m-1 km pixels) whose location the model fire has
@@ -145,6 +153,69 @@ const ignitions = presets.map((p) => {
   if (cell < 0) throw new Error(`calibrate: ignition ${p.id} is outside the grid`)
   return { cell, tMin: localToMin(grid.t0, p.timeLocal) }
 })
+
+// ---- Pace against satellite passes (pacing.ts) -------------------------------------------------------------
+type Sensor = 'goes' | 'viirs' | 'modis'
+const toObs = (pts: { lon: number; lat: number; timeLocal: string }[]): Obs[] => pts.map((p) => ({ lon: p.lon, lat: p.lat, tMin: localToMin(grid.t0, p.timeLocal) }))
+const OBS: Record<Sensor, Obs[]> = {
+  goes: toObs(goes),
+  viirs: toObs(firms.filter((f) => f.satellite.startsWith('VIIRS'))),
+  modis: toObs(firms.filter((f) => f.satellite.startsWith('MODIS'))),
+}
+const FIRE_LABEL: Record<string, string> = { 'las-tablas-penuelas': 'west (Las Tablas)', 'quilpue-villa-alemana-oriente': 'east (Lo Moscoso)' }
+/** Each preset fire with its own detections per sensor (space-time connected to its ignition, pacing.fireCluster). */
+const FIRES = presets.map((p, i) => {
+  const origin: [number, number] = [p.lon, p.lat]
+  // Linked through the detections of every sensor (MODIS passed once that afternoon and cannot chain on its own),
+  // with GOES's link radius; each sensor's front is then measured on its own detections.
+  const all = (Object.keys(OBS) as Sensor[]).flatMap((s) => OBS[s].map((o) => ({ ...o, sensor: s })))
+  const linked = fireCluster(all, origin, LINK_KM.goes)
+  const only = (s: Sensor) => linked.filter((o) => o.sensor === s)
+  const clusters: Record<Sensor, Obs[]> = { goes: only('goes'), viirs: only('viirs'), modis: only('modis') }
+  return { id: p.id, label: FIRE_LABEL[p.id] ?? p.id, origin, ignition: ignitions[i], clusters }
+})
+const BIN_KM = 0.1
+/** Passes of the polar orbiters (test set): one entry per (time, satellite). */
+const TEST_PASSES = [...new Map(firms.map((f) => [`${f.timeLocal} ${f.satellite}`, f])).values()].map((f) => ({
+  timeLocal: f.timeLocal,
+  satellite: f.satellite,
+  sensor: (f.satellite.startsWith('VIIRS') ? 'viirs' : 'modis') as Sensor,
+  tMin: localToMin(grid.t0, f.timeLocal),
+}))
+const GOES_FRAMES = [...new Set(OBS.goes.map((o) => o.tMin))].sort((a, b) => a - b)
+
+/** Front lag per fire against GOES-16 frames up to the horizon (fit) and against each VIIRS / MODIS pass (test).
+ *  arrivals[i] is the arrival grid of fire i run alone, so each fire's front is measured without the other. */
+function pacing(arrivals: Float32Array[], horizonMin: number) {
+  const fires = FIRES.map((f, i) => {
+    const curve = frontCurve(arrivals[i], grid, f.origin, BIN_KM)
+    const lags: { tMin: number; obsKm: number; modelKm: number; lagMin: number }[] = []
+    for (const t of GOES_FRAMES) {
+      if (t > horizonMin || t < f.ignition.tMin) continue
+      const d = observedFrontKm(f.clusters.goes, f.origin, t)
+      if (d === null) continue
+      lags.push({ tMin: t, obsKm: d, modelKm: modelFrontKm(curve, BIN_KM, t), lagMin: frontLagMin(curve, BIN_KM, d, t, HALF_PIXEL_KM.goes) })
+    }
+    const rmsLagMin = Math.sqrt(lags.reduce((s, x) => s + x.lagMin ** 2, 0) / Math.max(1, lags.length))
+    const test = TEST_PASSES.filter((p) => p.tMin <= horizonMin && p.tMin >= f.ignition.tMin).flatMap((p) => {
+      const d = observedFrontKm(f.clusters[p.sensor], f.origin, p.tMin)
+      if (d === null) return []
+      return [{
+        time: p.timeLocal.slice(11),
+        satellite: p.satellite,
+        fire: f.label,
+        obsKm: d,
+        modelKm: modelFrontKm(curve, BIN_KM, p.tMin),
+        lagMin: frontLagMin(curve, BIN_KM, d, p.tMin, HALF_PIXEL_KM[p.sensor]),
+        overrunHa: overrunHa(arrivals[i], grid, f.clusters[p.sensor], p.tMin, FOOTPRINT_M[p.sensor]),
+      }]
+    })
+    return { label: f.label, lags, rmsLagMin, test }
+  })
+  const lagScore = fires.reduce((s, f) => s + Math.max(0, 1 - f.rmsLagMin / 120), 0) / fires.length
+  const testAbsLag = fires.flatMap((f) => f.test.map((x) => Math.abs(x.lagMin)))
+  return { fires, lagScore, testMeanAbsLagMin: testAbsLag.reduce((s, x) => s + x, 0) / Math.max(1, testAbsLag.length) }
+}
 
 function weather(windFactor: number, dirCorrectionDeg: number): WeatherSeries {
   const t0Min = localToMin(grid.t0, weatherFile.times[0])
@@ -207,19 +278,32 @@ function run(k: Knobs) {
   FIRE_MODEL.fuels[FUEL.URBAN_LOW].factor = k.intermixFactor
   FIRE_MODEL.fuels[FUEL.URBAN_DENSE].spotTarget = k.consolidatedEmbers
   const params = { ...DEFAULT_FIRE_PARAMS, ...k.params }
-  const res = simulateFire({ grid, elevation, fuel, firebreak, ignitions, weather: weather(k.windFactor, k.windDirCorrectionDeg), params })
+  const w = weather(k.windFactor, k.windDirCorrectionDeg)
+  const res = simulateFire({ grid, elevation, fuel, firebreak, ignitions, weather: w, params })
+  const perFire = ignitions.map((ig) => simulateFire({ grid, elevation, fuel, firebreak, ignitions: [ig], weather: w, params }).arrivalMin)
   Object.assign(FIRE_MODEL, JSON.parse(saved))
   const end = score(res.arrivalMin, params.horizonMin)
   const bld = buildingScore(res.arrivalMin, params.horizonMin)
   const fr = firmsReached(res.arrivalMin)
   const anchors = anchorTimes(res.arrivalMin)
-  return { res, end, at24: score(res.arrivalMin, localToMin(grid.t0, '2024-02-03T00:00')), bld, firms: fr, anchors, ...objective(end.dice, bld, fr, anchors) }
+  const pace = pacing(perFire, params.horizonMin)
+  return { res, end, at24: score(res.arrivalMin, localToMin(grid.t0, '2024-02-03T00:00')), bld, firms: fr, anchors, pace, ...objective(end.dice, bld, pace, anchors) }
 }
 
 const fmtFull = (r: ReturnType<typeof run>) =>
   `${fmt(r.end)}\n   buildings: ${r.bld.reached} reached, ${r.bld.inScar}/${r.bld.scarTotal} of those in the scar (recall ${r.bld.recall.toFixed(2)}, precision ${r.bld.precision.toFixed(2)}, within 120 m of the scar ${r.bld.precisionNear.toFixed(2)})` +
-  `\n   FIRMS ${r.firms.reached}/${r.firms.total}; arrival ${r.anchors.map((a) => `${a.name} ${hhmm(a.modelMin)} (reported ${a.observed})`).join(', ')}` +
-  `\n   objective ${r.objective.toFixed(3)} (timing score ${r.timing.toFixed(2)})`
+  `\n   FIRMS ${r.firms.reached}/${r.firms.total}; arrival ${r.anchors.map((a) => `${a.name} ${hhmm(a.modelMin)} (GOES ${hhmm(a.satelliteMin)}, press ${a.observed})`).join(', ')}` +
+  `\n   pace: GOES RMS lag ${r.pace.fires.map((f) => `${f.label} ${f.rmsLagMin.toFixed(0)} min`).join(', ')}; VIIRS/MODIS mean |lag| ${r.pace.testMeanAbsLagMin.toFixed(0)} min` +
+  `\n   objective ${r.objective.toFixed(3)} (pace score ${r.pace.lagScore.toFixed(2)}; press timing score, not in the objective, ${r.timing.toFixed(2)})`
+
+/** Full pace tables: GOES every 30 min and every VIIRS / MODIS pass, per fire. */
+function printPace(r: ReturnType<typeof run>) {
+  for (const f of r.pace.fires) {
+    console.log(`   ${f.label}, GOES-16 (fit): time obs km / model km / lag min`)
+    console.log('     ' + f.lags.filter((x) => x.tMin % 30 === 5).map((x) => `${hhmm(x.tMin)} ${x.obsKm.toFixed(1)}/${x.modelKm.toFixed(1)}/${x.lagMin.toFixed(0)}`).join('  '))
+    console.log(`   ${f.label}, VIIRS/MODIS (test): ` + f.test.map((x) => `${x.time} ${x.satellite} ${x.obsKm.toFixed(1)}/${x.modelKm.toFixed(1)} km lag ${x.lagMin.toFixed(0)} min overrun ${x.overrunHa.toFixed(0)} ha`).join('; '))
+  }
+}
 
 const fmt = (s: ReturnType<typeof score>) => `Dice ${s.dice.toFixed(3)}, IoU ${s.iou.toFixed(3)} (recall ${s.recall.toFixed(2)}, precision ${s.precision.toFixed(2)}, ${s.ha.toFixed(0)} ha)`
 
@@ -260,11 +344,18 @@ if (!process.argv.includes('--scan')) {
       precision: Number(shipped.bld.precision.toFixed(3)),
       precisionWithin120m: Number(shipped.bld.precisionNear.toFixed(3)),
     },
-    anchors: shipped.anchors.map((a) => ({ name: a.name, reported: a.observed, model: hhmm(a.modelMin) })),
+    anchors: shipped.anchors.map((a) => ({ name: a.name, reported: a.observed, satellite: hhmm(a.satelliteMin), model: hhmm(a.modelMin) })),
+    pacing: {
+      note: 'Front lag = minutes the model is late (+) or early (-) at reaching the farthest satellite detection of each fire, 12:00-24:00. Fit: GOES-16 every 10 min (in sample). Test: VIIRS / MODIS passes (not used to fit).',
+      fit: { sensor: 'GOES-16 ABI', rmsLagMin: Object.fromEntries(shipped.pace.fires.map((f) => [f.label, Math.round(f.rmsLagMin)])) },
+      test: shipped.pace.fires.flatMap((f) => f.test.map((x) => ({ ...x, obsKm: Number(x.obsKm.toFixed(1)), modelKm: Number(x.modelKm.toFixed(1)), lagMin: Math.round(x.lagMin), overrunHa: Math.round(x.overrunHa) }))),
+      testMeanAbsLagMin: Math.round(shipped.pace.testMeanAbsLagMin),
+    },
     windDirCorrectionDeg: ERA5_WIND_DIR_CORRECTION_DEG,
   }
   writeFileSync(dir + 'validation.json', JSON.stringify(validation, null, 2) + '\n')
   console.log(`shipped defaults at the horizon: ${fmtFull(shipped)}`)
+  printPace(shipped)
   console.log('wrote public/data/validation.json\n')
   // Before / after: what each change contributes (one at a time from the shipped model).
   const variants: [string, Partial<Knobs>][] = [
