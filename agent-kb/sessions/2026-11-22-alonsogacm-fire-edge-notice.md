@@ -25,6 +25,12 @@
     at 21:21 (16,623 ha); Viña default reaches the east edge at 18:31 (18,008 ha); Eaton reaches the south edge
     at 21:53 and the west edge at 08:42 on 8 Jan.
 
+- **Phones (below 900 px):** the notes no longer cover an open "Capas y leyenda" card.
+  - While the card is open, the notes move to the bottom of the map, above the scale bar and the sheet.
+  - The card stops above them and scrolls inside: `--notes-h` is measured in `App.tsx`.
+  - The card keeps at least 160 px; on a landscape phone it then covers the notes until it is closed.
+  - Checked at 375×812, 375×667 and 812×375 (Viña's edge note), and at 1280×800 (desktop unchanged).
+
 ## Decisions
 - None (applies the "never fail silently" rule in CLAUDE.md).
 

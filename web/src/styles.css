@@ -1460,6 +1460,25 @@ input[type='range']:focus-visible {
     width: auto;
     transform: none;
   }
+  /* An open layers card fills the top-left corner: the notes move to the bottom of the map, above the scale bar and
+     the sheet, and the card stops above them and scrolls inside (--notes-h is measured in App.tsx). The card is as
+     wide as the notes and stays on top, so nothing peeks out beside it if a note grows before it is re-measured. */
+  .mapwrap:has(.layers-card.open) .map-notes {
+    top: auto;
+    bottom: calc(var(--sheet-h, 0px) + 40px);
+  }
+  .layers-card.open {
+    right: calc(48px + env(safe-area-inset-right));
+    max-width: none;
+    z-index: 4;
+  }
+  /* ...but keeps at least 160 px (a landscape phone): there the card covers the notes until it is closed. */
+  .mapwrap:has(.map-notes > *) .layers-card.open {
+    max-height: max(
+      calc(100% - var(--sheet-h, 0px) - var(--notes-h, 0px) - 64px),
+      min(160px, calc(100% - var(--sheet-h, 0px) - 24px))
+    );
+  }
   .main.narrow .maplibregl-ctrl-bottom-left,
   .main.narrow .maplibregl-ctrl-bottom-right {
     bottom: var(--sheet-h, 0px);
