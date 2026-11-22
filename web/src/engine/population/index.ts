@@ -92,12 +92,16 @@ export function scheduleAt(knots: [number, number][], hour: number): number {
 
 const md = (m: number, d: number) => m * 100 + d
 
+/** x within [a, b] on the calendar, inclusive. A range whose start comes after its end crosses New Year (a
+ *  northern-hemisphere school year, August to June, or a winter break from December to January). */
+const inRange = (x: number, a: number, b: number) => (a <= b ? x >= a && x <= b : x >= a || x <= b)
+
 /** Whether classes are held on that calendar date (weekday or not: the caller handles weekends). */
 export function inSchoolTerm(month: number, day: number, p: PresenceParams): boolean {
   const x = md(month, day)
   const t = p.schoolTerm
-  if (x < md(...t.start) || x > md(...t.end)) return false
-  return !(x >= md(...t.winterBreak[0]) && x <= md(...t.winterBreak[1]))
+  if (!inRange(x, md(...t.start), md(...t.end))) return false
+  return !inRange(x, md(...t.winterBreak[0]), md(...t.winterBreak[1]))
 }
 
 /** The calendar facts the presence model uses for a wall-clock minute: day of week (0 = Sunday), whether it is a

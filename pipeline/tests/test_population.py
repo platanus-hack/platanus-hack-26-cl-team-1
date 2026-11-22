@@ -104,3 +104,27 @@ def test_national_grid_index():
     assert ng.index(np.array([-80.0 + eps]), np.array([-17.0 - eps]))[0] == 0
     assert ng.index(np.array([-80.0 + 1.5 * pop.NAT_DEG]), np.array([-17.0 - 2.5 * pop.NAT_DEG]))[0] == 2 * 5 + 1
     assert ng.index(np.array([-80.1]), np.array([-17.5]))[0] == -1
+
+
+def test_ghsl_tile_matches_the_tiles_on_disk_and_refuses_two_tiles():
+    # Bounds read from the tiles: R6_C7 = lon -120.0079..-110.0079, lat 29.0996..39.0996.
+    assert pop.ghsl_tile(-118.87, 33.55, -117.31, 34.82) == "R6_C7"  # Eaton's regional extent
+    assert pop.ghsl_tile(-71.6, -33.2, -71.3, -33.0) == "R13_C11"  # Viña: one of GHSL_TILES
+    assert all(f"R{r}_C{c}" in pop.GHSL_TILES for r in (11, 15) for c in (11, 12))
+    assert pop.ghsl_tile(-120.0, 39.0, -119.9, 39.09) == "R6_C7"  # just inside the north-west corner
+    with pytest.raises(RuntimeError, match="spans GHSL tiles"):
+        pop.ghsl_tile(-120.01, 34.0, -119.9, 34.1)  # crosses the west edge (-120.0079)
+    with pytest.raises(RuntimeError, match="spans GHSL tiles"):
+        pop.ghsl_tile(-118.0, 39.0, -117.9, 39.2)  # crosses the north edge (39.0996)
+
+
+def test_expand_bbox_grows_by_at_least_the_margin():
+    w, s, e, n = pop.expand_bbox(-118.2, 34.1, -118.0, 34.27, 60_000.0)
+    assert n - 34.27 == pytest.approx(60_000 / pop.M_PER_DEG)
+    assert 34.1 - s == pytest.approx(60_000 / pop.M_PER_DEG)
+    # East-west margin in metres, at the extent's most poleward latitude (where a degree is shortest), is 60 km.
+    assert (-118.2 - w) * pop.M_PER_DEG * math.cos(math.radians(n)) == pytest.approx(60_000)
+    assert (e + 118.0) * pop.M_PER_DEG * math.cos(math.radians(34.1)) > 60_000
+    # Southern hemisphere: the most poleward latitude is the south edge.
+    w2, s2, _, _ = pop.expand_bbox(-71.6, -33.2, -71.3, -33.0, 30_000.0)
+    assert (-71.6 - w2) * pop.M_PER_DEG * math.cos(math.radians(s2)) == pytest.approx(30_000)

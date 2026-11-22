@@ -4,7 +4,7 @@ import type { Dataset } from '../data/load'
 import { minToHHMM } from '../data/time'
 import { FIREFIGHT_MODEL } from '../engine/brigade/model'
 import type { UnitStatus } from '../engine/brigade'
-import { UNIT_COUNT, UNIT_LABEL_ES, UNIT_SHORT_ES, type BrigadesFile, type UnitType } from '../engine/types'
+import { TIMELINE, UNIT_COUNT, UNIT_LABEL_ES, UNIT_SHORT_ES, type BrigadesFile, type UnitType } from '../engine/types'
 import type { BrigadesOut } from '../worker/protocol'
 import type { BrigadeScenario, Scenario } from '../worker/scenario'
 import { defaultBrigades, MAX_UNITS, scaleUnits } from '../worker/scenario'
@@ -108,7 +108,11 @@ function BrigadesBody(p: Props & { file: BrigadesFile }) {
         label="Simular el trabajo de bomberos"
         checked={b.enabled}
         onChange={(v) => set({ enabled: v })}
-        sub="Apagado es el escenario calibrado contra la cicatriz real, que ya incluye, sin separarlo, lo que se hizo ese día. Encendido, cada carro sale de su cuartel, va por calles abiertas al sector más amenazado al que llega antes que el fuego y lo defiende mientras le dura el agua."
+        sub={`${
+          p.data.event.id === TIMELINE.EATON_2025
+            ? 'Apagado, el fuego avanza sin combate, como en la prueba fuera de muestra (el modelo no se calibró con este incendio). Sin ayuda mutua: solo las estaciones del mapa, con lo que publica cada departamento o un carro bomba como supuesto.'
+            : 'Apagado es el escenario calibrado contra la cicatriz real, que ya incluye, sin separarlo, lo que se hizo ese día.'
+        } Encendido, cada carro sale de su cuartel, va por calles abiertas al sector más amenazado al que llega antes que el fuego y lo defiende mientras le dura el agua.`}
       />
       {b.enabled && (
         <>
