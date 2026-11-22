@@ -26,6 +26,9 @@ Owner in brackets once someone takes an item. Project: Cortafuego (D-019). The O
     one hypothetical ignition at 14:00). [Anaís + agent]
 
 ## Next
+- [ ] Maule (Talca box): the preset start sits in the box's south fifth, so a strong-wind fire reaches the north edge
+  (21:21 at wind ×1.5). Re-centre or move the box north and re-bake. Talca's cropland factor (27 % of cells) was never
+  fitted, and many valley-floor FOREST cells are probably orchards (2026-11-22 fire-edge-notice session log).
 - [ ] Plan de preparación (D-033), next: ignitions sampled from fire records, several weather days, a
   street-link optimizer (exact incremental evaluator in the 2026-11-22 optimizer session log), a geofenced alert mode.
 - [ ] Western stall of 14:05–16:25 (satellite) not reproduced: needs a cause the data shows (initial attack?

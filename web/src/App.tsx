@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { DEFAULT_FIRE_PARAMS } from './engine/fire'
+import { edgeContact } from './engine/fire/edge'
 import { DEFAULT_EVAC_PARAMS } from './engine/evac'
 import { awayShare, peopleInBurnedArea } from './engine/population'
 import { POPULATION_DAY, TIMELINE, type PopulationDay, type TimelineId } from './engine/types'
@@ -29,6 +30,7 @@ import { StartupSplash } from './ui/StartupSplash'
 import { MobileSheet, type SheetSnap } from './ui/MobileSheet'
 import { COARSE_QUERY, NARROW_QUERY, useMediaQuery } from './ui/useMediaQuery'
 import { fmtInt } from './ui/controls'
+import { edgeNote } from './ui/edgeNote'
 
 const NEUTRAL_WEATHER: WeatherSettings = {
   mode: 'real',
@@ -437,6 +439,9 @@ function Explorer({
   const sorted = useMemo(() => (fire ? sortedArrivals(fire.arrivalMin) : null), [fire])
   const cellHa = (data.grid.cellM * data.grid.cellM) / 10000
   const burnedHaNow = sorted ? countAtOrBefore(sorted, clock) * cellHa : 0
+  // The grid is a hard boundary (src/engine/fire/edge.ts): say when the fire reaches it, never cut silently.
+  const edge = useMemo(() => (fire ? edgeContact(data.grid.rows, data.grid.cols, fire.arrivalMin) : null), [fire, data])
+  useEffect(() => onNote('edge', edge ? edgeNote(edge, t0) : null), [edge, t0, onNote])
   // Where people are, by time of day (src/engine/population): each burned cell counted at its arrival time.
   const wall0 = useMemo(() => wallClockMin(t0), [t0])
   const people = useMemo(
@@ -593,6 +598,7 @@ function Explorer({
     fire,
     evac,
     brigadesOut,
+    edge,
     burnedHaNow,
     summary,
     baseline,
@@ -655,6 +661,7 @@ function Explorer({
           <MapView
             data={data}
             fire={fire}
+            edge={edge}
             evac={evac}
             brigades={brigadesOut}
             safe={safe}

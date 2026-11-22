@@ -8,6 +8,7 @@ import { localToMin } from '../data/time'
 import type { BrigadesOut, EvacOut, FireOut } from '../worker/protocol'
 import type { Scenario } from '../worker/scenario'
 import { HOUSEHOLD } from '../engine/types'
+import type { EdgeContact } from '../engine/fire/edge'
 import { PLAN_TILE_CELLS, tileRing } from '../engine/plan'
 import { drawFire, drawFuel, drawHillshade, drawPopulation, drawScar } from './overlays'
 import type { Feature, FeatureCollection, LineString, SetDataArg } from './geo'
@@ -53,6 +54,8 @@ const FALLBACK_STYLE: StyleSpecification = {
 interface Props {
   data: Dataset
   fire: FireOut | null
+  /** Outer-ring cells the fire reaches (src/engine/fire/edge.ts): drawn on the simulated area's outline. */
+  edge: EdgeContact | null
   evac: EvacOut | null
   brigades: BrigadesOut | null
   safe: Uint8Array | null
@@ -121,6 +124,33 @@ export function MapView(props: Props) {
       s.play()
       s.pause()
     }
+  }
+
+  /** The stretch of the simulated area's outline the fire reaches: one segment per outer-ring cell, on its outer
+   *  side(s), with its arrival time (shown from that time on, like the rest of the clock-driven layers). */
+  function updateEdge() {
+    const { data, edge } = p.current
+    const g = data.grid
+    const [w, s, e, n] = gridBounds(g)
+    const feats: Feature[] = []
+    if (edge) {
+      for (let k = 0; k < edge.cells.length; k++) {
+        const cell = edge.cells[k]
+        const r = Math.floor(cell / g.cols)
+        const c = cell % g.cols
+        const x0 = g.lonMin + c * g.dLon
+        const x1 = x0 + g.dLon
+        const y0 = g.latMax - r * g.dLat
+        const y1 = y0 - g.dLat
+        const segs: [number, number][][] = []
+        if (r === 0) segs.push([[x0, n], [x1, n]])
+        if (r === g.rows - 1) segs.push([[x0, s], [x1, s]])
+        if (c === 0) segs.push([[w, y0], [w, y1]])
+        if (c === g.cols - 1) segs.push([[e, y0], [e, y1]])
+        for (const coordinates of segs) feats.push({ type: 'Feature', geometry: { type: 'LineString', coordinates }, properties: { t: edge.times[k] } })
+      }
+    }
+    src('domain-edge')?.setData(fc(feats))
   }
 
   function updatePopulation() {
@@ -281,6 +311,7 @@ export function MapView(props: Props) {
   function updateVisibility() {
     const L = p.current.layers
     setVis('fire', L.fuego)
+    setVis('domain-edge', L.fuego)
     setVis('fuel', L.combustible)
     setVis('scar', L.cicatriz)
     setVis('pop', L.poblacion)
@@ -313,6 +344,7 @@ export function MapView(props: Props) {
   function syncAll() {
     updateClockState()
     updateFire()
+    updateEdge()
     updatePopulation()
     updateRoads()
     updateLinks()
@@ -373,8 +405,13 @@ export function MapView(props: Props) {
     map.addLayer({ id: 'scar', type: 'raster', source: 'scar', paint: { 'raster-resampling': 'nearest', 'raster-fade-duration': 0 } }, firstSymbol)
 
     const empty = fc([])
-    for (const id of ['roads', 'links', 'bld-all', 'bld-status', 'safe', 'firebreaks', 'draft', 'ignitions', 'firms', 'brig-cuts', 'brig-routes', 'brig-sites', 'brig-stations', 'plan-tiles', 'plan-sectors'])
+    for (const id of ['roads', 'links', 'bld-all', 'bld-status', 'safe', 'firebreaks', 'draft', 'ignitions', 'firms', 'brig-cuts', 'brig-routes', 'brig-sites', 'brig-stations', 'plan-tiles', 'plan-sectors', 'domain-edge'])
       map.addSource(id, { type: 'geojson', data: empty })
+    // The simulated area (the grid): the base map goes on beyond it, the fire model does not.
+    map.addSource('domain', {
+      type: 'geojson',
+      data: fc([{ type: 'Feature', geometry: { type: 'LineString', coordinates: [...corners, corners[0]] }, properties: {} }]),
+    })
 
     // Plan de preparación: the tile tint goes under the fire, the outlines under the streets.
     map.addLayer({ id: 'plan-tiles-fill', type: 'fill', source: 'plan-tiles', paint: { 'fill-color': '#a3e635', 'fill-opacity': 0.12 } }, 'fire')
@@ -549,6 +586,24 @@ export function MapView(props: Props) {
         'circle-stroke-color': '#ffffff',
         'circle-stroke-width': 1.5,
       },
+    })
+
+    // Outline of the simulated area, always on; the stretch the fire reaches, from its arrival time, in orange.
+    // A light casing under a dark dash: visible on the light base map and on the dark offline hillshade.
+    map.addLayer({ id: 'domain-casing', type: 'line', source: 'domain', paint: { 'line-color': '#f8fafc', 'line-width': 4, 'line-opacity': 0.7 } })
+    map.addLayer({
+      id: 'domain',
+      type: 'line',
+      source: 'domain',
+      paint: { 'line-color': '#0f172a', 'line-width': 1.6, 'line-opacity': 0.85, 'line-dasharray': [4, 3] },
+    })
+    map.addLayer({
+      id: 'domain-edge',
+      type: 'line',
+      source: 'domain-edge',
+      filter: ['<=', ['get', 't'], clock] as never,
+      layout: { 'line-cap': 'square' },
+      paint: { 'line-color': '#fb923c', 'line-width': 5, 'line-opacity': 0.95 },
     })
 
     // Static data
@@ -812,6 +867,7 @@ export function MapView(props: Props) {
 
   // ---------------------------------------------------------------- prop -> map sync
   useEffect(updateFire, [props.fire, props.clock])
+  useEffect(updateEdge, [props.edge])
   // The away share only changes during the morning and evening ramps: redraw when it moves by 0.5 points.
   useEffect(updatePopulation, [Math.round(props.awayNow * 200)])
   useEffect(updateClockState, [Math.floor(props.clock / CLOCK_STEP_MIN), props.showRoutes])

@@ -8,6 +8,8 @@ import { dayKind, type BurnedAreaPeople } from '../engine/population'
 import { LAG_CAP_MIN } from '../engine/fire/pacing'
 import { minToDateLabel, minToEndLabel, minToHHMM, localToMin, wallClockMin } from '../data/time'
 import type { BrigadesOut, EvacOut, FireOut } from '../worker/protocol'
+import type { EdgeContact } from '../engine/fire/edge'
+import { edgeStatNote } from './edgeNote'
 import { BrigadesSection } from './BrigadesSection'
 import { PlanSection } from './PlanSection'
 import { FirebreakEmberRange, type EmberRangeState } from './FirebreakEmberRange'
@@ -48,6 +50,8 @@ interface Props {
   fire: FireOut | null
   evac: EvacOut | null
   brigadesOut: BrigadesOut | null
+  /** Where and when the fire reaches the edge of the simulated area (null before the first result). */
+  edge: EdgeContact | null
   burnedHaNow: number
   summary: Summary | null
   baseline: Summary | null
@@ -128,6 +132,7 @@ export function Results(p: Props) {
   const t0 = p.data.grid.t0
   const s = p.summary
   const b = p.baseline
+  const edgeLine = p.edge ? edgeStatNote(p.edge, t0) : null
   return (
     <div className="results">
       <div className="results-head">
@@ -164,6 +169,7 @@ export function Results(p: Props) {
             {s ? fmtInt(s.burnedHaEnd) : '—'}
             <small> ha</small>
           </div>
+          {s && edgeLine && <div className="stat-sub">{edgeLine}</div>}
           {s && b && <Delta now={s.burnedHaEnd} base={b.burnedHaEnd} unit=" ha" />}
         </div>
         <div className="stat">
