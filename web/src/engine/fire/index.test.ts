@@ -270,6 +270,18 @@ describe('firebreaks and spotting', () => {
     for (let r = 0; r < 61; r++) expect(at(inp, res.arrivalMin, r, 30)).toBe(Infinity)
   })
 
+  it('embers ignite intermix housing but not the consolidated city across the break', () => {
+    // East of the break: built-up cells only. Intermix (URBAN_LOW) takes ember landings; consolidated
+    // (URBAN_DENSE, spotTarget false) does not, so nothing east of the break burns.
+    const town = (kind: FuelCode) => (_r: number, c: number) => (c >= 32 ? kind : FUEL.FOREST)
+    const params = { spotting: true, spotMetresPerKmh: 12, horizonMin: 600 }
+    const intermix = makeInput({ ...base, fuel: town(FUEL.URBAN_LOW), params })
+    const consolidated = makeInput({ ...base, fuel: town(FUEL.URBAN_DENSE), params })
+    expect(FIRE_MODEL.fuels[FUEL.URBAN_DENSE].spotTarget).toBe(false)
+    expect(eastBurned(intermix, simulateFire(intermix).arrivalMin)).toBeGreaterThan(0)
+    expect(eastBurned(consolidated, simulateFire(consolidated).arrivalMin)).toBe(0)
+  })
+
   it('no spotting in light wind (< 15 km/h) or across a break wider than D_max', () => {
     const light = makeInput({ ...base, weather: { ...base.weather, windKmh: 12 }, params: { spotting: true, horizonMin: 1200 } })
     expect(eastBurned(light, simulateFire(light).arrivalMin)).toBe(0)

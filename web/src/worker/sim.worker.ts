@@ -71,7 +71,14 @@ ctx.onmessage = (ev: MessageEvent<ToWorker>) => {
     const evac = simulateEvac({
       prepared,
       arrivalMin: lastFire.arrivalMin,
-      params: { ...DEFAULT_EVAC_PARAMS, alertMin: s.alertMin, prepMedianMin: s.prepMedianMin, footShare: s.footShare },
+      params: {
+        ...DEFAULT_EVAC_PARAMS,
+        alertMin: s.alertMin,
+        cueShare: s.cueShare,
+        cueRadiusM: s.cueRadiusM,
+        prepMedianMin: s.prepMedianMin,
+        footShare: s.footShare,
+      },
       edits: { closedEdges: s.closedEdges, addedLinks: s.addedLinks },
     })
     const safe = safeNodes(data.grid, data.roads.nodes, wildDist, lastFire.arrivalMin, DEFAULT_EVAC_PARAMS.safeDistanceM)

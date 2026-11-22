@@ -12,7 +12,7 @@ uv run pytest                    # unit tests for the non-trivial logic (no netw
 ```
 
 Needs only `uv` (Python 3.12/3.13 and wheels for numpy, rasterio + GDAL, scipy and duckdb are pulled
-automatically). Downloads are cached in `pipeline/.cache/` (gitignored, ~60 MB), so reruns are offline
+automatically). Downloads are cached in `pipeline/.cache/` (gitignored, ~90 MB), so reruns are offline
 and give byte-identical outputs (checked: two runs, same checksums; a from-scratch re-download gave
 byte-identical rasters, Overture and Sentinel-2 caches). From scratch, the slow parts are Overture (~60 s)
 and the Overpass street query (~45 s on a free server; one measured run took 650 s in all because two
@@ -32,7 +32,7 @@ Clock origin `t0 = 2024-02-02T12:00:00-03:00`.
 |---|---|---|
 | `grid.json` | `GridMeta` + `sources` (dataset -> citation, shown on the "Fuentes" panel) | - |
 | `elevation.bin` | Float32 per cell, m a.s.l. | Copernicus DEM GLO-30 |
-| `fuel.bin` | Uint8 `FUEL` code per cell | ESA WorldCover 2021 + building coverage |
+| `fuel.bin` | Uint8 `FUEL` code per cell; built-up split into intermix / consolidated | ESA WorldCover 2021 + Sentinel-2 NDVI of 2024-01-18 + building coverage |
 | `buildings.bin` | Float32 `[lon, lat, footprintM2]` per building | Overture Maps buildings |
 | `roads.json` | `RoadsFile` street graph | OpenStreetMap (Overpass API) |
 | `weather.json` | `WeatherFile`, hourly 2-3 Feb 2024 | Open-Meteo archive (ERA5-based) |
@@ -49,12 +49,38 @@ Binary files are little-endian, `rows * cols` values (except `buildings.bin`).
 whose centres fall in the cell (4.5 pixels per cell on average). Sea is 0 m. GLO-30 is a surface model
 (DSM): tree canopy and large buildings are included in the height.
 
-**fuel.bin.** ESA WorldCover 10 m v200 (2021), tiles `S36W072` and `S33W072` (the grid straddles lat -33),
-read by window through GDAL `/vsicurl/`. Majority class of the ~50 pixels per cell, then:
-10 -> FOREST, 20 -> SHRUB, 30 -> GRASS, 40 -> CROP, 50 -> built-up, 60/70/80 -> NONE, 90 -> GRASS,
-95 -> FOREST, 100 -> GRASS. Built-up cells become URBAN_DENSE when building footprints cover >= 15 % of the
-cell, else URBAN_LOW; vegetation cells with >= 25 % roof coverage also become URBAN_DENSE. Roof
-coverage = sum of footprint areas of the buildings whose centroid is in the cell / 3600 m2.
+**fuel.bin, base classes (`steps/fuel.py`).** ESA WorldCover 10 m v200 (2021), tiles `S36W072` and `S33W072`
+(the grid straddles lat -33), read by window through GDAL `/vsicurl/`. Majority class of the ~50 pixels per
+cell, then: 10 -> FOREST, 20 -> SHRUB, 30 -> GRASS, 40 -> CROP, 50 -> built-up, 60/70/80 -> NONE, 90 -> GRASS,
+95 -> FOREST, 100 -> GRASS. This step also computes a roof-coverage split (built-up -> URBAN_DENSE at >= 15 %
+footprint coverage, else URBAN_LOW; vegetation cells with >= 25 % roofs -> URBAN_DENSE; roof coverage = sum
+of footprint areas of the buildings whose centroid is in the cell / 3600 m2), but that split is no longer
+written: the next step replaces it and writes `fuel.bin`. The bake summary prints both histograms.
+
+**fuel.bin, urban split (`steps/wui.py`, shipped since 2026-11-22).** Splitting built-up cells by roof
+coverage gave a hillside neighbourhood of houses among vegetated quebradas and a paved city block with the
+same coverage the same class, and the fire engine burned dense, flat Quilpué instead of the hillside
+neighbourhoods of Viña (see `web/src/engine/fire/MODEL.md` section 6). This step splits them by the
+vegetation around them, from pre-fire sources only (the scar and FIRMS are never read by this step):
+`green` = max(WorldCover vegetation share of the cell (classes 10, 20, 30, 40, 90, 95, 100), share of its
+10 m Sentinel-2 pixels of 2024-01-18 with NDVI > `NDVI_GREEN` = 0.30), averaged over a disk of 180 m
+(`GREEN_RADIUS_CELLS` = 3; cells outside the grid are left out of the mean, not padded). Built-up cells
+(WorldCover built-up majority, or vegetation majority with roof coverage >= 25 %) become URBAN_LOW
+(intermix: embers ignite it) if `green >= INTERMIX_GREEN` = 0.40, else URBAN_DENSE (consolidated: embers do
+not ignite it, slow structure-to-structure spread); every other cell keeps its base class. The usual WUI definitions call "intermix" houses among > 50 % wildland vegetation
+(SILVIS, https://www.fs.usda.gov/rds/archive/products/RDS-2015-0012-3/_metadata_RDS-2015-0012-3.html; USGS
+building-based WUI, https://www.usgs.gov/data/wildland-urban-interface-maps-conterminous-us-based-125-million-building-locations);
+40 % is used because `green` is a lower bound of the vegetated share. The green definition, the radius (60-180 m)
+and the threshold (30-50 %) were also compared against the scar, as global scalars, among about 20 candidates; the
+score is flat over that range (+-20 % on the threshold or a 120 / 240 m radius change Dice by < 0.002). NDVI uses B04/B08 at 10 m read by
+window (cached as `.cache/s2_10m_<scene>.npz`) and the scene's 20 m SCL for validity (same invalid classes
+as the scar); reflectance = DN x 0.0001 with no extra -0.1, because Earth Search already removed the
+baseline-04.00 offset from these COGs (STAC `earthsearch:boa_offset_applied: true`, checked per scene and
+re-checked on the pixels: the step stops if more than 1 % of valid pixels come out negative). Cells with no
+valid Sentinel-2 pixel (sea, lake, cloud; ~14,600) use the WorldCover share alone. Slope is computed but
+not used in the rule: the engine already applies slope to the rate of spread. Feature rasters
+(float32, `rows * cols`) are written to `.cache/wui_{vegfrac,bcount,coverage,ndvi_mean,ndvi_green,green_r180,slope_deg}.bin`
+for calibration and analysis. All thresholds are constants at the top of `steps/wui.py`.
 
 **buildings.bin.** Overture Maps buildings, release `2026-11-18.0` (latest in the bucket at bake time),
 read anonymously from `s3://overturemaps-us-west-2/` with DuckDB (httpfs + spatial), filtered on the

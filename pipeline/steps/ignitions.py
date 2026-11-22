@@ -6,9 +6,10 @@ satellite detections (FIRMS VIIRS pass at 14:47 local), and each preset says so:
     12:06 and that it started around noon at Fundo Las Tablas, next to the Lago Peñuelas reserve (Ruta 68
     closed at km 91). The exact point is not public: we use the upwind (southern, the wind blew from
     S-SSW) end of the first VIIRS cluster, and 12:05 as start time.
-  * Quilpué / Villa Alemana (east): a second, separate cluster in the first VIIRS pass. Press reported a
-    fire at Lo Moscoso (Quilpué / Villa Alemana) at 15:54; we do not claim it is the same fire. Location =
-    centroid of that cluster in the first pass, start = 30 min before its first detection.
+  * Quilpué / Villa Alemana (east): a second, separate cluster in the first VIIRS pass, at the place of the
+    Lo Moscoso fire, which Spanish Wikipedia and La Tercera report as declared at 13:46. Location = centroid
+    of that cluster in the first pass, start = 30 min before its first detection (14:17); moving it to 13:46
+    fitted worse in calibration, so the satellite-based estimate stays.
 """
 
 from __future__ import annotations
@@ -34,8 +35,9 @@ LAS_TABLAS_SOURCE = (
 )
 EAST_SOURCE = (
     "Aprox., según primeras detecciones satelitales: centroide del cúmulo NASA FIRMS VIIRS de las 14:47 y "
-    "hora estimada 30 min antes. La prensa informó un foco en Lo Moscoso (Quilpué / Villa Alemana) a las "
-    "15:54; no se afirma que sea el mismo."
+    "hora estimada 30 min antes. Coincide con el incendio de Lo Moscoso, que se declaró a las 13:46 según "
+    "Wikipedia en español (https://es.wikipedia.org/wiki/Gran_incendio_de_Valpara%C3%ADso_de_2024) y "
+    "La Tercera."
 )
 
 

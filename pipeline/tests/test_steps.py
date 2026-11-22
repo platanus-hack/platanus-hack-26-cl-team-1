@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from steps import fuel, grid, roads, scar
+from steps import fuel, grid, roads, scar, wui
 
 
 def test_cell_index_corners_and_outside():
@@ -56,6 +56,70 @@ def test_classify_mapping_and_urban_split():
 def test_classify_rejects_unknown_class():
     with pytest.raises(ValueError):
         fuel.classify(np.array([0], dtype=np.uint8), np.zeros(1))
+
+
+def test_classify_wui_splits_built_up_by_neighbourhood_green_not_roofs():
+    f = fuel
+    wc = np.array([50, 50, 50, 50, 10, 10, 10, 30, 60, 80], dtype=np.uint8)
+    cov = np.array([0.30, 0.30, 0.05, 0.05, 0.10, 0.30, 0.30, 0.00, 0.40, 0.00])
+    green = np.array([0.60, 0.20, 0.40, 0.39, 0.00, 0.90, 0.10, 0.00, 0.90, 0.90])
+    got = wui.classify_wui(wc, cov, green)
+    assert got.tolist() == [
+        f.URBAN_LOW,  # built-up, many roofs, lots of vegetation around: intermix
+        f.URBAN_DENSE,  # built-up, many roofs, little vegetation: consolidated
+        f.URBAN_LOW,  # built-up, few roofs, green exactly at the threshold: intermix
+        f.URBAN_DENSE,  # built-up, few roofs, just under the threshold: consolidated (old rule: URBAN_LOW)
+        f.FOREST,  # tree cover with 10 % roofs keeps its vegetation class
+        f.URBAN_LOW,  # tree cover with 30 % roofs counts as built-up, green -> intermix
+        f.URBAN_DENSE,  # same roofs, little green -> consolidated
+        f.GRASS,
+        f.NONE,  # bare ground never becomes urban, whatever its roofs or green
+        f.NONE,  # water
+    ]
+    assert wui.INTERMIX_GREEN == 0.40  # the thresholds above assume it
+    with pytest.raises(ValueError):
+        wui.classify_wui(np.array([0], dtype=np.uint8), np.zeros(1), np.zeros(1))
+
+
+def test_classify_wui_matches_fuel_bin_outside_built_up_cells():
+    rng = np.random.default_rng(0)
+    wc = rng.choice(fuel.WC_CLASSES, size=2000).astype(np.uint8)
+    cov = rng.uniform(0, 0.5, size=2000)
+    green = rng.uniform(0, 1, size=2000)
+    old, new = fuel.classify(wc, cov), wui.classify_wui(wc, cov, green)
+    built = (wc == 50) | (np.isin(old, fuel.VEGETATION + (fuel.URBAN_DENSE,)) & (cov >= wui.VEG_TO_URBAN_COVERAGE))
+    assert (old[~built] == new[~built]).all()
+    assert np.isin(new[built], (fuel.URBAN_LOW, fuel.URBAN_DENSE)).all()
+
+
+def test_neighbourhood_green_disk_mean_edges_and_missing_ndvi():
+    veg = np.zeros(25)
+    ndvi_green = np.zeros(25)
+    ndvi_green[12] = 1.0  # centre of a 5x5 raster is fully green by NDVI
+    g = wui.neighbourhood_green(veg, ndvi_green, (5, 5), 1).reshape(5, 5)
+    assert g[2, 2] == pytest.approx(1 / 5)  # radius-1 disk = centre + 4 neighbours
+    assert g[1, 2] == pytest.approx(1 / 5) and g[1, 1] == 0.0  # diagonals are outside a radius-1 disk
+    # Corner: only 3 of the 5 disk cells are inside the raster, and the mean is over those 3.
+    veg2 = np.zeros(25)
+    veg2[0] = 0.9
+    g2 = wui.neighbourhood_green(veg2, np.full(25, np.nan), (5, 5), 1).reshape(5, 5)
+    assert g2[0, 0] == pytest.approx(0.9 / 3)  # NaN NDVI (no valid pixel) -> WorldCover share alone
+    # max(), not sum: a cell green by both sources counts once.
+    g3 = wui.neighbourhood_green(np.full(25, 0.5), np.full(25, 0.7), (5, 5), 2)
+    assert np.allclose(g3, 0.7)
+
+
+def test_vegetation_share_and_slope():
+    k = len(fuel.WC_CLASSES)
+    counts = np.zeros((2, k), dtype=np.int64)
+    counts[0, fuel.WC_CLASSES.index(10)] = 30
+    counts[0, fuel.WC_CLASSES.index(50)] = 10
+    counts[0, fuel.WC_CLASSES.index(30)] = 10
+    counts[1, fuel.WC_CLASSES.index(60)] = 50
+    assert wui.vegetation_share(counts).tolist() == pytest.approx([0.8, 0.0])
+    # A plane rising 10 degrees eastward on 60 m cells.
+    elev = np.tile(np.arange(6) * 60 * np.tan(np.radians(10)), (4, 1))
+    assert np.allclose(wui.slope_deg(elev, 60), 10)
 
 
 def _line(n0: int, n: int, lon0: float, lat0: float) -> tuple[list[int], dict[int, tuple[float, float]]]:

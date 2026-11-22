@@ -89,7 +89,7 @@ export function RiskChart({
       className={`chart${onPick ? ' pickable' : ''}`}
       viewBox={`0 0 ${W} ${H}`}
       role="img"
-      aria-label="Hogares que no alcanzan a salir según la hora de la alerta"
+      aria-label="Hogares con la salida cortada según la hora de la alerta"
       onClick={(e) => {
         if (!onPick) return
         const r = e.currentTarget.getBoundingClientRect()

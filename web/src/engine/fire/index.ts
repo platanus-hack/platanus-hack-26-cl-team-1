@@ -20,6 +20,7 @@ import {
 } from './model'
 
 export {
+  ERA5_WIND_DIR_CORRECTION_DEG,
   FIRE_MODEL,
   SPREAD_MODEL,
   flatRosKmh,
@@ -98,6 +99,8 @@ export function simulateFire(input: FireInput): FireResult {
   const fuelLoad = new Float64Array(256)
   const fuelFactor = new Float64Array(256)
   const fuelSpot = new Uint8Array(256)
+  const fuelLand = new Uint8Array(256)
+  const fuelSpotDist = new Float64Array(256)
   for (const code of Object.values(FUEL)) {
     const f = M.fuels[code]
     if (!f) throw new Error(`simulateFire: FIRE_MODEL.fuels has no entry for fuel code ${code}`)
@@ -108,6 +111,9 @@ export function simulateFire(input: FireInput): FireResult {
     fuelLoad[code] = f.loadTHa
     fuelFactor[code] = f.factor * M.modelFactor[f.model]
     fuelSpot[code] = f.spotSource ? 1 : 0
+    fuelLand[code] = f.spotTarget ? 1 : 0
+    if (!(f.spotDistanceFactor >= 0)) throw new Error(`simulateFire: FIRE_MODEL has an invalid spotDistanceFactor for fuel code ${code}`)
+    fuelSpotDist[code] = f.spotDistanceFactor
   }
 
   // Burnable: has fuel and is not a firebreak.
@@ -270,7 +276,7 @@ export function simulateFire(input: FireInput): FireResult {
 
     // Ember spotting: jump edges downwind (+-1 cell sideways) from 3 cells up to D_max, from intense fires only.
     if (spotOn && fuelSpot[f] && V >= M.spotMinWindKmh && Rh >= M.spotMinSourceRosMPerMin) {
-      const dMax = params.spotMetresPerKmh * V // metres
+      const dMax = params.spotMetresPerKmh * V * fuelSpotDist[f] // metres
       const kMax = Math.floor(dMax / cellM)
       const minD = spotMinCells * cellM
       for (let s = spotMinCells; s <= kMax; s++) {
@@ -282,7 +288,7 @@ export function simulateFire(input: FireInput): FireResult {
           const tc = Math.round(fc - lat * downR)
           if (tr < 0 || tr >= rows || tc < 0 || tc >= cols) continue
           const j = tr * cols + tc
-          if (settled[j] || !burnable[j]) continue
+          if (settled[j] || !burnable[j] || !fuelLand[fuel[j]]) continue
           const d = Math.sqrt((tr - r) * (tr - r) + (tc - c) * (tc - c)) * cellM
           if (d < minD || d > dMax) continue
           const tt = t + M.spotDelayMin + (M.spotTravelMin * d) / dMax

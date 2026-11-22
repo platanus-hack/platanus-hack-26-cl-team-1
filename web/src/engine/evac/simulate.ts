@@ -1,6 +1,7 @@
 // Evacuation simulation over a fire arrival field. See MODEL.md for the model and its assumptions.
 import { HOUSEHOLD, ROAD, type EvacEdits, type EvacInput, type EvacParams, type EvacResult } from '../types'
 import { makeLognormalCdf } from './lognormal'
+import { minFilterOctagon, octagonWindow } from './minfilter'
 import { asPrepared, buildCsr, sampleSegment, type Csr, type Prepared } from './prepare'
 
 /** EvacResult plus the user's emergency links (appended edges are not in edgeFlow/edgeClosesMin, whose
@@ -11,6 +12,9 @@ export interface EvacResultExt extends EvacResult {
   /** Buildings with no drivable way out near them (no car node within CAR_SNAP_MAX_M, or the user's
    *  closures cut it off): their car share walks. */
   carHouseholdsWalking: number
+  /** Buildings where the fire comes within cueRadiusM before the alert (their cue responders, a share
+   *  cueShare of them, start before the alert); 0 when cues are off. */
+  buildingsCuedBeforeAlert: number
 }
 
 /** Emergency links are this much longer than the straight line between their nodes. */
@@ -43,6 +47,8 @@ function validateParams(p: EvacParams) {
   finite('safetyMarginMin', p.safetyMarginMin, (v) => v >= 0, '>= 0')
   finite('safeDistanceM', p.safeDistanceM, (v) => v >= 0, '>= 0')
   finite('personsPerHousehold', p.personsPerHousehold, (v) => v > 0, '> 0')
+  finite('cueRadiusM', p.cueRadiusM, (v) => v >= 0, '>= 0')
+  finite('cueShare', p.cueShare, (v) => v >= 0 && v <= 1, 'in [0, 1]')
   const nCls = ROAD.PATH + 1
   if (!Array.isArray(p.carKmhByClass) || p.carKmhByClass.length !== nCls)
     fail(`params.carKmhByClass must have ${nCls} entries (one per ROAD class)`)
@@ -54,7 +60,7 @@ function validateParams(p: EvacParams) {
   }
 }
 
-/** min over each cell and its 8 neighbours (separable 3x3 min filter). Throws on NaN. */
+/** min over each cell and its 8 neighbours (separable 3x3 min filter). Throws on NaN and -Infinity. */
 function dilateMin3x3(a: Float32Array, rows: number, cols: number): { dil: Float32Array; maxFinite: number } {
   const tmp = new Float32Array(a.length)
   let maxFinite = -Infinity
@@ -64,6 +70,7 @@ function dilateMin3x3(a: Float32Array, rows: number, cols: number): { dil: Float
       const i = base + c
       const v = a[i]
       if (v !== v) fail(`arrivalMin[${i}] is NaN`)
+      if (v === -Infinity) fail(`arrivalMin[${i}] is -Infinity`)
       if (v !== Infinity && v > maxFinite) maxFinite = v
       let m = v
       if (c > 0 && a[i - 1] < m) m = a[i - 1]
@@ -270,19 +277,53 @@ function validateEdits(edits: EvacEdits, N: number, E: number) {
   })
 }
 
+/** Cue responders, for riskByAlert: a share of the households starts at min(alert, cueMin). */
+interface CurveCues {
+  share: number
+  /** Per building: earliest fire arrival within cueRadiusM of it (Infinity if none). */
+  cueMin: Float64Array
+}
+
 /** Expected trapped households if the alert had been at 0, 10, 20, ... horizon min. Departure deadlines
  *  D do not depend on the alert, so this bins D (CURVE_BIN_MIN) per mode and correlates the histogram
- *  with a tabulated lognormal CDF. */
+ *  with a tabulated lognormal CDF.
+ *  With cues, the responders' term at alert j splits the buildings by their cue time, binned the same
+ *  way (q bins): those not cued yet (j * S <= q) start at the alert, like everyone else (a second
+ *  histogram, filled while sweeping j downwards); those cued before keep their risk at the cue time
+ *  (prefix sums). Each building's risk is then exactly non-decreasing in j. */
 function riskCurve(
   nB: number,
   horizonMin: number,
   modes: { share: number; D: Float64Array }[],
   prepMedianMin: number,
   prepSigma: number,
+  cues: CurveCues | null,
 ): { alertMin: number; expectedTrappedHouseholds: number }[] {
   const nAlerts = Math.floor(horizonMin / ALERT_STEP_MIN) + 1
   const S = Math.round(ALERT_STEP_MIN / CURVE_BIN_MIN)
   const out = new Float64Array(nAlerts)
+  const alertShare = cues ? 1 - cues.share : 1
+  // Cue responders: building b is not cued yet at alert j while j <= u[b] = floor(q / S) (capped at the
+  // last alert; -1 for a cue before t0). Buildings sorted by u (counting sort): bucket B = u + 1 spans
+  // byU[uStart[B] .. uStart[B + 1]).
+  let qBin: Float64Array | null = null
+  let byU: Int32Array | null = null
+  let uStart: Int32Array | null = null
+  if (cues) {
+    qBin = new Float64Array(nB)
+    const u = new Int32Array(nB)
+    uStart = new Int32Array(nAlerts + 2)
+    for (let b = 0; b < nB; b++) {
+      const q = Math.floor(cues.cueMin[b] / CURVE_BIN_MIN) // Infinity stays Infinity
+      qBin[b] = q
+      u[b] = q < 0 ? -1 : Math.min(nAlerts - 1, Math.floor(q / S))
+      uStart[u[b] + 2]++
+    }
+    for (let B = 0; B <= nAlerts; B++) uStart[B + 1] += uStart[B]
+    byU = new Int32Array(nB)
+    const pos = uStart.slice()
+    for (let b = 0; b < nB; b++) byU[pos[u[b] + 1]++] = b
+  }
   for (const { share, D } of modes) {
     let maxD = 0
     let infCount = 0
@@ -304,7 +345,54 @@ function riskCurve(
       const o = j * S
       let gotOut = infCount
       for (let k = o; k < nBins; k++) gotOut += hist[k] * F[k - o]
-      out[j] += share * (nB - gotOut)
+      out[j] += alertShare * share * (nB - gotOut)
+    }
+    if (!cues || !qBin || !byU || !uStart) continue
+    // Responders cued before alert j (u < j): their risk at the cue time, summed per bucket. D and the
+    // cue are both taken at their bin centres, so their difference is a whole number of bins: G[i] is
+    // the CDF at i bins (G[k - q] <= F[k - j S] for j S <= q keeps each building monotone).
+    const G = new Float64Array(nBins)
+    for (let i = 0; i < nBins; i++) G[i] = cdf(i * CURVE_BIN_MIN)
+    const cued = new Float64Array(nAlerts)
+    for (let B = 0; B < nAlerts; B++) {
+      let sum = 0
+      for (let i = uStart[B]; i < uStart[B + 1]; i++) {
+        const b = byU[i]
+        const d = D[b]
+        if (d === Infinity) continue
+        const q = qBin[b]
+        if (q < 0) sum += 1 - cdf(d - cues.cueMin[b]) // cue before t0: never compared with an alert
+        else if (d <= 0) sum += 1
+        else {
+          const idx = Math.floor(d / CURVE_BIN_MIN) - q
+          sum += idx <= 0 ? 1 : 1 - G[idx]
+        }
+      }
+      cued[B] = sum
+    }
+    // Responders not cued yet at alert j (u >= j): same histogram correlation, on a histogram that
+    // gains bucket u = j as j goes down.
+    const hist2 = new Float64Array(nBins)
+    const uncued = new Float64Array(nAlerts)
+    let n2 = 0
+    let inf2 = 0
+    for (let j = nAlerts - 1; j >= 0; j--) {
+      for (let i = uStart[j + 1]; i < uStart[j + 2]; i++) {
+        const d = D[byU[i]]
+        n2++
+        if (d === Infinity) inf2++
+        else if (d > 0) hist2[Math.floor(d / CURVE_BIN_MIN)]++
+      }
+      const o = j * S
+      let gotOut = inf2
+      for (let k = o; k < nBins; k++) gotOut += hist2[k] * F[k - o]
+      uncued[j] = n2 - gotOut
+    }
+    const c = cues.share * share
+    let cuedSoFar = 0
+    for (let j = 0; j < nAlerts; j++) {
+      cuedSoFar += cued[j] // buckets B <= j, i.e. u < j
+      out[j] += c * (uncued[j] + cuedSoFar)
     }
   }
   const res: { alertMin: number; expectedTrappedHouseholds: number }[] = []
@@ -421,8 +509,21 @@ export function simulateEvac(input: EvacInput): EvacResultExt {
     carCc = r.cc
   }
 
-  // Households.
+  // Environmental cues: a share cueShare of the households starts its response when the fire comes within
+  // cueRadiusM of the home (earliest arrival in an octagon window around its cell), if before the alert.
   const { alertMin, prepMedianMin, prepSigma } = params
+  const cueOn = params.cueShare > 0 && params.cueRadiusM > 0
+  const cueShare = cueOn ? params.cueShare : 0
+  const cueMin = new Float64Array(cueOn ? nB : 0)
+  if (cueOn) {
+    const near = minFilterOctagon(arrivalMin, rows, cols, octagonWindow(params.cueRadiusM / cellM))
+    for (let b = 0; b < nB; b++) {
+      const c = P.bldCell[b]
+      cueMin[b] = c < 0 ? Infinity : near[c]
+    }
+  }
+
+  // Households.
   const walkMinPerM = minPerM(params.walkKmh)
   const cdf = makeLognormalCdf(prepMedianMin, prepSigma)
   const householdRisk = new Float32Array(nB)
@@ -434,6 +535,7 @@ export function simulateEvac(input: EvacInput): EvacResultExt {
   let expectedTrapped = 0
   let buildingsReached = 0
   let carHouseholdsWalking = 0
+  let buildingsCuedBeforeAlert = 0
   for (let b = 0; b < nB; b++) {
     const c = P.bldCell[b]
     const arr = c < 0 ? Infinity : arrivalMin[c]
@@ -459,6 +561,14 @@ export function simulateEvac(input: EvacInput): EvacResultExt {
         carHouseholdsWalking++
       }
       risk += carShare * (1 - cdf(dC - alertMin))
+    }
+    if (cueOn && cueMin[b] < alertMin) {
+      // Cue responders start at the cue; the others still wait for the alert.
+      const cue = cueMin[b]
+      buildingsCuedBeforeAlert++
+      let riskCue = footShare > 0 ? footShare * (1 - cdf(dF - cue)) : 0
+      if (car && carCc) riskCue += carShare * (1 - cdf(dC - cue))
+      risk = (1 - cueShare) * risk + cueShare * riskCue
     }
     Dfoot[b] = dF
     Dcar[b] = dC
@@ -495,7 +605,7 @@ export function simulateEvac(input: EvacInput): EvacResultExt {
   const curveModes: { share: number; D: Float64Array }[] = []
   if (footShare > 0) curveModes.push({ share: footShare, D: Dfoot })
   if (carShare > 0) curveModes.push({ share: carShare, D: Dcar })
-  const riskByAlert = riskCurve(nB, horizonMin, curveModes, prepMedianMin, prepSigma)
+  const riskByAlert = riskCurve(nB, horizonMin, curveModes, prepMedianMin, prepSigma, cueOn ? { share: cueShare, cueMin } : null)
 
   return {
     householdRisk,
@@ -509,6 +619,7 @@ export function simulateEvac(input: EvacInput): EvacResultExt {
     addedLinkFlow: Float32Array.from(flowAll.subarray(E)),
     addedLinkClosesMin: Float32Array.from(closes.subarray(E)),
     carHouseholdsWalking,
+    buildingsCuedBeforeAlert,
     elapsedMs: performance.now() - tStart,
   }
 }

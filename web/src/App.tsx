@@ -48,6 +48,8 @@ function defaultScenario(data: Dataset): Scenario {
     userIgnitions: [],
     firebreaks: [],
     alertMin: DEFAULT_EVAC_PARAMS.alertMin,
+    cueShare: DEFAULT_EVAC_PARAMS.cueShare,
+    cueRadiusM: DEFAULT_EVAC_PARAMS.cueRadiusM,
     prepMedianMin: DEFAULT_EVAC_PARAMS.prepMedianMin,
     footShare: DEFAULT_EVAC_PARAMS.footShare,
     closedEdges: [],

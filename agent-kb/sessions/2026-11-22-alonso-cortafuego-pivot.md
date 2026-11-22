@@ -30,12 +30,17 @@
 
 ## Decisions
 - D-019: pivot to Cortafuego; D-001, D-005, D-008 to D-018 moved to §3.
+- D-021: urban fuels split into intermix / consolidated by nearby vegetation, cue-driven evacuation, a calibrated
+  −10° ERA5 wind rotation.
 - D-020: CI is just Lint + Test; agent reviewers (the #48 diff was over GitHub's 300-file limit), auto-merge,
   actionlint and the `CI OK` aggregate removed; D-006 and D-007 moved to §3.
 
 ## Open / next
-- The model reaches ~21k buildings by midnight, but only ~1.9k of the 6,505 inside the real scar: where it
-  burns inside the city is the weakest part. The trapped-households count inherits that.
+- Urban fix (D-021): 5,423 of the 6,505 buildings in the scar are now reached (was 1,875), Dice 0.628, cut-off
+  households at an 18:00 alert 4,753 (was 9,719). Still 28,119 buildings reached in total (precision 0.19), the
+  western head is 45–80 min late, and the eastern fire overburns (5,745 ha vs ~1,300 ha) and drives over half of
+  the cut-off count. Present absolute counts as an exposure ceiling and lead with scenario comparisons.
+- A possible double Sentinel-2 offset in `pipeline/steps/scar.py` (would shrink the scar to 6,593 ha): unresolved.
 - Public deploy host (decisions.md §2); `deploy-url` is still empty.
 
 ## Cleanup after the pivot (2026-11-22 ~01:20)

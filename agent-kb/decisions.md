@@ -59,6 +59,25 @@ with a pointer to their replacement; nothing is ever deleted from §3.
   `CI OK` aggregate and the actionlint job. This supersedes D-006 and D-007 (moved to §3).
 - **Consequences:** PRs are merged by hand once Lint and Test are green. Nothing checks workflow files any more.
 
+### D-021 — Urban fuels split by nearby vegetation; cue-driven evacuation; calibrated ERA5 wind rotation (2026-11-22)
+- **Context:** the first build reached ~21k buildings by midnight but only 1,875 of the 6,505 inside the real
+  Sentinel-2 scar, and reported ~9,700 households cut off with an 18:00 alert. Diagnosis: the head went NNE into
+  Quilpué (ERA5 wind 204–207°) instead of N into El Olivar / Villa Independencia; almost all urban burning came
+  from embers landing on consolidated city; burned buildings sit within ~240 m of shrub/forest (none beyond 480 m).
+- **Decision (contract: `types.ts`):**
+  - `URBAN_LOW` now means **intermix** (built-up with ≥ 40 % green share over 180 m, from WorldCover 2021 and
+    pre-fire Sentinel-2 NDVI of 2024-01-18) and `URBAN_DENSE` means **consolidated**; `pipeline/steps/wui.py`
+    writes `fuel.bin`. Embers do not land on consolidated cells (`spotTarget` in `FIRE_MODEL`).
+  - `EvacParams` gains `cueShare` (0.65) and `cueRadiusM` (900 m): that share of households starts its response
+    when the fire comes within that distance, if earlier than the official alert (NIST TN 2103, Kincade).
+  - The historical ERA5 wind direction is rotated −10° (`ERA5_WIND_DIR_CORRECTION_DEG`): one fitted scalar, not
+    an observation (the nearby Concón station reads 220°), shown as such in the UI.
+- **Consequences:** buildings in the scar reached 1,875 → 5,423 (83 %), Dice 0.571 → 0.628, cut-off households
+  at an 18:00 alert 9,719 → 4,753; but total buildings reached rose to 28,119 (precision 0.19) and the counts
+  swing from a third to 3× under ±20 % wind. The UI now calls them "hogares con la salida cortada" and says the
+  absolute numbers are an exposure ceiling (no firefighting, no rescue); the pitch compares scenarios. Scar and
+  FIRMS are used only to score and to pick global scalars (in-sample, disclosed).
+
 ## §2 Open
 
 - **D-?? Public deploy target** for the static site (`web/dist`): Vercel or Render (both event sponsors) from

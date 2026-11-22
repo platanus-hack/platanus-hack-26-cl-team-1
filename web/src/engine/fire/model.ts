@@ -22,6 +22,11 @@ export interface FuelSpread {
   factor: number
   /** Whether a burning cell of this fuel lofts embers (spotting source). */
   spotSource: boolean
+  /** Whether an ember landing on this fuel can start a spot fire (spotting target). */
+  spotTarget: boolean
+  /** Multiplier on the maximum spotting distance (params.spotMetresPerKmh * wind) of embers lofted from
+   *  this fuel. Ignored when spotSource is false. */
+  spotDistanceFactor: number
 }
 
 /** McArthur's wind coefficient in FFDI (per km/h): FFDI ~ exp(0.0234 V). */
@@ -29,18 +34,30 @@ export const MCARTHUR_WIND_COEF = 0.0234
 /** McArthur's slope coefficient (per degree): ROS ~ exp(0.069 slope), i.e. doubles every ~10 degrees. */
 export const MCARTHUR_SLOPE_COEF = 0.069
 
+/** Calibration of the ERA5 wind direction (degrees added to "wind from"), applied to the historical series
+ *  only (scenario.ts mode "real", calibrate.ts). Fitted on the scar: the reanalysis (0.25 deg) blows from
+ *  195-207 deg in the afternoon and drives the head NNE into Quilpué, while the scar's axis and the FIRMS
+ *  detections run N (bearing ~5 deg) into El Olivar / Villa Independencia. The only station nearby
+ *  (Concón SCVM) reads 220 deg, so this is a fitted stand-in for terrain channelling that ERA5 cannot
+ *  resolve, not an observed wind. See MODEL.md section 6. */
+export const ERA5_WIND_DIR_CORRECTION_DEG = -10
+
 /** Every calibration knob of the engine in one place. simulateFire reads it at call time, so the integrator
  *  can tune it (e.g. against the Sentinel-2 scar) without touching the code. */
 export const FIRE_MODEL = {
   fuels: {
-    [FUEL.NONE]: { model: SPREAD_MODEL.NONE, loadTHa: 0, factor: 0, spotSource: false },
-    [FUEL.GRASS]: { model: SPREAD_MODEL.CSIRO_GRASS, loadTHa: 0, factor: 1, spotSource: false },
-    [FUEL.SHRUB]: { model: SPREAD_MODEL.MCARTHUR_FOREST, loadTHa: 12, factor: 1, spotSource: true },
-    [FUEL.FOREST]: { model: SPREAD_MODEL.MCARTHUR_FOREST, loadTHa: 20, factor: 1, spotSource: true },
-    [FUEL.CROP]: { model: SPREAD_MODEL.CSIRO_GRASS, loadTHa: 0, factor: 0.6, spotSource: false },
-    // Built-up fuels spread structure to structure: modelled as a fraction of grass ROS; embers matter more.
-    [FUEL.URBAN_LOW]: { model: SPREAD_MODEL.CSIRO_GRASS, loadTHa: 0, factor: 0.25, spotSource: false },
-    [FUEL.URBAN_DENSE]: { model: SPREAD_MODEL.CSIRO_GRASS, loadTHa: 0, factor: 0.05, spotSource: false },
+    [FUEL.NONE]: { model: SPREAD_MODEL.NONE, loadTHa: 0, factor: 0, spotSource: false, spotTarget: false, spotDistanceFactor: 1 },
+    [FUEL.GRASS]: { model: SPREAD_MODEL.CSIRO_GRASS, loadTHa: 0, factor: 1, spotSource: false, spotTarget: true, spotDistanceFactor: 1 },
+    [FUEL.SHRUB]: { model: SPREAD_MODEL.MCARTHUR_FOREST, loadTHa: 12, factor: 1, spotSource: true, spotTarget: true, spotDistanceFactor: 1 },
+    [FUEL.FOREST]: { model: SPREAD_MODEL.MCARTHUR_FOREST, loadTHa: 20, factor: 1, spotSource: true, spotTarget: true, spotDistanceFactor: 1 },
+    [FUEL.CROP]: { model: SPREAD_MODEL.CSIRO_GRASS, loadTHa: 0, factor: 0.6, spotSource: false, spotTarget: true, spotDistanceFactor: 1 },
+    // Built-up fuels (split in pipeline/steps/wui.py by the pre-fire vegetation within 180 m; MODEL.md section 6):
+    // - URBAN_LOW, intermix (houses among scrub, quebradas, gardens): 25 % of grass ROS, and embers ignite it
+    //   (roofs, eaves, yards). This is where the 2024 fire destroyed homes.
+    // - URBAN_DENSE, consolidated city: spreads only structure to structure (5 % of grass ROS) and embers do
+    //   not start new fires there (little fine fuel between houses). Checked with calibrate.ts --scan.
+    [FUEL.URBAN_LOW]: { model: SPREAD_MODEL.CSIRO_GRASS, loadTHa: 0, factor: 0.25, spotSource: false, spotTarget: true, spotDistanceFactor: 1 },
+    [FUEL.URBAN_DENSE]: { model: SPREAD_MODEL.CSIRO_GRASS, loadTHa: 0, factor: 0.05, spotSource: false, spotTarget: false, spotDistanceFactor: 1 },
   } as Record<FuelCode, FuelSpread>,
   /** Calibration per spread model, multiplying every fuel that uses it (on top of params.rosMultiplier).
    *  Fitted against the Sentinel-2 scar with calibrate.ts (see MODEL.md, "Calibration"):

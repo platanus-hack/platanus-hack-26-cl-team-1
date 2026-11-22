@@ -1,4 +1,4 @@
-import { DEFAULT_FIRE_PARAMS } from '../engine/fire'
+import { DEFAULT_FIRE_PARAMS, ERA5_WIND_DIR_CORRECTION_DEG } from '../engine/fire'
 // The user's scenario (everything the control panel can change) and the pure functions that turn it into
 // engine inputs. Shared by the UI thread and the simulation worker.
 import type { GridMeta, IgnitionPreset, Ignition, WeatherFile, WeatherSample, WeatherSeries } from '../engine/types'
@@ -52,6 +52,10 @@ export interface Scenario {
   userIgnitions: UserIgnition[]
   firebreaks: Firebreak[]
   alertMin: number
+  /** Environmental-cue (spontaneous) evacuation: share 0..1 of households that leave when they see the
+   *  fire, and the distance (m) at which they see it (EvacParams.cueShare / cueRadiusM). */
+  cueShare: number
+  cueRadiusM: number
   prepMedianMin: number
   /** 0..1 */
   footShare: number
@@ -98,7 +102,8 @@ export function buildWeatherSeries(file: WeatherFile, t0: string, w: WeatherSett
       tempC: file.tempC[i] + w.tempOffsetC,
       rh,
       windKmh: file.windKmh[i] * w.windFactor,
-      windFromDeg: norm360(file.windFromDeg[i] + w.windDirOffsetDeg),
+      // ERA5 direction calibrated on the scar (see engine/fire/MODEL.md), then the user's offset.
+      windFromDeg: norm360(file.windFromDeg[i] + ERA5_WIND_DIR_CORRECTION_DEG + w.windDirOffsetDeg),
     }
   })
   const notes = clamped > 0 ? [`La humedad ajustada quedó fuera de 1–100 % en ${clamped} de ${samples.length} horas; se limitó a ese rango.`] : []

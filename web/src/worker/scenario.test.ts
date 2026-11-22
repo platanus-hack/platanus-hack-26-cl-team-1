@@ -15,6 +15,7 @@ import {
   type WeatherSettings,
 } from './scenario'
 import { cellCentre } from '../data/grid'
+import { ERA5_WIND_DIR_CORRECTION_DEG as DIR } from '../engine/fire'
 
 const grid: GridMeta = {
   rows: 20,
@@ -52,6 +53,8 @@ function scenario(patch: Partial<Scenario> = {}): Scenario {
     userIgnitions: [],
     firebreaks: [],
     alertMin: 360,
+    cueShare: 0.65,
+    cueRadiusM: 900,
     prepMedianMin: 10,
     footShare: 0.5,
     closedEdges: [],
@@ -66,13 +69,14 @@ describe('buildWeatherSeries', () => {
     expect(series.t0Min).toBe(-60)
     expect(series.stepMin).toBe(60)
     expect(series.samples).toHaveLength(3)
-    expect(series.samples[1]).toEqual({ tempC: 25, rh: 30, windKmh: 20, windFromDeg: 10 })
+    // Mode "real" applies the calibrated ERA5 direction correction (engine/fire/model.ts).
+    expect(series.samples[1]).toEqual({ tempC: 25, rh: 30, windKmh: 20, windFromDeg: (10 + DIR + 360) % 360 })
     expect(notes).toEqual([])
   })
 
   it('applies adjustments and reports the humidity clamp', () => {
     const { series, notes } = buildWeatherSeries(weather, grid.t0, { ...neutral, windFactor: 1.5, windDirOffsetDeg: 20, rhOffset: -10, tempOffsetC: 2 })
-    expect(series.samples[0]).toEqual({ tempC: 22, rh: 40, windKmh: 15, windFromDeg: 10 })
+    expect(series.samples[0]).toEqual({ tempC: 22, rh: 40, windKmh: 15, windFromDeg: (10 + DIR + 360) % 360 })
     expect(series.samples[2].rh).toBe(1)
     expect(notes).toHaveLength(1)
     expect(notes[0]).toContain('1 de 3')
@@ -93,7 +97,7 @@ describe('sampleAt', () => {
     const { series } = buildWeatherSeries(weather, grid.t0, neutral)
     const s = sampleAt(series, -30)
     expect(s.windKmh).toBeCloseTo(15)
-    expect(s.windFromDeg).toBeCloseTo(0) // halfway between 350 and 10 through north
+    expect(s.windFromDeg).toBeCloseTo((360 + DIR) % 360) // halfway between 350 and 10 through north, plus the correction
     expect(sampleAt(series, -500).windKmh).toBe(10)
     expect(sampleAt(series, 999).windKmh).toBe(30)
   })

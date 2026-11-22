@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type { ReactElement } from 'react'
 import type { Dataset } from '../data/load'
+import { DEFAULT_EVAC_PARAMS } from '../engine/evac'
 
 export function SourcesModal({ data, onClose }: { data: Dataset; onClose: () => void }) {
   const ref = useRef<HTMLDialogElement>(null)
@@ -74,6 +75,16 @@ export function SourcesModal({ data, onClose }: { data: Dataset; onClose: () => 
           <li>Cada hogar sale por la red de calles hacia la zona segura más cercana, a pie o en auto.</li>
           <li>Búsqueda de la salida más tardía posible en el grafo de calles: una calle deja de servir cuando el fuego llega a ella o a su lado, con un margen de seguridad.</li>
           <li>Tránsito a flujo libre (sin congestión) y tiempo de preparación con distribución lognormal tras la alerta.</li>
+          <li>
+            Evacuación espontánea: una parte de los hogares ({Math.round(DEFAULT_EVAC_PARAMS.cueShare * 100)} % por defecto) empieza a prepararse cuando
+            el fuego llega a menos de cierta distancia de su casa ({DEFAULT_EVAC_PARAMS.cueRadiusM.toLocaleString('es-CL')} m por defecto), si eso ocurre
+            antes de la alerta. En una encuesta a hogares tras el incendio de Gatlinburg (EE.&nbsp;UU., 2016),
+            el 82 % evacuó y la mayoría lo hizo al ver, oír u oler el fuego; pocos citaron una orden oficial (
+            <a href="https://doi.org/10.6028/NIST.TN.2103" target="_blank" rel="noreferrer">
+              NIST TN 2103
+            </a>
+            ).
+          </li>
           <li>Zona segura: punto de la red lejos de vegetación combustible y que no se quema en el escenario.</li>
         </ul>
 

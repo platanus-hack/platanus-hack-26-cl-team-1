@@ -1,6 +1,7 @@
 import type { Dataset } from '../data/load'
 import VALIDATION from '../../public/data/validation.json'
 import type { WeatherSeries } from '../engine/types'
+import { ERA5_WIND_DIR_CORRECTION_DEG } from '../engine/fire/model'
 import { minToHHMM, localToMin } from '../data/time'
 import type { EvacOut, FireOut } from '../worker/protocol'
 import type { FirebreakWidth, Scenario, WeatherSettings } from '../worker/scenario'
@@ -129,16 +130,20 @@ export function Results(p: Props) {
           {s && b && <Delta now={s.burnedHaEnd} base={b.burnedHaEnd} unit=" ha" />}
         </div>
         <div className="stat">
-          <div className="stat-label">Viviendas alcanzadas por el fuego</div>
+          <div className="stat-label">Edificaciones alcanzadas por el fuego</div>
           <div className="stat-value">{s ? fmtInt(s.buildingsReached) : '—'}</div>
           {s && b && <Delta now={s.buildingsReached} base={b.buildingsReached} />}
         </div>
         <div className="stat strong">
-          <div className="stat-label">Hogares que no alcanzan a salir</div>
+          <div className="stat-label">Hogares con la salida cortada</div>
           <div className="stat-value">{s ? fmtInt(s.trappedHouseholds) : '—'}</div>
           {s && <div className="stat-sub">≈ {fmtInt(s.trappedPeople)} personas</div>}
           {s && b && <Delta now={s.trappedHouseholds} base={b.trappedHouseholds} />}
         </div>
+      </div>
+      <div className="muted small">
+        Sin bomberos ni rescate: las cifras absolutas son un techo de exposición, no daños ni víctimas. Lo
+        confiable es comparar escenarios.
       </div>
       <div className="base-row">
         <button type="button" className="btn small" disabled={!s} onClick={() => s && p.setBaseline(s)}>
@@ -164,7 +169,7 @@ function RiskBlock(p: Props) {
   return (
     <div className="risk">
       <div className="chart-title">
-        Hogares que no alcanzan a salir según la hora de la alerta <span className="muted">(línea: alerta a las {minToHHMM(t0, p.scenario.alertMin)})</span>
+        Hogares con la salida cortada según la hora de la alerta <span className="muted">(línea: alerta a las {minToHHMM(t0, p.scenario.alertMin)})</span>
       </div>
       <RiskChart curve={p.evac.riskByAlert} alertMin={p.scenario.alertMin} t0={t0} onPick={(alertMin) => p.update({ alertMin })} />
       <div className="muted small">Haz clic en el gráfico para probar otra hora de alerta.</div>
@@ -216,7 +221,10 @@ function ClimaSection(p: Props) {
             display={`${fmtSigned(w.windDirOffsetDeg)}°`}
             onChange={(v) => p.updateWeather({ windDirOffsetDeg: v })}
             extra={<Compass fromDeg={used.windFromDeg} />}
-            hint={hint(`${compassLabel(raw.windFromDeg)} (${raw.windFromDeg.toFixed(0)}°)`, `${compassLabel(used.windFromDeg)} (${used.windFromDeg.toFixed(0)}°)`)}
+            hint={hint(
+              `${compassLabel(raw.windFromDeg)} (${raw.windFromDeg.toFixed(0)}°, ERA5 con corrección calibrada de ${fmtSigned(ERA5_WIND_DIR_CORRECTION_DEG)}°)`,
+              `${compassLabel(used.windFromDeg)} (${used.windFromDeg.toFixed(0)}°)`,
+            )}
           />
           <Slider
             label="Humedad relativa (%)"
@@ -397,7 +405,7 @@ function EvacuacionSection(p: Props) {
       <Slider
         label="Tiempo de preparación (mediana, min)"
         value={s.prepMedianMin}
-        min={0}
+        min={1}
         max={60}
         step={1}
         display={`${s.prepMedianMin} min`}
@@ -412,6 +420,29 @@ function EvacuacionSection(p: Props) {
         display={`${Math.round(s.footShare * 100)} %`}
         onChange={(v) => p.update({ footShare: v / 100 })}
       />
+      <div className="sub-title">Evacuación espontánea</div>
+      <Slider
+        label="Responden al ver el fuego (%)"
+        value={Math.round(s.cueShare * 100)}
+        min={0}
+        max={100}
+        step={5}
+        display={`${Math.round(s.cueShare * 100)} %`}
+        onChange={(v) => p.update({ cueShare: v / 100 })}
+        hint="Hogares que salen al ver llamas, brasas o a sus vecinos evacuar, sin esperar la alerta. El resto espera la alerta. 0 % = solo la alerta."
+      />
+      <Slider
+        label="Distancia a la que se ve el fuego (m)"
+        value={s.cueRadiusM}
+        min={0}
+        max={3000}
+        step={100}
+        display={s.cueRadiusM === 0 ? 'desactivada' : `${s.cueRadiusM.toLocaleString('es-CL')} m`}
+        onChange={(v) => p.update({ cueRadiusM: v })}
+        disabled={s.cueShare === 0}
+        hint="Esos hogares empiezan a prepararse cuando el fuego llega a esta distancia de su casa, si es antes de la alerta."
+      />
+      <div className="sub-title">Calles</div>
       <div className="tools">
         <ToolButton tool="closeRoad" current={p.tool} setTool={p.setTool} label="Cerrar calle" />
         <ToolButton tool="link" current={p.tool} setTool={p.setTool} label="Abrir salida de emergencia" />
@@ -452,7 +483,24 @@ function ValidacionSection(p: Props) {
         <strong>
           {VALIDATION.firmsReached.reached} de {VALIDATION.firmsReached.total}
         </strong>
-        . Calibrado sobre este mismo incendio.
+        .
+      </p>
+      <p className="small">
+        Edificaciones: el fuego simulado alcanza <strong>{VALIDATION.buildings.inScar.toLocaleString('es-CL')}</strong> de las{' '}
+        {VALIDATION.buildings.scarTotal.toLocaleString('es-CL')} que están dentro de la cicatriz real ({Math.round(VALIDATION.buildings.recall * 100)}%). De todas
+        las que alcanza ({VALIDATION.buildings.reached.toLocaleString('es-CL')}), {Math.round(VALIDATION.buildings.precision * 100)}% están dentro de la cicatriz y{' '}
+        {Math.round(VALIDATION.buildings.precisionWithin120m * 100)}% a menos de 120 m de ella: el modelo sobrestima el daño urbano porque no incluye el combate del
+        fuego.
+      </p>
+      <p className="small">
+        Llegada del frente oeste (simulada / reportada):{' '}
+        {VALIDATION.anchors.map((a, k) => (
+          <span key={a.name}>
+            {k > 0 ? ' · ' : ''}
+            {a.name} {a.model === 'never' ? 'no llega' : a.model} / {a.reported}
+          </span>
+        ))}
+        . Calibrado sobre este mismo incendio (incluye una corrección de {VALIDATION.windDirCorrectionDeg}° a la dirección del viento de ERA5).
       </p>
     </Section>
   )

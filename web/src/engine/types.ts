@@ -32,8 +32,8 @@ export const FUEL = {
   SHRUB: 2, // matorral (WorldCover 20)
   FOREST: 3, // tree cover: eucalyptus / pine plantations and native sclerophyll forest (WorldCover 10)
   CROP: 4, // cropland (WorldCover 40)
-  URBAN_LOW: 5, // built-up with few buildings, gardens, wildland-urban interface
-  URBAN_DENSE: 6, // dense housing (structure-to-structure spread)
+  URBAN_LOW: 5, // built-up intermix: houses among vegetation (>= 40 % green within 180 m), the wildland-urban interface
+  URBAN_DENSE: 6, // consolidated built-up: little vegetation around, spread only structure to structure
 } as const
 export type FuelCode = (typeof FUEL)[keyof typeof FUEL]
 export const FUEL_LABEL_ES: Record<FuelCode, string> = {
@@ -42,8 +42,8 @@ export const FUEL_LABEL_ES: Record<FuelCode, string> = {
   2: 'Matorral',
   3: 'Bosque / plantación',
   4: 'Cultivo',
-  5: 'Urbano disperso',
-  6: 'Urbano denso',
+  5: 'Urbano en interfaz (casas entre vegetación)',
+  6: 'Urbano consolidado',
 }
 
 // elevation.bin: Float32Array(rows*cols), metres above sea level (Copernicus GLO-30 resampled).
@@ -173,7 +173,13 @@ export interface FireResult {
 export interface EvacParams {
   /** Time the evacuation alert reaches everyone in the domain (minutes since t0). */
   alertMin: number
-  /** Household preparation delay after the alert: lognormal with this median (min) and log-sd. */
+  /** Environmental-cue (spontaneous) evacuation: a household that responds to cues starts its response
+   *  when the fire comes within cueRadiusM (m) of its home, if that is earlier than the alert. 0 = off. */
+  cueRadiusM: number
+  /** Share of households (0..1) that respond to cues (seeing flames, embers or neighbours leaving); the
+   *  rest wait for the alert. 0 = off. */
+  cueShare: number
+  /** Household preparation delay after the alert (or the cue): lognormal with this median (min) and log-sd. */
   prepMedianMin: number
   prepSigma: number
   /** Share of households evacuating on foot (0..1); the rest by car. */

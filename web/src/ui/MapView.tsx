@@ -17,7 +17,7 @@ const STATUS_LABEL: Record<number, string> = {
   [HOUSEHOLD.UNAFFECTED]: 'Sin amenaza',
   [HOUSEHOLD.SAFE]: 'Sale a tiempo',
   [HOUSEHOLD.AT_RISK]: 'En riesgo',
-  [HOUSEHOLD.TRAPPED]: 'No alcanza a salir',
+  [HOUSEHOLD.TRAPPED]: 'Salida cortada',
 }
 
 export interface LayerToggles {
@@ -487,15 +487,20 @@ export function MapView(props: Props) {
       map.setStyle(FALLBACK_STYLE)
     }
     const timer = window.setTimeout(() => goFallback('tiempo de espera agotado'), 10000)
-    // The container can still be laid out (or hidden) when the map is built, which fits the grid at a
-    // country-wide zoom; fit again once, after the first style load, at the real container size.
-    let fitted = false
+    // The container can still be laid out (or hidden) when the map is built, which leaves a tiny canvas and a
+    // country-wide zoom. Follow the container's size, and re-fit the grid until the user moves the map.
+    let userMoved = false
+    map.on('movestart', (e) => {
+      if ((e as { originalEvent?: Event }).originalEvent) userMoved = true
+    })
+    const refit = () => {
+      map.resize()
+      if (!userMoved) map.fitBounds(gridBounds(data.grid), { padding: fitPadding(), duration: 0 })
+    }
+    const resizeObserver = new ResizeObserver(refit)
+    resizeObserver.observe(el.current)
     map.on('style.load', () => {
-      if (!fitted) {
-        fitted = true
-        map.resize()
-        map.fitBounds(gridBounds(data.grid), { padding: fitPadding(), duration: 0 })
-      }
+      refit()
       styleOk = true
       window.clearTimeout(timer)
       ready.current = false
@@ -525,6 +530,7 @@ export function MapView(props: Props) {
     })
     return () => {
       window.clearTimeout(timer)
+      resizeObserver.disconnect()
       ready.current = false
       map.remove()
       mapRef.current = null

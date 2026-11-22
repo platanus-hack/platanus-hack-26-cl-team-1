@@ -14,7 +14,7 @@ import shutil
 import sys
 import time
 
-from steps import buildings, firms, fuel, grid, ignitions, roads, scar, terrain, weather
+from steps import buildings, firms, fuel, grid, ignitions, roads, scar, terrain, weather, wui
 
 SOURCES = {
     "Relieve": "Copernicus DEM GLO-30 (ESA / Airbus), tiles S33/S34 W072 vía AWS Open Data "
@@ -22,7 +22,9 @@ SOURCES = {
     "GmbH 2014-2018, provisto bajo COPERNICUS por la Unión Europea y ESA.",
     "Cobertura de suelo / combustible": "ESA WorldCover 10 m 2021 v200 (https://esa-worldcover.org/), "
     "© ESA WorldCover project 2021 / Contiene datos Copernicus Sentinel modificados (2021), CC BY 4.0. "
-    "Clase mayoritaria por celda de 60 m; urbano dividido por cobertura de techos (Overture).",
+    "Clase mayoritaria por celda de 60 m. Zonas urbanas divididas en interfaz (casas entre vegetación: "
+    ">= 40 % de vegetación en 180 m, según WorldCover y NDVI de Sentinel-2 del 18-01-2024, previo al incendio) "
+    "y ciudad consolidada (el resto).",
     "Edificaciones": f"Overture Maps Foundation, buildings, release {buildings.OVERTURE_RELEASE} "
     "(https://overturemaps.org/), ODbL 1.0 (incluye OpenStreetMap y huellas derivadas de Microsoft y "
     "Google). Huellas actuales, no necesariamente las de febrero de 2024.",
@@ -125,7 +127,11 @@ def main() -> int:
         "count": len(bld),
         "footprint_km2": round(float(bld[:, 2].sum()) / 1e6, 1),
     }
-    fuel_codes, summary["fuel"] = step("fuel", fuel.bake, buildings.coverage(bld))
+    wc_counts = step("worldcover class counts", fuel.class_counts)
+    roof_codes, summary["fuel, roof-coverage split (base)"] = step(
+        "fuel base", fuel.bake, wc_counts, buildings.coverage(bld)
+    )
+    fuel_codes, summary["fuel.bin, WUI split"] = step("fuel (WUI split)", wui.bake, wc_counts, bld, roof_codes)
     summary["roads"] = step("roads", roads.bake)
     summary["weather"] = step("weather", weather.bake)
     firms_pts, summary["firms"] = step("firms", firms.bake)
