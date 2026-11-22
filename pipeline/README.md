@@ -39,6 +39,7 @@ Clock origin `t0 = 2024-02-02T12:00:00-03:00`.
 | `scar.bin` | Uint8 per cell: 1 burned, 0 not, 255 no data | Sentinel-2 L2A dNBR |
 | `firms.json` | `FirmsPoint[]`, 2-4 Feb 2024 local | NASA FIRMS (VIIRS, MODIS) |
 | `ignitions.json` | `IgnitionPreset[]` | FIRMS first detections + press reports |
+| `brigades.json` | `BrigadesFile`: fire companies, trucks, dispatch, reinforcements, road cuts | **Curated by hand** (not baked): OpenStreetMap fire stations + press; see `web/src/engine/brigade/MODEL.md` |
 
 Binary files are little-endian, `rows * cols` values (except `buildings.bin`).
 
@@ -129,6 +130,11 @@ UTC - 3 h (Chile summer time).
 around noon at Fundo Las Tablas, next to the reserve; the point is the upwind (southern) end of the first
 VIIRS cluster (14:47) and the time 12:05. Quilpué / Villa Alemana: centroid of the second cluster in the
 first VIIRS pass, start 30 min before that detection (14:17). Both are labelled approximate and say why.
+
+**brigades.json** is not written by `bake.py`: it is curated by hand (`make data` leaves it alone) and
+validated against the grid on load (`parseBrigades`). Positions are the OpenStreetMap `amenity=fire_station`
+nodes/ways of the four cuerpos inside the grid; every count, time and cut carries its source, or `null`, which
+the app shows as "supuesto". Sources and assumptions: `web/src/engine/brigade/MODEL.md`.
 
 ## Sources and licences
 

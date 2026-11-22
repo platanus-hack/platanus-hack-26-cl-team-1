@@ -16,6 +16,8 @@ Owner in brackets once someone takes an item. Project: Cortafuego (D-019). The O
   validation number, who pays (comunas under Ley 21.364, forestry companies, distributors, insurers). [team]
 
 ## Next
+- [ ] Bomberos (D-022): real inventories per company (ask each cuerpo), reopening time of Ruta 68, hydrant
+  availability as a variable, congestion slowing the trucks, units that move between sectors.
 - [ ] Congestion on evacuation routes (today free flow).
 - [ ] Ensemble (perturbed wind and spotting) for a burn-probability map and a range on the counts.
 - [ ] A second event (Penco / Lirquén, January 2026) to show it generalises.
@@ -24,4 +26,5 @@ Owner in brackets once someone takes an item. Project: Cortafuego (D-019). The O
 - [ ] Any comuna: bake the data for another bounding box from the same pipeline.
 
 ## Done
+- [x] Bomberos: companies, trucks per type, dispatch, Ruta 68 cut, defended cells, rescue (D-022). [Anaís + agent]
 - [x] Pivot research and decision (D-019).

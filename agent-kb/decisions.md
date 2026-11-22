@@ -78,6 +78,24 @@ with a pointer to their replacement; nothing is ever deleted from §3.
   absolute numbers are an exposure ceiling (no firefighting, no rescue); the pitch compares scenarios. Scar and
   FIRMS are used only to score and to pick global scalars (in-sample, disclosed).
 
+### D-022 — Firefighting as an optional two-pass scenario layer (2026-11-22)
+- **Context:** the team wants fire companies, trucks per type and route cuts as scenario variables. No open
+  dataset lists Chile's companies with their trucks, and there is no official count for 2 Feb 2024; the fire
+  calibration (Dice 0.628) already contains, without separating it, whatever suppression happened that day.
+- **Decision (contract: `types.ts`; decided with Anaís in a Q&A, design in
+  `docs/superpowers/specs/2026-11-22-bomberos-design.md`):**
+  - Hand-curated `web/public/data/brigades.json`: the 29 named companies of the four cuerpos in the grid (OSM),
+    trucks per type `[Bomba, Forestal, Aljibe, Escala/rescate]` (1 Bomba "supuesto" where there is no source),
+    dispatch per cuerpo, a Región Metropolitana reinforcement, and the Ruta 68 cut from 17:00.
+  - `src/engine/brigade/`: pass-1 fire → street closures by fire + historical cuts → earliest-arrival routing
+    → greedy sector dispatch → water windows → `FireInput.defense` (Bomba: structures, no limit; Forestal:
+    wildland up to 1,730 kW/m, GTR INT-131) → pass-2 fire → evacuation → rescue by Escala/rescate units.
+  - Off by default; with it on the UI compares against the same scenario without firefighters. "Cerrar calle"
+    affects only the evacuation. Every unsourced number is labelled "supuesto" in code and UI.
+- **Consequences:** the validation number does not change (off by default). Defaults: 79 trucks, −1,191
+  buildings reached and −62 households cut off at an 18:00 alert (`scenarios.ts`). Absolute effects rest on
+  supuestos (tank, flow, radii, rescue rate): present them as comparisons between resource scenarios.
+
 ## §2 Open
 
 - **D-?? Public deploy target** for the static site (`web/dist`): Vercel or Render (both event sponsors) from
