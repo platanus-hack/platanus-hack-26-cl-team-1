@@ -19,6 +19,17 @@ or marked **supuesto**; the UI lists them.
   (supuesto), reaching the map edge at 21:00 (supuesto) by Ruta 68 or, 45 min later (supuesto), by Ruta 60.
 - **Historical cut:** Ruta 68 from 17:00 (La Tercera), never reopened within the run (reopening time unknown).
 
+## All of Chile (`web/public/data/national/bomberos_cl.json`, for scenarios built from scratch)
+
+The 1,256 compañías of Chile with their trucks (`NationalStationsFile` in `types.ts`; method in
+`pipeline/README.md`). Positions come from the JNB cuartel survey 2025. Trucks are documented for the compañías in
+`pipeline/bomberos/fleets.json`; elsewhere they are estimated so that each region matches the JNB register of
+active vehicles per type (2025) (`source: null`, "supuesto"). Not loaded by the Viña del Mar explorer.
+`loadNationalStations()` + `stationsInBox(file, box)` give the `BrigadeStation[]` of any scenario box; each
+station's cuerpo still needs a `CuerpoDispatch` time. Vehicle kinds map to the four engine types through
+`VEHICLE_KIND_UNIT` (a first-response unit counts as Forestal; ladders and rescue as Escala / rescate; hazmat,
+ambulances, command and transport are not modelled).
+
 ## Algorithm (two passes)
 
 1. **Pass 1:** the fire without firefighters (`simulateFire`, no `defense`).

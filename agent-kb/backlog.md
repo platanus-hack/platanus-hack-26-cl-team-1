@@ -20,7 +20,7 @@ Owner in brackets once someone takes an item. Project: Cortafuego (D-019). The O
 - [ ] **Pitch (3 min):** sober opening on 2 Feb 2024, live demo (wind, humidity, firebreak, alert time), the
   validation number, who pays (comunas under Ley 21.364, forestry companies, distributors, insurers). [team]
   - The site now opens on today's forecast (D-028): open the demo at `https://cortafuego.app/?escenario=vina-2024`.
-  - Hypothetical Maule demo (D-031): `https://cortafuego.app/?escenario=talca` (Talca, 8 Feb 2025 weather,
+  - Hypothetical Maule demo (D-032): `https://cortafuego.app/?escenario=talca` (Talca, 8 Feb 2025 weather,
     one hypothetical ignition at 14:00). [Anaís + agent]
 
 ## Next
@@ -31,6 +31,8 @@ Owner in brackets once someone takes an item. Project: Cortafuego (D-019). The O
   front stops.
 - [ ] Bomberos (D-026): real inventories per company (ask each cuerpo), reopening time of Ruta 68, hydrant
   availability as a variable, congestion slowing the trucks, units that move between sectors.
+- [ ] Scenario from scratch: load `national/bomberos_cl.json` (`loadNationalStations` + `stationsInBox`, D-031) for the
+  scenario's box; each cuerpo needs a dispatch time. Real inventories go into `pipeline/bomberos/fleets.json`.
 - [ ] Evacuation by time of day: people per building at the alert time from the population layers (D-024),
   instead of a fixed 2.9 per household; offices and schools as origins on weekdays.
 - [ ] Better job proxy for old mixed-use centres (business POIs, the origin-destination surveys, SII employment by
@@ -51,6 +53,9 @@ Owner in brackets once someone takes an item. Project: Cortafuego (D-019). The O
 - [ ] Any comuna: bake the data for another bounding box from the same pipeline.
 
 ## Done
+- [x] **Every fire company of Chile with its trucks** (D-031): 1,256 compañías (JNB catastro 2025), documented fleets
+  for 330, the rest matched to the JNB register 2025 per region and type. Branch `feat/bomberos-chile-dataset`.
+  [Anaís + agent]
 - [x] Bomberos: companies, trucks per type, dispatch, Ruta 68 cut, defended cells, rescue (D-026). [Anaís + agent]
 - [x] **Scenario that starts today** (D-028): opens by default on today's forecast over the same territory; the
   2 Feb 2024 replay is in the picker and at `?escenario=vina-2024`. Branch `feat/scenario-today`.

@@ -21,7 +21,7 @@
   reached; Viña unchanged.
 
 ## Decisions
-- Talca hypothetical scenario as a fire-less baked event (→ decisions.md D-031).
+- Talca hypothetical scenario as a fire-less baked event (→ decisions.md D-032).
 
 ## Open / blocked
 - Viña's fire hits the grid's east edge at 18:31 with defaults and is clipped silently; options: a visible
