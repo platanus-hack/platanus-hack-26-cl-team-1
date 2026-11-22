@@ -30,9 +30,9 @@
 
 ## Decisions
 - D-019: pivot to Cortafuego; D-001, D-005, D-008 to D-018 moved to §3.
+- D-020: agent reviewers removed (the #48 diff was over GitHub's 300-file limit); PRs merge on `CI OK`.
 
 ## Open / next
 - The model reaches ~21k buildings by midnight, but only ~1.9k of the 6,505 inside the real scar: where it
   burns inside the city is the weakest part. The trapped-households count inherits that.
 - Public deploy host (decisions.md §2); `deploy-url` is still empty.
-- `docs/PR_REVIEW_FOCUS.md` still describes Ojo's pitfalls: update it in its own PR.

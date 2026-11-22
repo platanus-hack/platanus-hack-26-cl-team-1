@@ -12,7 +12,7 @@ data: ## Re-bake web/public/data from the open sources (downloads; slow the firs
 	cd pipeline && uv run python bake.py
 
 test: ## All tests
-	python3 -I -m unittest discover -s scripts/ci/tests -t .
+	cd pipeline && uv run pytest -q
 	cd web && pnpm test
 
 lint: ## Lint and type checks

@@ -74,6 +74,16 @@ with a pointer to their replacement; nothing is ever deleted from §3.
   server and the box CD (`cd-demo.yml`) are gone; the public link must be a static host. Tone rule in CLAUDE.md:
   prevention framing, no claims about the official alert without a source.
 
+### D-020 — No agent reviewers; PRs merge on `CI OK` (2026-11-22)
+- **Context:** the Cortafuego PR (#48) replaced the whole tree, and GitHub refuses the diff of a PR over 300
+  files, so both reviewer jobs failed before reviewing anything. With hours left, the team prefers speed.
+- **Decision:** remove `.github/workflows/code-review.yml`, its helpers (`scripts/ci/`) and
+  `docs/PR_REVIEW_FOCUS.md`. A PR is merged once `CI OK` is green. This supersedes the reviewer half of D-006
+  and the "agent-approved" part of D-007 (the aggregate `CI OK` check and `auto-merge.yml` stay).
+- **Consequences:** `main` has no branch protection and no required checks, so `auto-merge.yml` never arms
+  (it only arms a PR GitHub reports as BLOCKED) and PRs are merged by hand. A repo admin can make `CI OK`
+  required on `main` to bring auto-merge back.
+
 ## §2 Open
 
 - **D-?? Public deploy target** for the static site (`web/dist`): Vercel or Render (both event sponsors) from
