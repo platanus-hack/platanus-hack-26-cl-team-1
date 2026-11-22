@@ -30,6 +30,15 @@
   repo). A literature and cost scan covers FlamMap TOM, DPV / Cell2Fire, CVaR firebreaks, WUIVAC triggers,
   Chilean cortafuego plans and the Ley de Incendios status.
 
+- **Planning (proactive) version, at the team's request:** measures chosen before any fire, over an ensemble of
+  plausible fires (ignitions in wildland 400 m-3 km from inhabited land, never within 2 km of the 2 Feb
+  ignitions), tested on held-out fires and then on 2 Feb. A greedy plan built on 30 fires overfits (280 ha: 18 %
+  train, 5 % unseen, 1 % on 2 Feb), and the plan tuned to 2 Feb saves 0 % on other fires. A ranking of single
+  belt tiles learned on 80 or more fires carries over (1,000 ha: about 24 % on unseen fires, against 6.5 % for
+  random tiles) but barely helps on 2 Feb (2-4 %). Choosing the neighbourhoods for a community preparation
+  programme (20,000 households) carries over to 2 Feb: 17-19 % of its exposure, against 3.7 % for random
+  sectors. Scripts: `proactive.ts`, `proactive2.ts`.
+
 ## Decisions
 - None recorded. Proposal (not decided): if the app gets an optimizer, it optimises over a weather ensemble,
   shows the minimum next to the mean, and covers links and fuel tiles only; alerts get curves instead.
@@ -41,6 +50,8 @@
   (28 cells, 1 building). Fixed to inhabited land: 2,497 → 1,313 on the real weather.
 
 ## Next
+- Planning optimizer in the app: bake the ensemble ranking offline (`plan.json`), then budget sliders in ha and
+  households that highlight the tiles and sectors and apply them to the current scenario.
 - Cheapest in-app win: an alert mode "por cercanía del fuego" (geofenced) mapped to `cueShare 1,
   cueRadiusM R`, which is exact for full reach.
 - Links optimizer in the worker: port `links-core.ts` into `src/engine/evac` with a test against simulateEvac.
