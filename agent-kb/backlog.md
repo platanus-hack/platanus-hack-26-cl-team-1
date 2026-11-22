@@ -8,6 +8,7 @@ Owner in brackets once someone takes an item. Project: Cortafuego (D-019). The O
   in the browser. [Alonso + agents]
 - [ ] **Calibrate and validate** against the Sentinel-2 scar: `make validate` prints the overlap (Dice) used in
   the pitch; tune `rosMultiplier` and the per-fuel factors, in-sample, and say so. [Alonso + agents]
+  Pace against satellite passes (GOES-16 + VIIRS/MODIS) done (D-027) [Anaís + agent].
 - [ ] **Submission files:** `project-description.md`, the one-liner and description in the jsonc, a 1000×1000
   logo (≤ 500 KB), a short README written by the team. [team]
   - Logo ready (D-025): `project-logo.svg` and `project-logo.png` (1000×1000, 58.9 KB); remaining submission
@@ -16,6 +17,11 @@ Owner in brackets once someone takes an item. Project: Cortafuego (D-019). The O
   validation number, who pays (comunas under Ley 21.364, forestry companies, distributors, insurers). [team]
 
 ## Next
+- [ ] Western stall of 14:05–16:25 (satellite) not reproduced: needs a cause the data shows (initial attack?
+  local wind?); see `web/src/engine/fire/MODEL.md` section 6.
+- [ ] Pace back test polish (review of PR #53): GOES half-pixel 1.0 km vs a ~2.5–3 km pixel, look fires up by
+  id in `calibrate.ts`, check the 10-min GOES slots by name, score extent instead of lag once the observed
+  front stops.
 - [ ] Bomberos (D-026): real inventories per company (ask each cuerpo), reopening time of Ruta 68, hydrant
   availability as a variable, congestion slowing the trucks, units that move between sectors.
 - [ ] Evacuation by time of day: people per building at the alert time from the population layers (D-024),

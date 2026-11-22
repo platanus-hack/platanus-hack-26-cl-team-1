@@ -171,6 +171,28 @@ with a pointer to their replacement; nothing is ever deleted from §3.
   buildings reached and −62 households cut off at an 18:00 alert (`scenarios.ts`). Absolute effects rest on
   supuestos (tank, flow, radii, rescue rate): present them as comparisons between resource scenarios.
 
+### D-027 — Calibrate the pace against satellite passes; GOES-16 as a source; matorral at half of forest (2026-11-22)
+- **Context:** the validation scored the burn scar at midnight and FIRMS one-sidedly ("detections already
+  reached"), which cannot see a fire that is early. A back test against satellite passes showed the western head
+  ~1 h early at 16:05 and ~40 min late at 19:05, and the eastern fire early all afternoon.
+- **Decision:**
+  - The satellite is the reference for timing; the press times are shown next to it, not fitted.
+  - `pipeline/steps/goes.py` bakes GOES-16 fire pixels every 10 min (`goes.json`, same shape as `firms.json`,
+    scoring only). `pacing.ts` scores the front lag in both directions; `calibrate.ts` fits on GOES-16 + scar +
+    buildings and reports VIIRS/MODIS as the out-of-sample test.
+  - Knobs are ranked by their mean objective at ERA5 wind ×0.9 / ×1 / ×1.1 (robust scan), so a knife-edge fit
+    does not ship.
+  - Shipped: McArthur ×4 (was ×3) and matorral at half of it (`FIRE_MODEL.fuels[SHRUB].factor` 0.5).
+  - Tested and not shipped: the Concón METAR as weather, intensity-scaled embers, a per-cell ember-jitter
+    ensemble, faster ember jumps (knobs left at 0 in the engine). Ignitions unchanged.
+- **Consequences:** robust objective 0.372 → 0.470. At wind ×1, while the real fires were advancing (to
+  19:05 / 19:15) the GOES RMS lag is west 30 → 30 min and east 39 → 28 min, VIIRS/MODIS mean |lag| 42 → 34 min;
+  over 12:00–24:00 it is 47 → 55 and 110 → 76 min (62 → 55 min test), most of it the model's overshoot after the
+  real fires stopped (no suppression). Also Dice 0.628 → 0.639, buildings in the scar 83 % → 89 %,
+  households cut off at an 18:00 alert 4,753 → 4,061. The western stall of 14:05–16:25 is still not reproduced;
+  McArthur ×4 is above Project Vesta's 2–3× range; all of it is in-sample except the VIIRS/MODIS test.
+  Details: `web/src/engine/fire/MODEL.md` section 6.
+
 ## §2 Open
 
 - Verify the first CI-gated Render deployment after merging the deployment workflow (D-023).

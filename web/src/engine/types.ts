@@ -96,7 +96,8 @@ export interface IgnitionPreset {
   source: string
 }
 
-/** firms.json: NASA FIRMS active-fire detections (VIIRS / MODIS), converted to local time. */
+/** firms.json: NASA FIRMS active-fire detections (VIIRS / MODIS), converted to local time. goes.json (GOES-16 ABI fire
+ *  pixels every 10 min, `satellite` = "GOES-16 ABI", read only by the scoring script) uses the same shape. */
 export interface FirmsPoint {
   lon: number
   lat: number

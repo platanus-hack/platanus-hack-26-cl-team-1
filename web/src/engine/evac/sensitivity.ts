@@ -32,7 +32,7 @@ const ignitions = parseIgnitions(json('ignitions.json')).map((p) => {
   if (cell < 0) throw new Error(`sensitivity: ignition ${p.id} is outside the grid`)
   return { cell, tMin: localToMin(grid.t0, p.timeLocal) }
 })
-const fire = simulateFire({
+const fireInput = {
   grid,
   elevation: parseElevation(bin('elevation.bin'), n),
   fuel,
@@ -44,7 +44,8 @@ const fire = simulateFire({
     samples: wf.times.map((_, i) => ({ tempC: wf.tempC[i], rh: wf.rh[i], windKmh: wf.windKmh[i], windFromDeg: (wf.windFromDeg[i] + ERA5_WIND_DIR_CORRECTION_DEG + 360) % 360 })),
   },
   params: DEFAULT_FIRE_PARAMS,
-})
+}
+const fire = simulateFire(fireInput)
 const arrival = fire.arrivalMin
 const P = prepareEvac(grid, fuel, parseRoads(json('roads.json')), parseBuildings(bin('buildings.bin')), {
   safeDistanceM: DEFAULT_EVAC_PARAMS.safeDistanceM,
@@ -109,3 +110,14 @@ for (const [label, p] of [
       `${fmt(r.buildingsCuedBeforeAlert)} buildings see the fire before the alert`,
   )
 }
+
+// Default-cue curve by alert time (households, alert at the full hour) and the eastern fire run alone.
+const hours = [16, 17, 18, 19, 20, 22, 24]
+console.log(`\nDefault cues by alert time: ${hours.map((h) => `${String(h % 24).padStart(2, '0')}:00 ${fmt(run({ alertMin: (h - 12) * 60 }).expectedTrappedHouseholds)}`).join(' · ')}`)
+const eastId = 'quilpue-villa-alemana-oriente'
+const presets = parseIgnitions(json('ignitions.json'))
+const east = presets.findIndex((p) => p.id === eastId)
+if (east < 0) throw new Error(`sensitivity: preset ${eastId} not found`)
+const eastArrival = simulateFire({ ...fireInput, ignitions: [ignitions[east]] }).arrivalMin
+const eastRun = simulateEvac({ prepared: P, arrivalMin: eastArrival, params: { ...DEFAULT_EVAC_PARAMS, alertMin: ALERT }, edits })
+console.log(`Eastern fire alone, default cues, alert 18:00: ${fmt(eastRun.expectedTrappedHouseholds)} households`)

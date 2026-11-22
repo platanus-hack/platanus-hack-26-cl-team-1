@@ -4,6 +4,7 @@ import type { PopulationDay, WeatherSeries } from '../engine/types'
 import { POPULATION_DAY } from '../engine/types'
 import { STUDENT_SHARE, WORKER_SHARE, type BurnedAreaPeople } from '../engine/population'
 import { ERA5_WIND_DIR_CORRECTION_DEG } from '../engine/fire/model'
+import { LAG_CAP_MIN } from '../engine/fire/pacing'
 import { minToHHMM, localToMin } from '../data/time'
 import type { BrigadesOut, EvacOut, FireOut } from '../worker/protocol'
 import { BrigadesSection } from './BrigadesSection'
@@ -503,6 +504,12 @@ function EvacuacionSection(p: Props) {
   )
 }
 
+/** Short Spanish name of each preset fire, by ignitions.json id (validation.json keys the pace results by id). */
+const FIRE_ES: Record<string, string> = { 'las-tablas-penuelas': 'oeste', 'quilpue-villa-alemana-oriente': 'este' }
+/** Front lag for the panel: signed minutes; at the cap (LAG_CAP_MIN) the model is at least that far off. */
+const fmtLag = (m: number) =>
+  Math.abs(m) >= LAG_CAP_MIN ? `${m > 0 ? '+' : '−'}${LAG_CAP_MIN / 60} h o más` : `${m > 0 ? '+' : m < 0 ? '−' : ''}${Math.abs(m)} min`
+
 function ValidacionSection(p: Props) {
   return (
     <Section title="Validación" defaultOpen={false}>
@@ -533,14 +540,34 @@ function ValidacionSection(p: Props) {
         fuego.
       </p>
       <p className="small">
-        Llegada del frente oeste (simulada / reportada):{' '}
+        Ritmo del avance frente al satélite (minutos que el frente simulado va atrasado, +, o adelantado, −, respecto del frente
+        detectado): con GOES-16, una imagen cada 10 minutos, mientras el fuego real avanzaba (hasta las{' '}
+        {VALIDATION.pacing.fit.advanceUntil['las-tablas-penuelas']} en el oeste y las{' '}
+        {VALIDATION.pacing.fit.advanceUntil['quilpue-villa-alemana-oriente']} en el este) el desfase cuadrático medio es de{' '}
+        <strong>{VALIDATION.pacing.fit.rmsAdvanceMin['las-tablas-penuelas']} min</strong> en el foco oeste y{' '}
+        <strong>{VALIDATION.pacing.fit.rmsAdvanceMin['quilpue-villa-alemana-oriente']} min</strong> en el este. Hasta medianoche sube a{' '}
+        {VALIDATION.pacing.fit.rmsLagMin['las-tablas-penuelas']} y {VALIDATION.pacing.fit.rmsLagMin['quilpue-villa-alemana-oriente']} min:
+        después de esa hora el fuego real dejó de avanzar y el modelo, que no incluye el combate del fuego, sigue (con estos datos se
+        ajustó el modelo). En las pasadas VIIRS y MODIS, que no se usaron para ajustar:{' '}
+        {VALIDATION.pacing.test.map((x, k) => (
+          <span key={`${x.time}-${x.fire}`}>
+            {k > 0 ? ' · ' : ''}
+            {x.time} {FIRE_ES[x.fire] ?? x.fire} {fmtLag(x.lagMin)}
+          </span>
+        ))}
+        . Entre las 14:00 y las 16:30 el fuego real estuvo casi detenido a unos 6 km de Las Tablas y luego avanzó unos 100 m por
+        minuto; el modelo no reproduce esa detención.
+      </p>
+      <p className="small">
+        Llegada del frente oeste (simulada / satélite GOES-16 / reportada por prensa):{' '}
         {VALIDATION.anchors.map((a, k) => (
           <span key={a.name}>
             {k > 0 ? ' · ' : ''}
-            {a.name} {a.model === 'never' ? 'no llega' : a.model} / {a.reported}
+            {a.name} {a.model === 'never' ? 'no llega' : a.model} / {a.satellite === 'never' ? 'sin detección' : a.satellite} / {a.reported}
           </span>
         ))}
-        . Calibrado sobre este mismo incendio (incluye una corrección de {VALIDATION.windDirCorrectionDeg}° a la dirección del viento de ERA5).
+        . Calibrado sobre este mismo incendio: factores de combustible ajustados al ritmo satelital y una corrección de{' '}
+        {VALIDATION.windDirCorrectionDeg}° a la dirección del viento de ERA5.
       </p>
     </Section>
   )

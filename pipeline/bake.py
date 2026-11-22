@@ -14,7 +14,7 @@ import shutil
 import sys
 import time
 
-from steps import buildings, firms, fuel, grid, ignitions, population, roads, scar, terrain, weather, wui
+from steps import buildings, firms, fuel, goes, grid, ignitions, population, roads, scar, terrain, weather, wui
 
 SOURCES = {
     "Relieve": "Copernicus DEM GLO-30 (ESA / Airbus), tiles S33/S34 W072 vía AWS Open Data "
@@ -33,6 +33,7 @@ SOURCES = {
     "Meteorología": weather.SOURCE,
     "Cicatriz del incendio": scar.SOURCE,
     "Detecciones satelitales de fuego": firms.SOURCE,
+    "Detecciones de fuego GOES-16 (cada 10 min)": goes.SOURCE,
     "Focos predefinidos": "Ubicaciones aproximadas según primeras detecciones satelitales (NASA FIRMS VIIRS); "
     "hora del foco Las Tablas según reportes de prensa (CIPER, Cooperativa). No son datos oficiales.",
     "Población por hora": population.SOURCE,
@@ -47,6 +48,7 @@ OUTPUTS = [
     "weather.json",
     "scar.bin",
     "firms.json",
+    "goes.json",
     "ignitions.json",
     "population_home.bin",
     "population_work.bin",
@@ -98,6 +100,9 @@ def validate_outputs() -> None:
     for p in json.loads((d / "firms.json").read_text()):
         if set(p) != {"lon", "lat", "timeLocal", "satellite", "frp"}:
             raise AssertionError(f"firms.json: bad point {p}")
+    for p in json.loads((d / "goes.json").read_text()):
+        if set(p) != {"lon", "lat", "timeLocal", "satellite", "frp"} or p["frp"] < 0:
+            raise AssertionError(f"goes.json: bad point {p}")
     for p in json.loads((d / "ignitions.json").read_text()):
         if set(p) != {"id", "label", "lon", "lat", "timeLocal", "source"}:
             raise AssertionError(f"ignitions.json: bad preset {p}")
@@ -148,6 +153,7 @@ def main() -> int:
     summary["scar"] = step("scar", scar.bake, firms_pts, fuel_codes)
     summary["ignitions"] = step("ignitions", ignitions.bake, firms_pts)
     summary["population"] = step("population (from the committed national product)", population.bake_domain)
+    _, summary["goes"] = step("goes", goes.bake)
 
     step("validate outputs against types.ts", validate_outputs)
 

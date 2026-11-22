@@ -1,7 +1,7 @@
 # Firefighting model (Bomberos)
 
 Scenario exploration for prevention and planning, not a reconstruction of what the cuerpos did on 2 February
-2024 and not a judgement of it. Off by default: the calibrated fire model (Dice 0.628 against the scar) already
+2024 and not a judgement of it. Off by default: the calibrated fire model (Dice 0.639 against the scar, D-027) already
 contains, without separating it, whatever suppression happened that day. With "Bomberos" on, the app compares
 the same scenario with and without the trucks the user sets. Every parameter is in `model.ts` with a source
 or marked **supuesto**; the UI lists them.
@@ -49,15 +49,22 @@ or marked **supuesto**; the UI lists them.
    takes out up to 6 households per hour (supuesto), highest risk first, within 300 m (supuesto) of its site,
    from its arrival to midnight (`applyRescue`).
 
-## Measured on the real data (`pnpm exec tsx src/engine/brigade/scenarios.ts`, 2026-11-22 02:09, alert 18:00)
+## Measured on the real data (`pnpm exec tsx src/engine/brigade/scenarios.ts`, 2026-11-22 02:43, alert 18:00)
+
+Re-measured after the fire's pace recalibration (D-027: McArthur ×4, matorral at half of it), which changes the
+rates of spread and so the fireline intensity the Forestal check sees. Burned area counts every cell (`make
+validate` leaves out cells with no Sentinel-2 data, hence its 17,934 ha).
 
 | Scenario | Trucks | Burned | Buildings reached | Households cut off | Rescued |
 |---|---|---|---|---|---|
-| No firefighters | 0 | 18,108 ha | 28,119 | 4,753 | – |
-| Defaults (brigades.json) | 79 | −36 ha | −1,191 | −62 | 37 |
-| Without the Ruta 68 cut | 79 | −36 ha | −1,194 | −62 | 37 |
-| Double every count | 158 | −58 ha | −1,800 | −76 | 43 |
-| Every company 2 Bomba + 1 Forestal + 1 Aljibe | 166 | −68 ha | −2,094 | −36 | 0 |
+| No firefighters | 0 | 18,008 ha | 29,209 | 4,061 | – |
+| Defaults (brigades.json) | 79 | −43 ha | −1,436 | −76 | 35 |
+| Without the Ruta 68 cut | 79 | −45 ha | −1,456 | −76 | 35 |
+| Double every count | 158 | −59 ha | −1,954 | −85 | 40 |
+| Every company 2 Bomba + 1 Forestal + 1 Aljibe | 166 | −78 ha | −2,504 | −49 | 0 |
+| Dispatch at 14:30 | 79 | −43 ha | −1,436 | −79 | 37 |
+
+Before the recalibration the first two rows read 18,108 ha / 28,119 / 4,753 and −36 ha / −1,191 / −62 / 37.
 
 Planning takes ~200 ms; the whole two-pass run ~0.5 s in the browser.
 

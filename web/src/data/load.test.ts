@@ -4,6 +4,7 @@ import {
   DataError,
   parseElevation,
   parseFuel,
+  parseGoes,
   parseGrid,
   parseRoads,
   parseScar,
@@ -29,6 +30,14 @@ const gridJson = {
 }
 
 describe('parsers', () => {
+  it('parseGoes reads GOES-16 points and rejects one without frp, naming goes.json', () => {
+    const ok = [{ lon: -71.5, lat: -33.1, timeLocal: '2024-02-02T16:35', satellite: 'GOES-16 ABI', frp: 12.5 }]
+    expect(parseGoes(ok)).toEqual(ok)
+    const bad = [{ lon: -71.5, lat: -33.1, timeLocal: '2024-02-02T16:35', satellite: 'GOES-16 ABI' }]
+    expect(() => parseGoes(bad)).toThrow(DataError)
+    expect(() => parseGoes(bad)).toThrow(/goes\.json/)
+  })
+
   it('accepts a valid grid and rejects a malformed one', () => {
     expect(parseGrid(gridJson).cols).toBe(3)
     expect(() => parseGrid({ ...gridJson, rows: 0 })).toThrow(DataError)

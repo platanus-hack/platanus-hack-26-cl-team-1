@@ -1,46 +1,139 @@
 {
   "note": "Defaults as shipped, ERA5 wind x1 with the calibrated direction correction, spotting on, preset ignitions; burned by the horizon vs the Sentinel-2 scar (final footprint, no-data cells ignored). In-sample: the model factors and the wind correction were fitted on this same fire.",
   "evalTime": "2024-02-03T00:00",
-  "dice": 0.628,
-  "iou": 0.458,
-  "precision": 0.479,
-  "recall": 0.913,
-  "modelHa": 18043,
+  "dice": 0.639,
+  "iou": 0.469,
+  "precision": 0.488,
+  "recall": 0.924,
+  "modelHa": 17934,
   "scarHa": 9467,
-  "runMs": 67,
+  "runMs": 74,
   "firmsReached": {
-    "reached": 206,
+    "reached": 193,
     "total": 237
   },
   "buildings": {
-    "reached": 28119,
-    "inScar": 5423,
+    "reached": 29209,
+    "inScar": 5784,
     "scarTotal": 6505,
-    "recall": 0.834,
-    "precision": 0.193,
-    "precisionWithin120m": 0.521
+    "recall": 0.889,
+    "precision": 0.198,
+    "precisionWithin120m": 0.555
   },
   "anchors": [
     {
       "name": "Jardín Botánico",
       "reported": "17:00",
-      "model": "18:23"
+      "satellite": "17:55",
+      "model": "18:26"
     },
     {
       "name": "Pompeya Sur",
       "reported": "18:10",
-      "model": "18:04"
+      "satellite": "17:55",
+      "model": "18:06"
     },
     {
       "name": "El Olivar",
       "reported": "18:30",
-      "model": "19:14"
+      "satellite": "18:25",
+      "model": "19:19"
     },
     {
       "name": "Villa Independencia",
       "reported": "18:30",
-      "model": "19:36"
+      "satellite": "18:25",
+      "model": "19:39"
     }
   ],
+  "pacing": {
+    "note": "Front lag = minutes the model is late (+) or early (-) at reaching the farthest satellite detection of each fire, 12:00-24:00. Fit: GOES-16 every 10 min (in sample). Test: VIIRS / MODIS passes (not used to fit).",
+    "fit": {
+      "sensor": "GOES-16 ABI",
+      "rmsLagMin": {
+        "las-tablas-penuelas": 55,
+        "quilpue-villa-alemana-oriente": 76
+      },
+      "advanceUntil": {
+        "las-tablas-penuelas": "19:05",
+        "quilpue-villa-alemana-oriente": "19:15"
+      },
+      "rmsAdvanceMin": {
+        "las-tablas-penuelas": 30,
+        "quilpue-villa-alemana-oriente": 28
+      },
+      "rmsAfterMin": {
+        "las-tablas-penuelas": 78,
+        "quilpue-villa-alemana-oriente": 105
+      }
+    },
+    "test": [
+      {
+        "time": "14:47",
+        "satellite": "VIIRS NOAA-20",
+        "fire": "las-tablas-penuelas",
+        "obsKm": 4.8,
+        "modelKm": 5.9,
+        "lagMin": -21,
+        "overrunHa": 116
+      },
+      {
+        "time": "15:38",
+        "satellite": "VIIRS S-NPP",
+        "fire": "las-tablas-penuelas",
+        "obsKm": 5.3,
+        "modelKm": 8.2,
+        "lagMin": -61,
+        "overrunHa": 824
+      },
+      {
+        "time": "16:27",
+        "satellite": "VIIRS NOAA-20",
+        "fire": "las-tablas-penuelas",
+        "obsKm": 5.9,
+        "modelKm": 10.7,
+        "lagMin": -97,
+        "overrunHa": 1666
+      },
+      {
+        "time": "23:18",
+        "satellite": "MODIS Terra",
+        "fire": "las-tablas-penuelas",
+        "obsKm": 20.5,
+        "modelKm": 23.9,
+        "lagMin": -180,
+        "overrunHa": 6709
+      },
+      {
+        "time": "14:47",
+        "satellite": "VIIRS NOAA-20",
+        "fire": "quilpue-villa-alemana-oriente",
+        "obsKm": 0.6,
+        "modelKm": 0.2,
+        "lagMin": 21,
+        "overrunHa": 0
+      },
+      {
+        "time": "15:38",
+        "satellite": "VIIRS S-NPP",
+        "fire": "quilpue-villa-alemana-oriente",
+        "obsKm": 1.4,
+        "modelKm": 1.7,
+        "lagMin": -3,
+        "overrunHa": 0
+      },
+      {
+        "time": "16:27",
+        "satellite": "VIIRS NOAA-20",
+        "fire": "quilpue-villa-alemana-oriente",
+        "obsKm": 4.4,
+        "modelKm": 4,
+        "lagMin": 4,
+        "overrunHa": 26
+      }
+    ],
+    "testMeanAbsLagMin": 55,
+    "testAdvanceMeanAbsLagMin": 34
+  },
   "windDirCorrectionDeg": -10
 }
