@@ -686,7 +686,8 @@ function SheetSummary({ summary, busy, burnedHaNow, hhmm }: { summary: Summary |
         <b>{summary ? fmtInt(burnedHaNow) : '—'}</b>
         <span>ha quemadas a las {hhmm}</span>
       </span>
-      {busy && <span className="spinner sheet-busy" role="status" aria-label="Simulando" />}
+      {/* inside the sheet's button: decoration only (the results block below says "Simulando…") */}
+      {busy && <span className="spinner sheet-busy" aria-hidden="true" />}
     </>
   )
 }
