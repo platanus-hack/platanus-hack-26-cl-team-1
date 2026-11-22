@@ -235,6 +235,27 @@ D-026 to D-028 were taken by #54, #53 and the today scenario._
   overlay. Reduced motion bypasses animation; startup errors show immediately, and a skip control avoids
   waiting for the intro. No fake progress percentage, audio, or endlessly animated flame.
 
+### D-030 — National fire-company dataset: JNB positions, trucks matched to the JNB register per region (2026-11-22)
+- **Context:** the team is building scenarios from scratch anywhere in Chile; `brigades.json` (D-026) only covers
+  the four cuerpos of the Viña del Mar grid. Anaís asked for the location of every compañía in Chile and, where
+  truck fleets (count and models) cannot be found quickly, the most precise assumption possible.
+- **Decision (contract: `NationalStationsFile`, `VEHICLE_KIND`, `VEHICLE_KIND_UNIT` in `types.ts`):**
+  - `web/public/data/national/bomberos_cl.json`, baked by `pipeline/steps/bomberos.py` (`make bomberos`). Positions:
+    JNB Catastro Nacional de Cuarteles 2025 (Geoportal de Chile) joined with the bomberos.cl list of 2024 (Itrend,
+    CC BY 4.0) on (cuerpo, number); OSM and uncoded catastro cuarteles break ties. 1,256 compañías (JNB Memoria 2025: 1,262).
+  - Trucks: documented per compañía in `pipeline/bomberos/fleets.json` (source URL per vehicle, `complete` flag);
+    everything else is estimated so that each region's vehicles per type equal the JNB Registro Nacional de
+    Material Mayor 2025 (Memoria p. 34, 4,476 in active service), shared by documented specialty and urban / rural
+    weights (supuestos), with make/model drawn from the documented models and JNB bulk purchases. Estimated
+    vehicles have `source: null` ("supuesto").
+  - Twelve vehicle kinds (the JNB register's categories plus command / transport); `Q` porta escalas and aerials
+    are `escala`; a first-response unit counts as a Forestal for the engine, ladders and rescue as Escala / rescate.
+  - Not loaded by the Viña del Mar explorer; `stationsInBox()` gives `BrigadeStation[]` for any scenario box.
+- **Consequences:** regional totals per type are exact against the register (except where documented vehicles
+  exceed it: 15 ladders in the Metropolitana, 2 ladders and 3 hazmat units in Biobío), but a given compañía's estimated trucks are not an inventory. Aysén has
+  36 stations against 29 compañías in the JNB count (likely brigadas). `brigades.json` is unchanged; its 29
+  stations match the national file within 1.5 km (test).
+
 ## §2 Open
 
 - Verify the first CI-gated Render deployment after merging the deployment workflow (D-023).
