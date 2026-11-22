@@ -8,7 +8,7 @@ import type { Dataset } from './data/load'
 import { loadRealDataset } from './data/load'
 import { makeMockDataset } from './data/mock'
 import { fetchForecast, santiagoDate, type Forecast } from './data/forecast'
-import { EATON_2025_CHOICE, isTimelineId, TIMELINE_OPTIONS, timelineDataset, VINA_2024_CHOICE, type TimelineChoice } from './data/timeline'
+import { EATON_2025_CHOICE, isTimelineId, TALCA_CHOICE, TIMELINE_OPTIONS, timelineDataset, VINA_2024_CHOICE, type TimelineChoice } from './data/timeline'
 import { checkEvent, EVENTS, eventOfTimeline, type EventDef, type EventId } from './data/events'
 import { localToMin, minToDateLabel, minToHHMM, wallClockMin } from './data/time'
 import { SimClient } from './worker/client'
@@ -126,6 +126,7 @@ function windowLabel(data: Dataset): string {
 function subtitleFor(data: Dataset | null, timeline: TimelineId): string {
   if (timeline === TIMELINE.VINA_2024) return 'Explorador de escenarios del incendio del 2 de febrero de 2024'
   if (timeline === TIMELINE.EATON_2025) return 'Explorador de escenarios del incendio Eaton del 7 de enero de 2025 · Altadena y Pasadena, California'
+  if (timeline === TIMELINE.TALCA) return 'Escenario hipotético en Talca (Maule) con el tiempo de un día caluroso de referencia, 8 de febrero de 2025'
   const day = data ? ` (${minToDateLabel(data.grid.t0, 0)}, ${windowLabel(data)})` : ''
   return `Escenario de hoy${day} con el pronóstico del tiempo`
 }
@@ -193,6 +194,7 @@ export default function App() {
   const choice = useMemo<TimelineChoice | null>(() => {
     if (timeline === TIMELINE.VINA_2024) return VINA_2024_CHOICE
     if (timeline === TIMELINE.EATON_2025) return EATON_2025_CHOICE
+    if (timeline === TIMELINE.TALCA) return TALCA_CHOICE
     return okForecast ? { id: TIMELINE.TODAY, forecast: okForecast } : null
   }, [timeline, okForecast])
   const view = useMemo(() => {
@@ -441,11 +443,12 @@ function Explorer({
   }, [])
   useEffect(() => onNote('tool', null), [tool, onNote])
 
-  // Layers this scenario has no data for: FIRMS in the today timeline, population and firefighters where the
-  // event does not ship them (EventDef.layers).
+  // Layers this scenario has no data for: FIRMS in the today timeline, the scar where no fire was observed
+  // (EventDef.observedFire), population and firefighters where the event does not ship them (EventDef.layers).
   const hiddenLayers = useMemo(
     () => [
       ...(data.firms.length === 0 ? (['firms'] as const) : []),
+      ...(data.event.observedFire ? [] : (['cicatriz'] as const)),
       ...(data.population ? [] : (['poblacion'] as const)),
       ...(data.brigades ? [] : (['bomberos'] as const)),
     ],

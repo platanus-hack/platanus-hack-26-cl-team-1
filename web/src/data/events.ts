@@ -7,7 +7,7 @@ import { DEFAULT_FIRE_PARAMS } from '../engine/fire'
 import { ERA5_WIND_DIR_CORRECTION_DEG } from '../engine/fire/model'
 import { TIMELINE, type TimelineId } from '../engine/types'
 
-export const EVENT_IDS = [TIMELINE.VINA_2024, TIMELINE.EATON_2025] as const
+export const EVENT_IDS = [TIMELINE.VINA_2024, TIMELINE.EATON_2025, TIMELINE.TALCA] as const
 export type EventId = (typeof EVENT_IDS)[number]
 
 /** A value used by default, with where it comes from (null source = labelled assumption). */
@@ -27,6 +27,9 @@ export interface EventDef {
   windDirCorrectionDeg: number
   /** Optional layers this event ships: brigades.json, population_{home,work}.bin. */
   layers: { brigades: boolean; population: boolean }
+  /** A real fire was observed here: the scar, FIRMS and the Validación section mean something. False for a
+   *  hypothetical scenario (Talca), whose scar.bin is all "no data" and firms.json empty. */
+  observedFire: boolean
   /** Evacuation defaults that depend on the place. */
   evac: {
     alertMin: Sourced<number>
@@ -44,6 +47,7 @@ export const EVENTS: Record<EventId, EventDef> = {
     horizonMin: DEFAULT_FIRE_PARAMS.horizonMin, // 12:00 to midnight: the model has no suppression, so later hours overburn
     windDirCorrectionDeg: ERA5_WIND_DIR_CORRECTION_DEG,
     layers: { brigades: true, population: true },
+    observedFire: true,
     evac: {
       alertMin: { value: DEFAULT_EVAC_PARAMS.alertMin, source: null },
       personsPerHousehold: { value: DEFAULT_EVAC_PARAMS.personsPerHousehold, source: null },
@@ -57,6 +61,7 @@ export const EVENTS: Record<EventId, EventDef> = {
     horizonMin: 18 * 60, // 18:00 on 7 Jan to 12:00 on 8 Jan (Pacific time): the first night and morning
     windDirCorrectionDeg: 0,
     layers: { brigades: false, population: false },
+    observedFire: true,
     evac: {
       // 19:25: the first evacuation orders (east of Lake Avenue). West of Lake the first order came at 03:25.
       alertMin: {
@@ -75,6 +80,21 @@ export const EVENTS: Record<EventId, EventDef> = {
       },
     },
     calendarNote: null,
+  },
+  [TIMELINE.TALCA]: {
+    id: TIMELINE.TALCA,
+    dir: 'talca/',
+    horizonMin: 12 * 60, // 12:00 to midnight, the same window as Viña's validated replay
+    windDirCorrectionDeg: 0, // the -10 deg correction was fitted on Viña's scar only
+    layers: { brigades: false, population: true },
+    observedFire: false,
+    evac: {
+      // 17:00: three hours after the hypothetical 14:00 ignition. A labelled assumption, like Viña's 18:00.
+      alertMin: { value: 5 * 60, source: null },
+      personsPerHousehold: { value: DEFAULT_EVAC_PARAMS.personsPerHousehold, source: null },
+      footShare: { value: DEFAULT_EVAC_PARAMS.footShare, source: null },
+    },
+    calendarNote: 'El día de referencia, 8 de febrero de 2025, fue un sábado.',
   },
 }
 

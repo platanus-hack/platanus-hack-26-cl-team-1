@@ -270,15 +270,32 @@ def test_event_definitions_are_consistent(event_id, restore_default_event):
     # The fixed UTC offset holds over the whole baked window, and t0 carries it.
     tz = ZoneInfo(ev.timezone)
     assert datetime.fromisoformat(ev.t0).utcoffset() == timedelta(hours=ev.utc_offset_h)
-    for day in (ev.firms_first, ev.firms_last, ev.weather_first_day, ev.weather_last_day):
+    days = (ev.weather_first_day, ev.weather_last_day)
+    days += (ev.firms_first, ev.firms_last) if ev.observed_fire else ()
+    for day in days:
         assert datetime.fromisoformat(day).replace(tzinfo=tz).utcoffset() == timedelta(hours=ev.utc_offset_h)
-    for t in (ev.goes_first_utc, ev.goes_last_utc):
+    for t in (ev.goes_first_utc, ev.goes_last_utc) if ev.observed_fire else ():
         assert t.replace(tzinfo=ZoneInfo("UTC")).astimezone(tz).utcoffset() == timedelta(hours=ev.utc_offset_h)
     # Every fixed ignition preset is in the grid and has the ignitions.json shape.
     for p in ev.ignitions or ():
         assert set(p) == {"id", "label", "lon", "lat", "timeLocal", "source"}
         assert grid.cell_index(p["lon"], p["lat"]) >= 0
-    assert ev.s2_pre.split("_")[1] == ev.s2_post.split("_")[1]  # same MGRS tile: same pixel grid
+    if ev.observed_fire:
+        assert ev.s2_pre.split("_")[1] == ev.s2_post.split("_")[1]  # same MGRS tile: same pixel grid
+    else:
+        assert "goes.json" not in ev.outputs and ev.ignitions  # hypothetical: fixed presets, no GOES
+
+
+def test_hypothetical_event_sets_no_fire_fields_or_all_of_them():
+    from dataclasses import replace
+
+    talca = events.EVENTS["talca"]
+    assert not talca.observed_fire
+    assert all(getattr(talca, f) is None for f in events.FIRE_FIELDS)
+    with pytest.raises(ValueError, match="or none"):
+        replace(talca, s2_post="S2B_19HBA_20260318_0_L2A")  # a post scene without the rest of a real fire
+    with pytest.raises(ValueError, match="ignition presets"):
+        replace(talca, ignitions=None)
 
 
 def test_unknown_event_raises():

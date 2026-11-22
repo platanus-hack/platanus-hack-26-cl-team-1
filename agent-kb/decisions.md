@@ -258,6 +258,25 @@ D-026 to D-028 were taken by #54, #53 and the today scenario._
   scar but spreading through consolidated Pasadena. Next: fit on both fires (backlog). The bake found that Viña's
   scar uses a −0.1 reflectance offset its COGs do not need; kept for byte-identity, open in §2.
 
+### D-031 — A hypothetical scenario in Talca (Maule) for demos: a baked event with no observed fire (2026-11-22)
+- **Context:** the user asked for data to simulate a fire in the Maule region for a demo, and chose (asked before
+  building) a hypothetical fire around Talca over a replay of Santa Olga 2017, and a picker option plus a URL.
+- **Decision (contract: `types.ts` `TIMELINE.TALCA`; builds on D-030's events):**
+  - An event either has an observed fire (all of `events.FIRE_FIELDS`: post-fire scene, scar parameters, FIRMS,
+    GOES) or none (`observed_fire` False); a mix stops at import, and a fire-less event needs fixed ignition presets.
+    Its bake writes `scar.bin` all 255 ("no data"), `firms.json` `[]` and no `goes.json`; `validate_outputs`
+    checks it. In the web, `EventDef.observedFire` false hides the scar layer and the Validación section.
+  - `talca`: 464 × 529 cells of 60 m around Talca (whole city, Maule, Pencahue, grassland hills SSW, wooded hills
+    across the Río Claro), the real ERA5 weather of a hot reference day, 8 Feb 2025 (37 °C, 13 % RH, SSW wind
+    up to 25 km/h at 17:00), 12:00 to midnight, one hypothetical ignition at 14:00 on grassland 4 km SSW of the
+    city, alert 17:00 (assumption), population from the national product, no firefighters, no wind correction.
+  - Picker option "Talca, Maule · hipotético" (`?escenario=talca`); a note says it reproduces no real fire and
+    the model was calibrated only on Viña 2024 with no local validation.
+- **Consequences:** a fixed baked day, not today's forecast, so the demo works offline from the forecast API and
+  is reproducible. With the defaults the model burns ~14,100 ha by midnight and reaches ~34,700 buildings; like
+  Viña and Eaton it overburns (no suppression), so the numbers compare scenarios, not predict. Brigades for
+  Talca could come from the national fire-station dataset later.
+
 ## §2 Open
 
 - Viña's scar (`scar.bin`) applies a −0.1 reflectance offset that the Earth Search COGs do not need (15.6 % / 19.6 %

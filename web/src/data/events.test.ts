@@ -21,5 +21,11 @@ describe('event registry', () => {
     expect(eventOfTimeline(TIMELINE.TODAY)).toBe(TIMELINE.VINA_2024)
     expect(eventOfTimeline(TIMELINE.VINA_2024)).toBe(TIMELINE.VINA_2024)
     expect(eventOfTimeline(TIMELINE.EATON_2025)).toBe(TIMELINE.EATON_2025)
+    expect(eventOfTimeline(TIMELINE.TALCA)).toBe(TIMELINE.TALCA)
+  })
+  it('marks Talca as hypothetical: no observed fire, so no scar, FIRMS or validation to show', () => {
+    expect(EVENTS[TIMELINE.TALCA].observedFire).toBe(false)
+    expect(EVENTS[TIMELINE.VINA_2024].observedFire).toBe(true)
+    expect(EVENTS[TIMELINE.EATON_2025].observedFire).toBe(true)
   })
 })

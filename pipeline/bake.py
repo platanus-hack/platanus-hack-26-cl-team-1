@@ -69,8 +69,11 @@ def validate_outputs() -> None:
         raise AssertionError("elevation.bin: non-finite values")
     if not np.isin(raw("fuel.bin", "u1", n), np.arange(7)).all():
         raise AssertionError("fuel.bin: values outside FUEL")
-    if not np.isin(raw("scar.bin", "u1", n), [0, 1, 255]).all():
+    scar_cells = raw("scar.bin", "u1", n)
+    if not np.isin(scar_cells, [0, 1, 255]).all():
         raise AssertionError("scar.bin: values outside {0, 1, 255}")
+    if not grid.EVENT.observed_fire and not (scar_cells == 255).all():
+        raise AssertionError("scar.bin: a scenario with no observed fire must be all 255 (no data)")
     b = raw("buildings.bin", "<f4")
     if b.size % 3 or not np.isfinite(b).all() or (grid.cell_index(b[0::3], b[1::3]) < 0).any():
         raise AssertionError("buildings.bin: malformed or out-of-grid buildings")
@@ -88,10 +91,13 @@ def validate_outputs() -> None:
     for k in ("tempC", "rh", "windKmh", "windFromDeg", "gustKmh"):
         if len(w[k]) != len(w["times"]):
             raise AssertionError(f"weather.json: {k} length differs from times")
-    for p in json.loads((d / "firms.json").read_text()):
+    firms_pts = json.loads((d / "firms.json").read_text())
+    if not grid.EVENT.observed_fire and firms_pts != []:
+        raise AssertionError("firms.json: a scenario with no observed fire must be []")
+    for p in firms_pts:
         if set(p) != {"lon", "lat", "timeLocal", "satellite", "frp"}:
             raise AssertionError(f"firms.json: bad point {p}")
-    for p in json.loads((d / "goes.json").read_text()):
+    for p in json.loads((d / "goes.json").read_text()) if grid.EVENT.observed_fire else []:
         if set(p) != {"lon", "lat", "timeLocal", "satellite", "frp"} or p["frp"] < 0:
             raise AssertionError(f"goes.json: bad point {p}")
     for p in json.loads((d / "ignitions.json").read_text()):
@@ -162,12 +168,18 @@ def main() -> int:
     fuel_codes, summary["fuel.bin, WUI split"] = step("fuel (WUI split)", wui.bake, wc_counts, bld, roof_codes)
     summary["roads"] = step("roads", roads.bake)
     summary["weather"] = step("weather", weather.bake)
-    firms_pts, summary["firms"] = step("firms", firms.bake)
-    summary["scar"] = step("scar", scar.bake, firms_pts, fuel_codes)
-    summary["ignitions"] = step("ignitions", ignitions.bake, firms_pts)
+    if ev.observed_fire:
+        firms_pts, summary["firms"] = step("firms", firms.bake)
+        summary["scar"] = step("scar", scar.bake, firms_pts, fuel_codes)
+        summary["ignitions"] = step("ignitions", ignitions.bake, firms_pts)
+    else:  # hypothetical scenario: no satellite observations to bake, fixed ignition presets
+        summary["firms"] = step("firms (none: no observed fire)", firms.write_none)
+        summary["scar"] = step("scar (all no data: no observed fire)", scar.write_no_data)
+        summary["ignitions"] = step("ignitions (fixed presets)", ignitions.bake, [])
     if ev.population:
         summary["population"] = step("population (from the committed national product)", population.bake_domain)
-    _, summary["goes"] = step("goes", goes.bake)
+    if ev.observed_fire:
+        _, summary["goes"] = step("goes", goes.bake)
     if ev.perimeter:
         summary["perimeter (validation only)"] = step("official perimeter", perimeter.bake)
     if ev.dins:

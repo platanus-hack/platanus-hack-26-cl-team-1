@@ -63,6 +63,12 @@ def load() -> list[dict]:
     return pts
 
 
+def write_none() -> dict:
+    """firms.json for a hypothetical scenario (Event.observed_fire False): an explicit empty list."""
+    (grid.OUT_DIR / "firms.json").write_text("[]")
+    return {"detections": 0, "reason": "no observed fire (hypothetical scenario)"}
+
+
 def bake() -> tuple[list[dict], dict]:
     pts = load()
     (grid.OUT_DIR / "firms.json").write_text(json.dumps(pts, separators=(",", ":")))
