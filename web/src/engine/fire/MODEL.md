@@ -1,0 +1,249 @@
+# Fire-spread engine: model notes
+
+`simulateFire(input)` (`index.ts`) returns the time the fire reaches each cell, starting from the ignitions
+and stopping at `params.horizonMin`. The formulas are in `model.ts`, and every calibration knob is in
+`FIRE_MODEL`. This is a scenario-exploration model for prevention and planning. It is not a forecast.
+
+## 1. Rate of spread on flat ground (head fire)
+
+Inputs: V is the 10 m wind (km/h), H is relative humidity (%), T is temperature (°C), DF is the drought
+factor (0..10) and C is grass curing (%).
+
+| Fuel | Model |
+|---|---|
+| FOREST (W = 20 t/ha), SHRUB (W = 12 t/ha) | McArthur Mk5 forest meter as equations (Noble et al. 1980): FFDI = 2 exp(−0.45 + 0.987 ln DF − 0.0345 H + 0.0338 T + 0.0234 V); R = 0.0012 · FFDI · W km/h |
+| GRASS | CSIRO grassland model, natural pasture (Cheney, Gould & Catchpole 1998): U < 5: R = (0.054 + 0.209 U) φM φC; U ≥ 5: R = (1.4 + 0.838 (U − 5)^0.844) φM φC km/h. MC = 9.58 − 0.205 T + 0.138 H; φM = exp(−0.108 MC) if MC < 12, otherwise 0.684 − 0.0342 MC (U < 10) or 0.547 − 0.0228 MC, never below 0 (moisture of extinction); φC = 1.12 / (1 + 59.2 exp(−0.124 (C − 50))) |
+| CROP | 0.6 × grass |
+| URBAN_LOW (intermix) | 0.5 × grass in the spec; shipped 0.25 (section 6) |
+| URBAN_DENSE (consolidated) | 0.35 × grass in the spec; shipped 0.05, and embers do not ignite it (section 6) |
+| NONE | does not burn |
+
+Then each model gets its calibration factor (`FIRE_MODEL.modelFactor`, section 6), and everything is
+multiplied by `params.rosMultiplier`.
+
+## 2. Wind and slope as one vector
+
+The slope comes from the DEM by central differences (one-sided at the grid edges). Slope is capped at 40°
+(`maxSlopeDeg`): McArthur's slope rule was fitted on slopes up to about 20°, and steeper cells in a 30 m DEM
+are cliffs, cuts or artefacts.
+
+- The wind vector is V along the direction the wind blows toward (`windFromDeg + 180`).
+- The slope gives an equivalent wind U_s = (0.069 / 0.0234) · slope° ≈ 2.95 km/h per degree, pointing
+  upslope. This makes exp(0.0234 U_s) = exp(0.069 slope), McArthur's rule that spread doubles every 10°.
+- W_eff = wind vector + U_s · (upslope unit vector), and U = |W_eff|. The head direction is the direction
+  of W_eff.
+- The head ROS is R_head = R_flat(V) · exp(0.0234 (U − V)).
+  - For McArthur fuels this equals R_flat(U), exactly as specified.
+  - For grass-based fuels it applies McArthur's slope rule: ×2 per 10° upslope with the wind, ÷2 per 10°
+    downslope.
+  - **This deviates from the spec on purpose.** The spec fed U into Cheney's wind curve. With that, a 10°
+    slope in calm air would make grass spread about 150× faster, and a wind blowing straight downhill
+    would almost stop it.
+
+## 3. Fire shape
+
+- Length-to-breadth ratio: LB = 1 + 8.729 (1 − exp(−0.030 U))^2.155 (Alexander 1985), with U = |W_eff|.
+- Eccentricity: e = √(1 − 1/LB²).
+- Spread at angle φ from the head: R(φ) = R_head (1 − e) / (1 − e cos φ). This is the polar ellipse with
+  the ignition at a focus (Van Wagner 1969).
+
+## 4. Propagation
+
+The engine runs a minimum-travel-time search (Finney 2002), implemented as a time-dependent Dijkstra over
+typed arrays with an indexed binary heap (`heap.ts`).
+
+- **Stencil:** 16 neighbours, made of the 8 adjacent cells and 8 knight moves.
+- **Settling a cell:** when a cell settles at time t, its head ROS, direction and eccentricity come from the
+  weather at t. The weather is linearly interpolated, wind direction along the shorter arc, and held
+  constant outside the series.
+- **Travel time:** each neighbour gets travel time = distance / R(φ), using the source cell's ellipse.
+- **Unburnable cells:** NONE and firebreak cells never burn.
+- **Knight moves:** both cells the move passes between must be burnable.
+- **Diagonal moves:** a diagonal may not cut a corner between two unburnable cells, so 8-connected
+  firebreak lines are watertight. This rule is an addition to the spec.
+- **Outputs:** `arrivalMin` (Infinity if the fire never arrives), `rosMPerMin` (head ROS at arrival, 0 if
+  unburned), `burnedCells`, `elapsedMs`.
+
+### Grid anisotropy and "anchors" (an addition to the spec)
+
+A 16-direction stencil leaves gaps of up to 26.6° between move directions. With an elongated ellipse
+(e ≈ 0.97 at 30 km/h), a head that points between two stencil directions has to zig-zag. On those
+zig-zag moves R(φ) drops to about 55 % of R_head, so the head runs about 45 % slower depending only on how
+the wind lines up with the grid.
+
+The fix is any-angle relaxation in the style of Theta* (Nash et al. 2007):
+
+- Every cell remembers its anchor, the cell whose ellipse gave it its time.
+- When a neighbour j is relaxed from cell i, the engine also tries the straight line from i's anchor a,
+  using a's ellipse: t_a + |aj| / R_a(φ_aj).
+- This only applies while j and a have the same fuel, |aj| ≤ 8 cells (`anchorMaxCells`), and the head at
+  i stays within 25 % ROS and 20° of the head at a. Otherwise the chain restarts at i.
+- Topology is unchanged: j must still be a legal neighbour of i.
+
+`bench.ts` measures how far the head gets as a fraction of R·t, on flat grass with a 30 km/h wind. The
+bearings 90°, 63.4° and 45° are stencil directions; 76.7° and 54° lie between them.
+
+| Head bearing | 90° | 76.7° | 63.4° | 54° | 45° |
+|---|---|---|---|---|---|
+| With anchors | 1.00 | 0.96 | 0.99 | 0.97 | 0.99 |
+| Plain 16-neighbour stencil | 1.00 | 0.56 | 0.98 | 0.73 | 0.99 |
+
+`index.test.ts` checks the 76.7° case. Set `anchorMaxCells = 0` to get the plain spec behaviour.
+
+## 5. Spotting
+
+Spotting runs only when `params.spotting` is on. It starts from settled cells whose fuel has `spotSource`
+(shipped: FOREST and SHRUB) when the 10 m wind (not the slope) is at least 15 km/h.
+
+- **Jump edges:** they go downwind, ±1 cell sideways, to burnable cells whose fuel has `spotTarget` (every
+  burnable fuel except URBAN_DENSE, the consolidated city) from 3 cells away up to
+  D_max = `spotMetresPerKmh` · V · `spotDistanceFactor` metres (the factor is 1 for every fuel as shipped).
+- **Travel time:** 4 min + 10 min · d / D_max.
+- **Crossing breaks:** jumps skip the cells in between, so embers cross a firebreak narrower than D_max.
+  `index.test.ts` checks that a 60 m break stops the fire without spotting and is crossed with spotting
+  in a 45 km/h wind.
+
+**Source-intensity gate (an addition to the spec):** only cells whose head ROS is at least
+`spotMinSourceRosMPerMin` (15 m/min) throw embers.
+
+- Without the gate, spotting is deterministic from every eligible cell. It then moves the front downwind at
+  about D_max / 14 min ≈ 0.86 · V m/min whatever the fuel moisture, and it keeps going all night as long as
+  the wind is above 15 km/h.
+- On the real domain, the ungated version burned 52,969 ha against a 9,467 ha scar.
+- Set the gate to 0 to get the spec behaviour.
+
+## 6. Calibration (`calibrate.ts`)
+
+Run `pnpm exec tsx src/engine/fire/calibrate.ts`, or add `--scan` for a grid search. It uses the baked
+dataset, the historical ERA5 weather (direction corrected, see below), the two preset ignitions and the UI horizon (midnight). It scores the burned
+cells against the Sentinel-2 scar, ignoring no-data cells.
+
+`pnpm validate` runs it and writes `public/data/validation.json`, which the app's "Validación" section shows.
+Numbers measured on 2026-11-22 00:25 (scar 9,467 ha; Dice = F1 = 2·IoU/(1+IoU)):
+
+| Setup | Dice | IoU | Burned by 06:00 |
+|---|---|---|---|
+| Spec as written (model factors 1, no gate), spotting on | 0.30 | 0.18 | 52,969 ha |
+| McArthur ×3, grass ×0.25, gate 15 m/min, spotting 12 m per km/h, wind ×1 | 0.46 | 0.30 | 9,057 ha |
+| Spotting 25 m per km/h, urban as spec (×0.5 / ×0.35, urban embers on) | 0.52 | 0.35 | 20,226 ha |
+| Spotting 25, URBAN_LOW ×0.25, URBAN_DENSE ×0.05, no embers from urban cells, scored at 00:00 (before the urban fix below) | 0.57 | 0.40 | 15,576 ha |
+| **Shipped:** the above + WUI fuel split, no embers on consolidated city, ERA5 direction −10°, scored at **00:00** | **0.63** | 0.46 | 18,043 ha (by 00:00) |
+
+- **Spotting 25 m per km/h** (≈ 700 m at the afternoon's 28 km/h): with 12 m per km/h the western front was
+  still ~9 km south of Viña del Mar at 18:30, while the real fire was in Villa Independencia around then
+  (press reports). Eucalyptus spotting of 0.5–2 km is common, so 700 m is conservative. The model has no
+  suppression, so it keeps spreading at night; the simulation therefore stops at midnight (`horizonMin` 12 h).
+
+### Where in the city it burns (fix of 2026-11-22, 01:30)
+
+**Diagnosis.** With the previous defaults the model reached 21,339 buildings by midnight but only 1,875 of the
+6,505 inside the scar. Two causes, measured with scratch scripts and confirmed by `calibrate.ts`:
+
+1. **The western head went NNE instead of N.** ERA5 blows from 195–207° in the afternoon, so the downwind
+   embers (which drive the spread: with spotting off the fire covers 2,473 ha) pushed the head toward ~20°,
+   into flat, dense Quilpué at 18:00–19:00. The scar's main axis from Las Tablas is ~5°, and the FIRMS
+   northernmost points lie at 1–10°; the real fire ran to El Salto and the Jardín Botánico (17:00–18:00) and
+   crossed into El Olivar and Villa Independencia (burning at 18:30). No other gridded model shows a more
+   southerly wind (GFS, ICON, GEM, UKMO, JMA, ARPEGE all 190–225°:
+   https://historical-forecast-api.open-meteo.com/v1/forecast?latitude=-33.17,-33.10,-33.04&longitude=-71.51,-71.50,-71.50&start_date=2024-02-02&end_date=2024-02-02&hourly=wind_speed_10m,wind_direction_10m&models=gfs_global,icon_global,gem_global,ukmo_global_deterministic_10km,jma_gsm,meteofrance_arpege_world&timezone=America%2FSantiago),
+   and the Concón airport METAR (SCVM) reads 220° at 16:00–18:00
+   (https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py?station=SCVM&data=drct&data=sknt&year1=2024&month1=2&day1=2&year2=2024&month2=2&day2=3&tz=America%2FSantiago&format=onlycomma).
+2. **Interior city blocks burned like the wildland-urban interface.** Embers landed on any burnable cell, so
+   12,911 of the 19,464 out-of-scar buildings were in cells reached through an ember landing on an urban cell.
+   Burned urban cells sit next to vegetation: URBAN_DENSE cells inside the scar have a median 0.24 share of
+   shrub/forest within ±210 m and are 60 m from it; the ones wrongly burned in Quilpué, 0.04 and 180 m. The
+   previous split by roof coverage could not see that (3,663 of the 6,505 in-scar buildings were "dense").
+
+**Fixes, all from pre-fire inputs plus global scalars:**
+
+- **Fuel layer (`pipeline/steps/wui.py`):** built-up cells are split by the vegetation within 180 m
+  (WorldCover 2021 + Sentinel-2 NDVI of 2024-01-18): ≥ 40 % green → URBAN_LOW, *intermix*; otherwise
+  URBAN_DENSE, *consolidated*. Inside the scar 41 % of buildings are now intermix (11 % before); outside, 20 %.
+  The scar is never read by the pipeline.
+- **Embers do not ignite consolidated city** (`spotTarget: false` on URBAN_DENSE); intermix keeps them. Damage
+  studies support the asymmetry: in seven central-Chile WUI fires, damage odds rose within ~60 m of vegetation
+  (Aguirre et al. 2024, https://nhess.copernicus.org/articles/24/1521/2024/); in Australian fires the chance of
+  destruction falls with distance from bushland and the furthest destroyed homes are usually < 700 m in
+  (Chen & McAneney 2004, https://ui.adsabs.harvard.edu/abs/2004GeoRL..3112212C/abstract). Spread rates stay
+  as before (intermix 0.25 × grass, consolidated 0.05 × grass).
+- **ERA5 wind direction −10°** (`ERA5_WIND_DIR_CORRECTION_DEG`, applied to the historical series only, shown
+  in the wind hint of the panel). This is **one fitted scalar, not an observation**: it stands in for terrain
+  channelling along the N–S quebradas that a 0.25° reanalysis cannot resolve, and the only nearby station
+  contradicts it (see above).
+
+**Before / after** (`pnpm validate`, horizon 00:00, scar 9,467 ha; anchors = first arrival within 300 m):
+
+| Setup | Dice | Model ha | Buildings reached | In scar (recall) | Precision (≤ 120 m) | FIRMS | J. Botánico / Pompeya / El Olivar / V. Independencia | Objective |
+|---|---|---|---|---|---|---|---|---|
+| Before (roof split, embers everywhere, ERA5 as is) | 0.571 | 15,576 | 21,339 | 1,875 (0.29) | 0.09 (–) | 203/237 | 20:26 / 18:07 / never / never | – |
+| Only the wind correction removed (0°) | 0.575 | 15,408 | 15,768 | 1,875 (0.29) | 0.12 (0.39) | 203/237 | 20:26 / 18:12 / never / never | 0.461 |
+| Only embers allowed back on consolidated | 0.626 | 18,187 | 32,725 | 5,914 (0.91) | 0.18 (0.49) | 206/237 | 18:23 / 18:04 / 19:14 / 19:36 | 0.595 |
+| **Shipped** | **0.628** | 18,043 | **28,119** | **5,423 (0.83)** | **0.19 (0.52)** | 206/237 | 18:23 / 18:04 / 19:14 / 19:36 | **0.599** |
+| Reported (press, CIGIDEN) | – | 9,467 | – | 6,505 | – | – | ~17:00 / 18:10 / < 18:30 / ~18:30 | – |
+
+"Objective" = mean of Dice, building F1, FIRMS share and a timing score (1 at the reported time, 0 at 2 h off).
+`calibrate.ts --scan` (wind −20…0°, intermix ×0.25/0.5/1, embers on consolidated yes/no, McArthur ×2/3/4) puts
+−15°/×0.25 at 0.602, −10°/×0.25 at 0.599 and −10°/×0.5 at 0.597: the optimum is flat, so the shipped values
+keep the old spread factors and the smaller rotation. −5° falls to 0.473 and 0° to 0.460: the result hinges
+on the rotation. Precision is "share of reached buildings inside the scar"; the scar misses houses in
+built-up cells (the Copernicus EMSR715 grading counts 333 ha of residential damage where the scar marks 225 ha
+of built-up land, https://rapidmapping.emergency.copernicus.eu/backend/dashboard-api/public-activations/?code=EMSR715),
+so the "≤ 120 m" column is the fairer reading.
+
+**Honest caveats.**
+
+- In-sample: the rotation and the urban rule were chosen on this same fire.
+- The western head is ~45–65 min late at El Olivar / Villa Independencia and ~80 min late at the Jardín
+  Botánico; the model's speed is ~40 m/min throughout, while the real head crawled until ~16:30 and then ran
+  ~100 m/min.
+- The eastern fire (preset at 14:17) still burns sideways: 5,745 ha against ~1,300 ha of scar there, 4,756
+  buildings reached of which 357 are in the scar.
+- The model has no suppression, so precision stays low: about 28,000 buildings are reached against roughly
+  6,000 homes destroyed (MINVU's preliminary count, 21 Feb 2024: 6,019 homes with non-repairable damage,
+  https://www.minvu.gob.cl/noticia/ministro-montes-presenta-primeros-lineamientos-de-la-estrategia-de-reconstruccion-para-las-comunas-afectadas-por-los-incendios-en-la-region-de-valparaiso/).
+
+- **McArthur ×3:** Project Vesta (Cheney et al. 2012) found that the Mk5 meter under-predicts summer
+  spread in dry eucalypt forest by about 2–3×.
+- **Grass ×0.25:** fitted to the scar. Much of the domain's WorldCover "grassland" is grazed or sparse
+  cover, which spreads slower than Cheney's natural pasture.
+- **Scope of the scores:** these IoUs measure agreement with one historical event under one reanalysis
+  weather series. They are not an accuracy figure for predictions.
+
+## 7. Performance (`bench.ts`)
+
+`pnpm exec tsx src/engine/fire/bench.ts` runs a synthetic 464 × 529 grid of 60 m cells, with mixed fuels,
+hills and a diurnal wind, on Node 26 on the author's laptop. It reports the median of 7 runs:
+
+| Run | Time | Cells burned |
+|---|---|---|
+| Default params | 30 ms | 14 % |
+| Spotting off | 14 ms | |
+| Worst case (rosMultiplier 6) | 136 ms | 73 % |
+| Worst case without anchors | 103 ms | |
+
+On the real dataset a run takes 20–130 ms.
+
+## 8. Known limitations
+
+- The weather is a single point (ERA5), with no terrain-channelled winds and no gusts. The −10° direction
+  correction (section 6) is a fitted stand-in for channelling, not an observation.
+- Spotting is deterministic: there is no ember probability and no long-range spotting beyond D_max.
+- Structures are modelled as a grass fraction, in two classes (intermix / consolidated). There is no
+  building-to-building ignition model.
+- Time-dependent Dijkstra assumes FIFO, meaning leaving later never arrives earlier. This holds only
+  approximately when the weather changes quickly.
+- With anchors, a cell's time can be slightly underestimated where the straight line from its anchor
+  clips the corner of a firebreak or NONE cell. The topology is never affected.
+- Slope makes the fire very elongated upslope, with LB up to about 7 at 20°, so fire backs down slopes very
+  slowly.
+
+## References
+
+- Alexander, M.E. (1985). Estimating the length-to-breadth ratio of elliptical forest fire patterns. Proc. 8th Conf. Fire and Forest Meteorology, 287–304.
+- Cheney, N.P., Gould, J.S., Catchpole, W.R. (1998). Prediction of fire spread in grasslands. Int. J. Wildland Fire 8(1), 1–13.
+- Cheney, N.P., Gould, J.S., McCaw, W.L., Anderson, W.R. (2012). Predicting fire behaviour in dry eucalypt forest in southern Australia. Forest Ecology and Management 280, 120–131.
+- Finney, M.A. (2002). Fire growth using minimum travel time methods. Can. J. For. Res. 32, 1420–1424.
+- Nash, A., Daniel, K., Koenig, S., Felner, A. (2007). Theta*: any-angle path planning on grids. AAAI-07.
+- Noble, I.R., Bary, G.A.V., Gill, A.M. (1980). McArthur's fire-danger meters expressed as equations. Aust. J. Ecol. 5, 201–203.
+- Rothermel, R.C. (1972). A mathematical model for predicting fire spread in wildland fuels. USDA For. Serv. Res. Pap. INT-115.
+- Van Wagner, C.E. (1969). A simple fire-growth model. Forestry Chronicle 45, 103–104.

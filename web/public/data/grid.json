@@ -1,0 +1,20 @@
+{
+ "rows": 464,
+ "cols": 529,
+ "latMax": -32.965,
+ "lonMin": -71.625,
+ "dLat": 0.0005389867049946101,
+ "dLon": 0.0006433250032750409,
+ "cellM": 60,
+ "t0": "2024-02-02T12:00:00-03:00",
+ "sources": {
+  "Relieve": "Copernicus DEM GLO-30 (ESA / Airbus), tiles S33/S34 W072 vía AWS Open Data (https://registry.opendata.aws/copernicus-dem/). © DLR e.V. 2010-2014 y © Airbus Defence and Space GmbH 2014-2018, provisto bajo COPERNICUS por la Unión Europea y ESA.",
+  "Cobertura de suelo / combustible": "ESA WorldCover 10 m 2021 v200 (https://esa-worldcover.org/), © ESA WorldCover project 2021 / Contiene datos Copernicus Sentinel modificados (2021), CC BY 4.0. Clase mayoritaria por celda de 60 m. Zonas urbanas divididas en interfaz (casas entre vegetación: >= 40 % de vegetación en 180 m, según WorldCover y NDVI de Sentinel-2 del 18-01-2024, previo al incendio) y ciudad consolidada (el resto).",
+  "Edificaciones": "Overture Maps Foundation, buildings, release 2026-11-18.0 (https://overturemaps.org/), ODbL 1.0 (incluye OpenStreetMap y huellas derivadas de Microsoft y Google). Huellas actuales, no necesariamente las de febrero de 2024.",
+  "Calles": "© OpenStreetMap contributors, vía Overpass API (https://www.openstreetmap.org/copyright), ODbL 1.0. Red actual, no necesariamente la de febrero de 2024.",
+  "Meteorología": "Open-Meteo Historical Weather API (reanalysis based on ECMWF ERA5 / ERA5-Land), punto -33.10, -71.49, horario local America/Santiago. https://open-meteo.com/ (CC BY 4.0)",
+  "Cicatriz del incendio": "Copernicus Sentinel-2 L2A (ESA), escenas S2B 2024-01-18 y S2A 2024-02-12, tile 19HBD, vía Element84 Earth Search (https://earth-search.aws.element84.com/v1). dNBR > 0.27 (0.15 en zonas urbanas). Huella final del evento (2-4 feb). Contiene datos Copernicus Sentinel modificados (2024), licencia abierta Copernicus.",
+  "Detecciones satelitales de fuego": "NASA FIRMS (Fire Information for Resource Management System), detecciones VIIRS S-NPP / NOAA-20 375 m y MODIS 1 km, archivo por país (Chile 2024). https://firms.modaps.eosdis.nasa.gov/ (datos NASA, uso libre con atribución)",
+  "Focos predefinidos": "Ubicaciones aproximadas según primeras detecciones satelitales (NASA FIRMS VIIRS); hora del foco Las Tablas según reportes de prensa (CIPER, Cooperativa). No son datos oficiales."
+ }
+}

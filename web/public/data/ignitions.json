@@ -1,0 +1,18 @@
+[
+ {
+  "id": "las-tablas-penuelas",
+  "label": "Las Tablas / Lago Peñuelas (aprox.)",
+  "lon": -71.50828,
+  "lat": -33.19439,
+  "timeLocal": "2024-02-02T12:05",
+  "source": "Hora: detección ~12:06 por torre de CONAF reportada por prensa (CIPER; Cooperativa 2024-02-02: inicio cerca del mediodía en Fundo Las Tablas, junto a la Reserva Nacional Lago Peñuelas). Ubicación aprox., según primeras detecciones satelitales (extremo sur del primer cúmulo NASA FIRMS VIIRS, 14:47)."
+ },
+ {
+  "id": "quilpue-villa-alemana-oriente",
+  "label": "Foco Quilpué / Villa Alemana (aprox., según primeras detecciones satelitales)",
+  "lon": -71.32568,
+  "lat": -33.10165,
+  "timeLocal": "2024-02-02T14:17",
+  "source": "Aprox., según primeras detecciones satelitales: centroide del cúmulo NASA FIRMS VIIRS de las 14:47 y hora estimada 30 min antes. Coincide con el incendio de Lo Moscoso, que se declaró a las 13:46 según Wikipedia en español (https://es.wikipedia.org/wiki/Gran_incendio_de_Valpara%C3%ADso_de_2024) y La Tercera."
+ }
+]

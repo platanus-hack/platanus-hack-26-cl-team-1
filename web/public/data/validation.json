@@ -1,0 +1,46 @@
+{
+  "note": "Defaults as shipped, ERA5 wind x1 with the calibrated direction correction, spotting on, preset ignitions; burned by the horizon vs the Sentinel-2 scar (final footprint, no-data cells ignored). In-sample: the model factors and the wind correction were fitted on this same fire.",
+  "evalTime": "2024-02-03T00:00",
+  "dice": 0.628,
+  "iou": 0.458,
+  "precision": 0.479,
+  "recall": 0.913,
+  "modelHa": 18043,
+  "scarHa": 9467,
+  "runMs": 67,
+  "firmsReached": {
+    "reached": 206,
+    "total": 237
+  },
+  "buildings": {
+    "reached": 28119,
+    "inScar": 5423,
+    "scarTotal": 6505,
+    "recall": 0.834,
+    "precision": 0.193,
+    "precisionWithin120m": 0.521
+  },
+  "anchors": [
+    {
+      "name": "Jardín Botánico",
+      "reported": "17:00",
+      "model": "18:23"
+    },
+    {
+      "name": "Pompeya Sur",
+      "reported": "18:10",
+      "model": "18:04"
+    },
+    {
+      "name": "El Olivar",
+      "reported": "18:30",
+      "model": "19:14"
+    },
+    {
+      "name": "Villa Independencia",
+      "reported": "18:30",
+      "model": "19:36"
+    }
+  ],
+  "windDirCorrectionDeg": -10
+}

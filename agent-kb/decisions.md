@@ -5,12 +5,6 @@ with a pointer to their replacement; nothing is ever deleted from §3.
 
 ## §1 In force
 
-### D-001 — Pivot to a general step-by-step task supervisor (2026-11-21)
-- **Context:** Circuito Vivo's Modo Armado was already a supervisor for one task (wiring a circuit). The
-  team wants the general version: any task as a recipe, simulated or real video, a VLM, a controller, voice.
-- **Decision:** build the supervisor described in `docs/VISION.md`.
-- **Consequences:** the previous product stops being developed; its PR #8 (hackathon metadata) is superseded.
-
 ### D-002 — Start from an empty tree; reuse the old code through git history (2026-11-21)
 - **Context:** the old code is large (500+ files) and most of it (circuit sim, Blockly, compile) is irrelevant;
   a few pieces (camera streaming, VLM serving, TTS queue, QLoRA) are directly reusable.
@@ -32,10 +26,66 @@ with a pointer to their replacement; nothing is ever deleted from §3.
 - **Decision:** identifiers, comments, docs and agent-kb in English; every user-visible string and the voice in Spanish.
 - **Consequences:** prompts that generate spoken text must ask for Spanish output.
 
-### D-005 — Providers available: Claude for tasks, ElevenLabs for voice, own RTX 3090 (2026-11-21)
-- **Context:** the team has access to the Claude API, the ElevenLabs API and the 3090 server.
-- **Decision:** Claude generates and revises task recipes; ElevenLabs does TTS; heavy models (VLM, training) run on the 3090.
-- **Consequences:** see `docs/RESEARCH.md` for models and costs.
+### D-019 — Pivot to Cortafuego, a wildfire and evacuation scenario simulator (2026-11-21)
+- **Context:** late Saturday the team judged Ojo (the camera supervisor, D-001) weak for the Simulations track:
+  the flight simulator was bolted on, and the track was already full of agent/what-if simulators on maps of
+  Chile (the prediction-market favourites Sub50, santiaguito.cl and Agarra la pala are all in it). A research
+  pass (past Platanus winners, the 47 other Santiago repos, Bogotá's Simulations track, simulation startups,
+  Chilean open data) found that nobody at the event simulates physical, interactive phenomena such as fire.
+- **Decision:** replace the whole tree with **Cortafuego**: a static web app that replays the 2 Feb 2024 fire in
+  Viña del Mar / Quilpué / Villa Alemana on real open data (Copernicus DEM, ESA WorldCover, Overture/OSM
+  buildings and streets, Open-Meteo/ERA5 weather, NASA FIRMS, a Sentinel-2 burn scar) and lets the user change
+  wind, humidity, temperature, drought, ignitions, firebreaks, the alert time and evacuation routes.
+  - Fire: McArthur Mk5 forest / CSIRO grassland rate of spread, slope + wind as one vector, elliptical spread,
+    minimum-travel-time propagation on a 60 m grid, ember spotting.
+  - Evacuation: latest-departure search on the street graph per mode (foot/car), lognormal preparation time,
+    free flow (no congestion yet).
+  - Everything runs in the browser (Web Worker); the data is baked once by `pipeline/` into `web/public/data/`.
+  - The shared contract is `web/src/engine/types.ts` (replaces the pydantic `contracts/` package of D-009).
+- **Consequences:** D-001, D-005 and D-008 to D-018 are superseded (moved to §3); D-002 (old code lives in git
+  history, last Ojo commit `a2a871e`), D-003, D-004, D-006 and D-007 stay. The GPU box, vLLM, the WebSocket
+  server and the box CD (`cd-demo.yml`) are gone; the public link must be a static host. Tone rule in CLAUDE.md:
+  prevention framing, no claims about the official alert without a source.
+
+### D-020 — CI is just Lint + Test; no agent reviewers, no auto-merge (2026-11-22)
+- **Context:** the Cortafuego PR (#48) replaced the whole tree, and GitHub refuses the diff of a PR over 300
+  files, so both reviewer jobs failed before reviewing anything. `main` has no branch protection or required
+  checks, so `auto-merge.yml` never armed a PR either (it only arms a PR GitHub reports as BLOCKED). With hours
+  left, the team wants the classic setup.
+- **Decision:** `.github/workflows/ci.yml` has two jobs:
+  - **Lint:** ruff on `pipeline/`, `tsc` on `web/`.
+  - **Test:** pytest on `pipeline/`, vitest and the production build on `web/`.
+  Removed: `code-review.yml`, its helpers (`scripts/ci/`), `docs/PR_REVIEW_FOCUS.md`, `auto-merge.yml`, the
+  `CI OK` aggregate and the actionlint job. This supersedes D-006 and D-007 (moved to §3).
+- **Consequences:** PRs are merged by hand once Lint and Test are green. Nothing checks workflow files any more.
+
+### D-021 — Urban fuels split by nearby vegetation; cue-driven evacuation; calibrated ERA5 wind rotation (2026-11-22)
+- **Context:** the first build reached ~21k buildings by midnight but only 1,875 of the 6,505 inside the real
+  Sentinel-2 scar, and reported ~9,700 households cut off with an 18:00 alert. Diagnosis: the head went NNE into
+  Quilpué (ERA5 wind 204–207°) instead of N into El Olivar / Villa Independencia; almost all urban burning came
+  from embers landing on consolidated city; burned buildings sit within ~240 m of shrub/forest (none beyond 480 m).
+- **Decision (contract: `types.ts`):**
+  - `URBAN_LOW` now means **intermix** (built-up with ≥ 40 % green share over 180 m, from WorldCover 2021 and
+    pre-fire Sentinel-2 NDVI of 2024-01-18) and `URBAN_DENSE` means **consolidated**; `pipeline/steps/wui.py`
+    writes `fuel.bin`. Embers do not land on consolidated cells (`spotTarget` in `FIRE_MODEL`).
+  - `EvacParams` gains `cueShare` (0.65) and `cueRadiusM` (900 m): that share of households starts its response
+    when the fire comes within that distance, if earlier than the official alert (NIST TN 2103, Kincade).
+  - The historical ERA5 wind direction is rotated −10° (`ERA5_WIND_DIR_CORRECTION_DEG`): one fitted scalar, not
+    an observation (the nearby Concón station reads 220°), shown as such in the UI.
+- **Consequences:** buildings in the scar reached 1,875 → 5,423 (83 %), Dice 0.571 → 0.628, cut-off households
+  at an 18:00 alert 9,719 → 4,753; but total buildings reached rose to 28,119 (precision 0.19) and the counts
+  swing from a third to 3× under ±20 % wind. The UI now calls them "hogares con la salida cortada" and says the
+  absolute numbers are an exposure ceiling (no firefighting, no rescue); the pitch compares scenarios. Scar and
+  FIRMS are used only to score and to pick global scalars (in-sample, disclosed).
+
+## §2 Open
+
+- **D-?? Public deploy target** for the static site (`web/dist`): Vercel or Render (both event sponsors) from
+  a personal mirror, or GitHub Pages (needs a repo admin to enable Pages).
+
+## §3 Superseded
+
+_Moved here by D-019 (pivot to Cortafuego): D-001, D-005, D-008 to D-018. Moved by D-020: D-006, D-007._
 
 ### D-006 — CI with one aggregate check, and two agent reviewers on every PR (2026-11-21)
 - **Context:** several people and agents push PRs in parallel overnight; nobody has time to review everything,
@@ -63,6 +113,17 @@ with a pointer to their replacement; nothing is ever deleted from §3.
   the merge. Drafts are how to hold a PR. Needs a repo admin to enable "Allow auto-merge" and set the protection
   (until then the workflow refuses to arm). Merges made with `GITHUB_TOKEN` trigger no `push` run, so CI on `main`
   only runs on the next PR or by hand (`workflow_dispatch`). Workflow changes take effect only once merged.
+
+### D-001 — Pivot to a general step-by-step task supervisor (2026-11-21)
+- **Context:** Circuito Vivo's Modo Armado was already a supervisor for one task (wiring a circuit). The
+  team wants the general version: any task as a recipe, simulated or real video, a VLM, a controller, voice.
+- **Decision:** build the supervisor described in `docs/VISION.md`.
+- **Consequences:** the previous product stops being developed; its PR #8 (hackathon metadata) is superseded.
+
+### D-005 — Providers available: Claude for tasks, ElevenLabs for voice, own RTX 3090 (2026-11-21)
+- **Context:** the team has access to the Claude API, the ElevenLabs API and the 3090 server.
+- **Decision:** Claude generates and revises task recipes; ElevenLabs does TTS; heavy models (VLM, training) run on the 3090.
+- **Consequences:** see `docs/RESEARCH.md` for models and costs.
 
 ### D-008 — Ownership by workstream (2026-11-21)
 - **Context:** three people plus agents in parallel; without owners, agents edit the same files.
@@ -237,15 +298,3 @@ with a pointer to their replacement; nothing is ever deleted from §3.
   Overlapping windows mean each brief action is seen by several calls. Accuracy per call is unchanged (same
   prompt); whether it catches more of the real actions needs a labelled live run.
 
-## §2 Open (decide in block 1, see docs/VISION.md)
-
-- **D-?? Demo scenario.** Direction: physical assembly in robotics (a contact who assembles robots will give a
-  testimonial and a pitch framing). Exact task to pick when their input arrives; candidates in `docs/VISION.md`
-  § Demo scenario. Build task-agnostic until then.
-- **D-?? M_VL labeller/fallback.** Main model decided (D-012); proposal: a Gemini Flash-class API as labeller/fallback.
-- **D-?? Visual simulator.** Proposal: Runway Gen-4.5 image-to-video (and Aleph for mistake variants) per step,
-  starting from photos of our real setup; local Wan 2.2 as fallback. Budget to agree.
-
-## §3 Superseded
-
-_None yet._
