@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { DEFAULT_FIRE_PARAMS } from './engine/fire'
 import { DEFAULT_EVAC_PARAMS } from './engine/evac'
-import { awayShare, DEFAULT_PRESENCE_PARAMS, peopleInBurnedArea } from './engine/population'
+import { awayShare, peopleInBurnedArea } from './engine/population'
 import { POPULATION_DAY, TIMELINE, type PopulationDay, type TimelineId } from './engine/types'
 import type { Dataset } from './data/load'
 import { loadRealDataset } from './data/load'
@@ -382,10 +382,10 @@ function Explorer({
   // Where people are, by time of day (src/engine/population): each burned cell counted at its arrival time.
   const wall0 = useMemo(() => wallClockMin(t0), [t0])
   const people = useMemo(
-    () => (fire && data.population ? peopleInBurnedArea(fire.arrivalMin, data.population.home, data.population.work, wall0, DEFAULT_PRESENCE_PARAMS, populationDay) : null),
+    () => (fire && data.population ? peopleInBurnedArea(fire.arrivalMin, data.population.home, data.population.work, wall0, data.event.presence.params, populationDay) : null),
     [fire, data, wall0, populationDay],
   )
-  const awayNow = awayShare(wall0 + Math.floor(clock), DEFAULT_PRESENCE_PARAMS, populationDay)
+  const awayNow = awayShare(wall0 + Math.floor(clock), data.event.presence.params, populationDay)
   const summary: Summary | null =
     fire && evac && (people || !data.population)
       ? {

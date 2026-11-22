@@ -97,6 +97,7 @@ export function SourcesModal({ data, onClose }: { data: Dataset; onClose: () => 
             {fmtDec(ev.personsPerHousehold.value)} personas por hogar ({sourceOf(ev.personsPerHousehold.source)}); {Math.round(ev.footShare.value * 100)} % de
             los hogares a pie ({sourceOf(ev.footShare.source)}).
           </li>
+          {data.event.presence.source && <li>Quiénes están fuera de casa según día y hora en este incendio: {data.event.presence.source}</li>}
         </ul>
 
         <h3>Limitaciones</h3>

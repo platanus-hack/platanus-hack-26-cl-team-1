@@ -41,8 +41,6 @@ Owner in brackets once someone takes an item. Project: Cortafuego (D-019). The O
 - [ ] Ensemble (perturbed wind and spotting) for a burn-probability map and a range on the counts.
 - [ ] **Fit on both fires** (Viña + Eaton, D-030): out of sample the Viña calibration overburns Eaton ~2.6×; tune
   the spread factors on both together, keep a fit only if Viña does not get worse. [Anaís + agent]
-- [ ] Eaton population layer (WorldPop USA + GHSL; US time-of-day assumptions: ATUS, ACS B08302; LAUSD and PUSD
-  were in session on 7 Jan 2025). [Anaís + agent]
 - [ ] Eaton firefighters (LA County LMS stations; Pasadena FD apparatus from its 2025 Standards of Cover; LACoFD
   publishes counts only). [Anaís + agent]
 - [ ] Score Eaton buildings against CAL FIRE DINS (`dins.json`, 9,419 destroyed) instead of scar cells.
@@ -53,6 +51,11 @@ Owner in brackets once someone takes an item. Project: Cortafuego (D-019). The O
 - [ ] Any comuna: bake the data for another bounding box from the same pipeline.
 
 ## Done
+- [x] **Eaton population layer**: regional bake (GHSL GHS-POP 2025 residents, since WorldPop USA cannot be read by
+  window; NRES volume and the same gravity model on the grid + 60 km); LA County shares (ACS 2020-2024) and the
+  Pasadena Unified calendar as Eaton's presence parameters. Branch `feat/eaton-population`. [Anaís + agent]
+- [ ] Check Eaton's GHS-POP residents against the Census (24,145 inside the perimeter; Altadena CDP has 15,092
+  households x 2.70 per ACS) and try WorldPop USA when it can be downloaded.
 - [x] **Every fire company of Chile with its trucks** (D-031): 1,256 compañías (JNB catastro 2025), documented fleets
   for 330, the rest matched to the JNB register 2025 per region and type. Branch `feat/bomberos-chile-dataset`.
   [Anaís + agent]

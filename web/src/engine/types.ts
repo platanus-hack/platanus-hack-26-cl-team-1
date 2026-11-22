@@ -523,6 +523,8 @@ export interface PresenceParams {
   /** Share of students at school on a school day, by local hour. */
   schoolSchedule: [number, number][]
   /** School term [month (1-12), day] start and end, both inclusive, and the winter break inside it. */
+  /** [month, day] dates, inclusive. A range whose start is after its end crosses New Year (a northern-hemisphere
+   *  school year, August to June; a winter break from December to January). */
   schoolTerm: { start: [number, number]; end: [number, number]; winterBreak: [[number, number], [number, number]] }
 }
 

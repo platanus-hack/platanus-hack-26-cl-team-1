@@ -5,7 +5,8 @@
 import { DEFAULT_EVAC_PARAMS } from '../engine/evac'
 import { DEFAULT_FIRE_PARAMS } from '../engine/fire'
 import { ERA5_WIND_DIR_CORRECTION_DEG } from '../engine/fire/model'
-import { TIMELINE, type TimelineId } from '../engine/types'
+import { checkPresenceParams, DEFAULT_PRESENCE_PARAMS } from '../engine/population'
+import { TIMELINE, type PresenceParams, type TimelineId } from '../engine/types'
 
 export const EVENT_IDS = [TIMELINE.VINA_2024, TIMELINE.EATON_2025, TIMELINE.TALCA] as const
 export type EventId = (typeof EVENT_IDS)[number]
@@ -38,6 +39,29 @@ export interface EventDef {
   }
   /** Calendar of the real date, for the population section (Spanish), or null. */
   calendarNote: string | null
+  /** Who is out at work or school by time of day (src/engine/population), and where those shares come from
+   *  (Spanish, for "Fuentes"; null = the Chilean assumptions documented in engine/population/MODEL.md). */
+  presence: { params: PresenceParams; source: string | null }
+}
+
+/** Eaton: Los Angeles County shares (US Census, ACS 2020-2024 5-year: population B01003 9,808,667; workers 16+
+ *  B08301 4,687,090, of whom 801,832 worked from home, so commuters 3,885,258 = 0.396 of the population;
+ *  enrolled in school B14001 2,382,781 = 0.243). Pasadena Unified (Altadena and Pasadena) 2024-25 calendar:
+ *  winter break 23 Dec to 3 Jan, second semester from 6 Jan, so classes were on for Tuesday 7 Jan 2025; the
+ *  term's start and end dates are approximate (mid-August to mid-June). Hours: the Chilean assumptions. */
+const EATON_PRESENCE: PresenceParams = {
+  workerShare: 0.396,
+  studentShare: 0.243,
+  workSchedule: DEFAULT_PRESENCE_PARAMS.workSchedule,
+  schoolSchedule: DEFAULT_PRESENCE_PARAMS.schoolSchedule,
+  schoolTerm: {
+    start: [8, 15],
+    end: [6, 15],
+    winterBreak: [
+      [12, 23],
+      [1, 3],
+    ],
+  },
 }
 
 export const EVENTS: Record<EventId, EventDef> = {
@@ -54,13 +78,14 @@ export const EVENTS: Record<EventId, EventDef> = {
       footShare: { value: DEFAULT_EVAC_PARAMS.footShare, source: null },
     },
     calendarNote: 'La fecha real del escenario fue un viernes de vacaciones de verano.',
+    presence: { params: DEFAULT_PRESENCE_PARAMS, source: null },
   },
   [TIMELINE.EATON_2025]: {
     id: TIMELINE.EATON_2025,
     dir: 'eaton-2025/',
     horizonMin: 18 * 60, // 18:00 on 7 Jan to 12:00 on 8 Jan (Pacific time): the first night and morning
     windDirCorrectionDeg: 0,
-    layers: { brigades: false, population: false },
+    layers: { brigades: false, population: true },
     observedFire: true,
     evac: {
       // 19:25: the first evacuation orders (east of Lake Avenue). West of Lake the first order came at 03:25.
@@ -79,7 +104,12 @@ export const EVENTS: Record<EventId, EventDef> = {
           'supuesto derivado: a pie solo los hogares sin vehículo, 570 de 15.092 en Altadena (3,8 %; US Census, ACS 2020-2024, tabla B08201); no se encontró una encuesta de cómo evacuaron los hogares en el incendio Eaton',
       },
     },
-    calendarNote: null,
+    calendarNote: 'La fecha real fue un martes con clases (Pasadena Unified volvió de vacaciones el 6 de enero).',
+    presence: {
+      params: EATON_PRESENCE,
+      source:
+        'Condado de Los Ángeles, US Census ACS 2020-2024 (5 años): trabajan fuera de casa 3.885.258 personas (tabla B08301, sin contar a quienes trabajan desde casa) de 9.808.667 habitantes (B01003), 39,6 %; estudian 2.382.781 (B14001), 24,3 %. Calendario de Pasadena Unified 2024-25 (vacaciones de invierno del 23 dic al 3 ene, https://resources.finalsite.net/images/v1721079687/pusdus/olmfqhmifggjwi9ilv0c/OfficialSchoolYearCalendar2024-25.pdf); inicio y fin del año escolar aproximados. Horarios de trabajo y de clases: los mismos supuestos que en Chile.',
+    },
   },
   [TIMELINE.TALCA]: {
     id: TIMELINE.TALCA,
@@ -95,6 +125,7 @@ export const EVENTS: Record<EventId, EventDef> = {
       footShare: { value: DEFAULT_EVAC_PARAMS.footShare, source: null },
     },
     calendarNote: 'El día de referencia, 8 de febrero de 2025, fue un sábado.',
+    presence: { params: DEFAULT_PRESENCE_PARAMS, source: null },
   },
 }
 
@@ -115,5 +146,6 @@ export function checkEvent(e: EventDef): EventDef {
   for (const [k, v] of nums) if (!Number.isFinite(v)) throw new Error(`Evento ${e.id}: "${k}" no está definido`)
   if (e.evac.footShare.value < 0 || e.evac.footShare.value > 1) throw new Error(`Evento ${e.id}: "evac.footShare" fuera de 0..1`)
   if (e.evac.alertMin.value < 0 || e.evac.alertMin.value > e.horizonMin) throw new Error(`Evento ${e.id}: la alerta queda fuera del horizonte`)
+  checkPresenceParams(e.presence.params)
   return e
 }

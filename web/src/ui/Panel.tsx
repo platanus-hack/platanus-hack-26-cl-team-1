@@ -2,9 +2,9 @@ import type { Dataset } from '../data/load'
 import VALIDATION from '../../public/data/validation.json'
 import EATON_VALIDATION from '../../public/data/eaton-2025/validation.json'
 import type { EventId } from '../data/events'
-import type { PopulationDay, WeatherSeries } from '../engine/types'
+import type { PopulationDay, PresenceParams, WeatherSeries } from '../engine/types'
 import { POPULATION_DAY, TIMELINE } from '../engine/types'
-import { dayKind, STUDENT_SHARE, WORKER_SHARE, type BurnedAreaPeople } from '../engine/population'
+import { dayKind, type BurnedAreaPeople } from '../engine/population'
 import { LAG_CAP_MIN } from '../engine/fire/pacing'
 import { minToDateLabel, minToHHMM, localToMin, wallClockMin } from '../data/time'
 import type { BrigadesOut, EvacOut, FireOut } from '../worker/protocol'
@@ -84,8 +84,8 @@ const DOW_ES = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes',
 
 /** How the presence model's own calendar treats the scenario's date, e.g. "El modelo trata el viernes 2 feb 2024
  *  como día hábil sin clases (...)". It is the model's assumption: holidays are not modelled. */
-function scenarioDayText(t0: string): string {
-  const k = dayKind(wallClockMin(t0))
+function scenarioDayText(t0: string, params: PresenceParams): string {
+  const k = dayKind(wallClockMin(t0), params)
   const what = !k.weekday ? 'fin de semana, con todos en casa' : k.school ? 'día hábil con clases' : 'día hábil sin clases'
   return `El modelo trata el ${DOW_ES[k.dow]} ${minToDateLabel(t0, 0)} como ${what} (calendario escolar aproximado, sin feriados).`
 }
@@ -527,12 +527,13 @@ function EvacuacionSection(p: Props) {
 }
 
 function PopulationControls(p: Props) {
+  const presence = p.data.event.presence.params
   return (
     <>
       <Segmented label="Día que se supone para la población" options={POPULATION_DAY_OPTIONS} value={p.populationDay} onChange={p.setPopulationDay} />
       <div className="muted small">
-        De noche y los fines de semana todos en casa; un día hábil, quienes trabajan ({pct(WORKER_SHARE)}) y estudian ({pct(STUDENT_SHARE)},
-        solo en periodo de clases) pasan el día en su trabajo o estudio. {scenarioDayText(p.data.grid.t0)} Cambia el conteo de personas donde llega
+        De noche y los fines de semana todos en casa; un día hábil, quienes trabajan fuera de casa ({pct(presence.workerShare)}) y estudian ({pct(presence.studentShare)},
+        solo en periodo de clases) pasan el día en su trabajo o estudio. {scenarioDayText(p.data.grid.t0, presence)} Cambia el conteo de personas donde llega
         el fuego, no la evacuación de los hogares.
       </div>
       <Toggle label="Mostrar personas a esta hora" checked={p.layers.poblacion} onChange={(v) => p.setLayer('poblacion', v)} sub="Personas por celda de 60 m a la hora del reloj" />
@@ -656,8 +657,7 @@ function EatonNote() {
   return (
     <div className="alert info timeline-note">
       <b>Incendio Eaton</b> (Altadena y Pasadena, California), 7 de enero de 2025 desde las 18:00 hasta el mediodía del 8, hora del Pacífico. Mismos
-      datos abiertos y mismo modelo que en Viña del Mar, sin ajustes para este incendio: sirve para ver si el modelo se generaliza. Aún sin bomberos ni
-      población por hora.
+      datos abiertos y mismo modelo que en Viña del Mar, sin ajustes para este incendio: sirve para ver si el modelo se generaliza. Aún sin bomberos.
     </div>
   )
 }

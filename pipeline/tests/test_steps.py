@@ -324,3 +324,16 @@ def test_perimeter_rasterises_cell_centres(restore_default_event):
     assert got[10:13, 20:24].all()
     with pytest.raises(RuntimeError, match="Polygon"):
         perimeter.rasterize({"type": "Point", "coordinates": [w, n]})
+
+
+def test_population_modes():
+    from dataclasses import replace
+
+    eaton, vina = events.EVENTS["eaton-2025"], events.EVENTS["vina-2024"]
+    # Outside Chile: the two grid layers from the regional model, never the national product.
+    assert eaton.population_regional
+    assert {"population_home.bin", "population_work.bin"} <= set(eaton.outputs)
+    assert not any(f.startswith("national/") for f in eaton.outputs)
+    assert "national/population_cl.bin" in vina.outputs and not vina.population_regional
+    with pytest.raises(ValueError, match="population_regional"):
+        replace(eaton, population=False)

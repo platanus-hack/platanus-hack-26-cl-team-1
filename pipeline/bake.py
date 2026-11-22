@@ -41,11 +41,8 @@ def sources(ev: events.Event) -> dict[str, str]:
     """grid.json "sources" of an event (dataset -> citation, shown on the "Fuentes" panel)."""
     out = dict(ev.sources)
     if ev.population:
-        out["Población por hora"] = population.SOURCE
+        out["Población por hora"] = population.REGIONAL_SOURCE if ev.population_regional else population.SOURCE
     return out
-
-
-SOURCES = sources(events.EVENTS[events.DEFAULT])
 
 
 def validate_outputs() -> None:
@@ -110,7 +107,8 @@ def validate_outputs() -> None:
             a = raw(name, "<f4", n)
             if not np.isfinite(a).all() or (a < 0).any():
                 raise AssertionError(f"{name}: negative or non-finite values")
-        population.load_national()  # raises on a missing or inconsistent national product
+        if not grid.EVENT.population_regional:
+            population.load_national()  # raises on a missing or inconsistent national product
     if grid.EVENT.perimeter:
         if not np.isin(raw("perimeter.bin", "u1", n), [0, 1]).all():
             raise AssertionError("perimeter.bin: values outside {0, 1}")
@@ -177,7 +175,8 @@ def main() -> int:
         summary["scar"] = step("scar (all no data: no observed fire)", scar.write_no_data)
         summary["ignitions"] = step("ignitions (fixed presets)", ignitions.bake, [])
     if ev.population:
-        summary["population"] = step("population (from the committed national product)", population.bake_domain)
+        how = "regional gravity model" if ev.population_regional else "from the committed national product"
+        summary["population"] = step(f"population ({how})", population.bake_domain)
     if ev.observed_fire:
         _, summary["goes"] = step("goes", goes.bake)
     if ev.perimeter:
