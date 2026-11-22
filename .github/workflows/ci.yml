@@ -1,6 +1,6 @@
 name: CI
 
-# Two checks: lint and test. D-020.
+# Two validation checks on PRs; deploy main only after both pass. D-020, D-023.
 on:
   pull_request:
   push:
@@ -70,3 +70,47 @@ jobs:
           pnpm install --frozen-lockfile
           pnpm test
           pnpm build
+
+  deploy:
+    name: Deploy to Render
+    needs: [lint, test]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: cortafuego-production
+      cancel-in-progress: false
+    steps:
+      - name: Skip superseded commits
+        id: current
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          latest="$(gh api "repos/${REPOSITORY}/commits/main" --jq '.sha')"
+          if [[ "$latest" == "$GITHUB_SHA" ]]; then
+            echo 'deploy=true' >> "$GITHUB_OUTPUT"
+          else
+            echo "Skipping ${GITHUB_SHA}: main has advanced to ${latest}."
+          fi
+      - name: Deploy the tested commit
+        if: steps.current.outputs.deploy == 'true'
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_CORTAFUEGO_DEPLOY_HOOK }}
+        run: |
+          if [[ -z "$RENDER_DEPLOY_HOOK" ]]; then
+            echo '::error::Missing RENDER_CORTAFUEGO_DEPLOY_HOOK repository secret.'
+            exit 1
+          fi
+          case "$RENDER_DEPLOY_HOOK" in
+            'https://api.render.com/deploy/srv-dc170amc6qcc73covp10?key='*) ;;
+            *) echo '::error::Unexpected Render service deploy hook.'; exit 1 ;;
+          esac
+          # No verbose output or automatic POST retries: keep the key secret and avoid duplicate deploys.
+          status="$(curl --fail --silent --show-error --max-time 60 \
+            --request POST --output /dev/null --write-out '%{http_code}' \
+            "${RENDER_DEPLOY_HOOK}&ref=${GITHUB_SHA}")"
+          case "$status" in
+            200|202) echo "Render accepted deployment of ${GITHUB_SHA} (HTTP ${status})." >> "$GITHUB_STEP_SUMMARY" ;;
+            *) echo "::error::Unexpected Render response: HTTP ${status}."; exit 1 ;;
+          esac

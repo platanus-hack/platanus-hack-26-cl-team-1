@@ -8,6 +8,8 @@ writes exactly that and re-reads every file at the end to check it against the c
 cd pipeline
 uv run python bake.py            # ~8 s with a warm cache; ~3-4 min from scratch (see below)
 uv run python bake.py --refresh  # wipe the download cache first and re-download everything
+uv run python bake_population.py # national population product + the grid's two layers (~25 s warm, ~80 MB cold)
+uv run python population_report.py  # totals and day/night checks quoted in the population MODEL.md
 uv run pytest                    # unit tests for the non-trivial logic (no network)
 ```
 
@@ -40,6 +42,9 @@ Clock origin `t0 = 2024-02-02T12:00:00-03:00`.
 | `firms.json` | `FirmsPoint[]`, 2-4 Feb 2024 local | NASA FIRMS (VIIRS, MODIS) |
 | `ignitions.json` | `IgnitionPreset[]` | FIRMS first detections + press reports |
 | `brigades.json` | `BrigadesFile`: fire companies, trucks, dispatch, reinforcements, road cuts | **Curated by hand** (not baked): OpenStreetMap fire stations + press; see `web/src/engine/brigade/MODEL.md` |
+| `population_home.bin` | Float32 residents per cell | WorldPop 2024 (constrained, 100 m) |
+| `population_work.bin` | Float32 people per cell if every resident is at work or school | WorldPop 2024 + GHSL GHS-BUILT-V NRES 2025, gravity model |
+| `national/population_cl.{json,bin}` | Both layers for all of Chile, 30" (~0.9 km), sparse (`NationalPopulationMeta`) | same |
 
 Binary files are little-endian, `rows * cols` values (except `buildings.bin`).
 
@@ -136,6 +141,20 @@ validated against the grid on load (`parseBrigades`). Positions are the OpenStre
 nodes/ways of the four cuerpos inside the grid; every count, time and cut carries its source, or `null`, which
 the app shows as "supuesto". Sources and assumptions: `web/src/engine/brigade/MODEL.md`.
 
+**Population (`steps/population.py`, `bake_population.py`).** Where people are by time of day, for all of
+Chile; the time-of-day part runs in the browser (`web/src/engine/population/MODEL.md`).
+- Residents: WorldPop 2024, constrained, 3" (`chl_pop_2024_CN_100m_R2025A_v1.tif`, 62 MB).
+- Workplaces and schools: GHSL non-residential building volume 2025, 3", twelve 10 x 10 degree tiles (R11-R15 x
+  C11-C12, R12_C8 for Rapa Nui, R12_C10 for San Félix). The tile bounds were checked by reading them.
+- Residents go to non-residential volume with an origin-constrained gravity model on a 30" grid aligned with
+  WorldPop's: kernel exp(-d / 10 km), cut at 30 km, computed by FFT in latitude bands.
+- Volume in Argentina, Bolivia and Peru is masked out (geoBoundaries gbOpen ADM0, simplified).
+- The national product is committed, so `bake.py` only refines it onto the grid (`population.bake_domain`). The
+  refinement splits each national cell over its 3" pixels, then over 6 x 6 sub-pixels binned into 60 m cells,
+  which conserves the totals.
+- `bake_population.py` re-bakes both. It also rewrites `grid.json`, which is deterministic from constants, to
+  carry the new source.
+
 ## Sources and licences
 
 - Copernicus DEM GLO-30: © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018, provided
@@ -148,6 +167,11 @@ the app shows as "supuesto". Sources and assumptions: `web/src/engine/brigade/MO
 - Open-Meteo: CC BY 4.0; ERA5 © ECMWF / Copernicus Climate Change Service. https://open-meteo.com/
 - Sentinel-2 L2A: contains modified Copernicus Sentinel data (2024). Earth Search by Element 84.
 - NASA FIRMS: NASA open data, attribution requested. https://firms.modaps.eosdis.nasa.gov/
+- WorldPop 2024 (R2025A v1): CC BY 4.0. https://www.worldpop.org/
+- GHSL GHS-BUILT-V R2023A (European Commission, Joint Research Centre): CC BY 4.0.
+  https://human-settlement.emergency.copernicus.eu/
+- geoBoundaries gbOpen ADM0 (Argentina, Bolivia, Peru): used only as a mask while baking, not redistributed.
+  https://www.geoboundaries.org/
 
 ## Known limitations
 
@@ -161,3 +185,6 @@ the app shows as "supuesto". Sources and assumptions: `web/src/engine/brigade/MO
 - The burn scar marks only cells where most pixels changed: lightly burned edges and isolated burned
   houses inside unburned blocks are missed; burned built-up area is under-detected (225 ha marked).
 - Ignition presets are approximate (see above); they are not official findings.
+- Population is a model: WorldPop is itself an estimate (19.7 M, against 18.5 M counted by Censo 2024), and
+  building volume is a proxy for jobs that under-weights old mixed-use centres (Santiago, Concepción). See
+  `web/src/engine/population/MODEL.md`.

@@ -19,7 +19,7 @@
   fire `defense`, worker two-pass, "Bomberos" panel section and map layers. 97 tests; `pnpm validate` unchanged.
 
 ## Decisions
-- D-022 (firefighting as an optional two-pass scenario layer).
+- D-026 (firefighting; renumbered from D-022 after merging main as an optional two-pass scenario layer).
 
 ## Open / blocked
 - Truck inventories per company are supuestos except Valparaíso 10ª; tank, flow, radii, rescue rate too.

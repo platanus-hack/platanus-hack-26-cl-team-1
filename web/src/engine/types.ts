@@ -332,3 +332,73 @@ export interface BrigadesFile {
   reinforcements: Reinforcement[]
   cuts: RouteCut[]
 }
+
+// ---------------------------------------------------------------------------------------------------------
+// Population: where people are by time of day (pipeline/steps/population.py, src/engine/population/)
+// ---------------------------------------------------------------------------------------------------------
+
+// population_home.bin: Float32Array(rows*cols), residents per cell: where people are at night and, in this model,
+//   all weekend (WorldPop 2024 refined onto the grid).
+// population_work.bin: Float32Array(rows*cols), where people are if every resident is at their workplace or
+//   school (gravity model to non-residential building volume, GHSL 2025). It counts commuters from outside the grid
+//   and leaves out residents who work outside it, so its total differs from home's.
+// The share of residents actually away at a given local time is PresenceParams; people in a cell at that time
+// = home + away * (work - home).
+
+/** national/population_cl.json: the same two layers for all of Chile on a 30" grid (~0.9 km), aligned with
+ *  WorldPop's 3" grid. Row 0 is the NORTH edge; cell index = r * cols + c. The binary
+ *  national/population_cl.bin holds, little-endian: Uint32 cell[n] (ascending), Float32 home[n],
+ *  Float32 work[n], Float32 nonResidentialM3[n]. Only cells with residents, workers or non-residential
+ *  buildings are stored. sum(home) == sum(work): the gravity model moves people, it does not create them. */
+export interface NationalPopulationMeta {
+  version: 1
+  lonMin: number
+  latMax: number
+  dLon: number
+  dLat: number
+  rows: number
+  cols: number
+  /** Number of stored cells. */
+  n: number
+  layout: string
+  /** Gravity kernel exp(-d / scaleM), cut at maxM (metres). */
+  commute: { scaleM: number; maxM: number }
+  totals: { home: number; work: number; stayHome: number; nonResidentialMillionM3: number }
+  source: string
+}
+
+export interface NationalPopulation {
+  meta: NationalPopulationMeta
+  cell: Uint32Array
+  home: Float32Array
+  work: Float32Array
+  nonResidentialM3: Float32Array
+}
+
+/** Who is out of home at a given local time. Piecewise-linear schedules are [hour (0..24), share 0..1] knots
+ *  in increasing hour order. Weekends (Saturday, Sunday) everyone is home. */
+export interface PresenceParams {
+  /** Employed persons / population. */
+  workerShare: number
+  /** Enrolled students (school + higher education) / population. */
+  studentShare: number
+  /** Share of workers at their workplace on a weekday, by local hour. */
+  workSchedule: [number, number][]
+  /** Share of students at school on a school day, by local hour. */
+  schoolSchedule: [number, number][]
+  /** School term [month (1-12), day] start and end, both inclusive, and the winter break inside it. */
+  schoolTerm: { start: [number, number]; end: [number, number]; winterBreak: [[number, number], [number, number]] }
+}
+
+/** Which day the population model assumes. 'real' = the simulation's own date. Closed set. */
+export const POPULATION_DAY = {
+  REAL: 'real',
+  WEEKDAY_SCHOOL: 'laboral_con_clases',
+  WEEKDAY_NO_SCHOOL: 'laboral_sin_clases',
+  WEEKEND: 'fin_de_semana',
+} as const
+export type PopulationDay = (typeof POPULATION_DAY)[keyof typeof POPULATION_DAY]
+
+// export function awayShare(localIso: string, params: PresenceParams, day?: PopulationDay): number
+// export function peopleInBurnedArea(...)  (src/engine/population/index.ts)
+// export const DEFAULT_PRESENCE_PARAMS: PresenceParams

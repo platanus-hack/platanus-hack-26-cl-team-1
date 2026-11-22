@@ -1,6 +1,8 @@
 import type { Dataset } from '../data/load'
 import VALIDATION from '../../public/data/validation.json'
-import type { WeatherSeries } from '../engine/types'
+import type { PopulationDay, WeatherSeries } from '../engine/types'
+import { POPULATION_DAY } from '../engine/types'
+import { STUDENT_SHARE, WORKER_SHARE, type BurnedAreaPeople } from '../engine/population'
 import { ERA5_WIND_DIR_CORRECTION_DEG } from '../engine/fire/model'
 import { minToHHMM, localToMin } from '../data/time'
 import type { BrigadesOut, EvacOut, FireOut } from '../worker/protocol'
@@ -16,6 +18,8 @@ export interface Summary {
   buildingsReached: number
   trappedHouseholds: number
   trappedPeople: number
+  /** People present where the fire arrives, at the time it arrives (src/engine/population). */
+  peopleReached: number
 }
 
 export interface Timings {
@@ -57,7 +61,21 @@ interface Props {
   setShowRoutes: (v: boolean) => void
   linkStart: number | null
   firmsShown: number
+  people: BurnedAreaPeople | null
+  /** Share of residents at work or school at the clock's time (0..1). */
+  awayNow: number
+  populationDay: PopulationDay
+  setPopulationDay: (d: PopulationDay) => void
 }
+
+const POPULATION_DAY_OPTIONS: { value: PopulationDay; label: string }[] = [
+  { value: POPULATION_DAY.REAL, label: 'Fecha real' },
+  { value: POPULATION_DAY.WEEKDAY_SCHOOL, label: 'Hábil con clases' },
+  { value: POPULATION_DAY.WEEKDAY_NO_SCHOOL, label: 'Hábil sin clases' },
+  { value: POPULATION_DAY.WEEKEND, label: 'Fin de semana' },
+]
+
+const pct = (x: number) => `${Math.round(x * 100)} %`
 
 function ToolButton({ tool, current, setTool, label }: { tool: Tool; current: Tool; setTool: (t: Tool) => void; label: string }) {
   const on = current === tool
@@ -141,6 +159,17 @@ export function Results(p: Props) {
           <div className="stat-value">{s ? fmtInt(s.trappedHouseholds) : '—'}</div>
           {s && <div className="stat-sub">≈ {fmtInt(s.trappedPeople)} personas</div>}
           {s && b && <Delta now={s.trappedHouseholds} base={b.trappedHouseholds} />}
+        </div>
+        <div className="stat wide">
+          <div className="stat-label">Personas donde llega el fuego, a la hora en que llega</div>
+          <div className="stat-value">{s ? fmtInt(s.peopleReached) : '—'}</div>
+          {s && p.people && (
+            <div className="stat-sub">
+              {fmtInt(p.people.residents)} viven ahí (de noche o un fin de semana). A las {minToHHMM(t0, p.clock)}, {pct(p.awayNow)} de la
+              población está en su trabajo o estudio.
+            </div>
+          )}
+          {s && b && <Delta now={s.peopleReached} base={b.peopleReached} />}
         </div>
       </div>
       <div className="muted small">
@@ -462,6 +491,14 @@ function EvacuacionSection(p: Props) {
         )}
       </div>
       <Toggle label="Mostrar rutas de evacuación" checked={p.showRoutes} onChange={p.setShowRoutes} sub="Grosor según hogares que pasan por cada calle" />
+      <div className="sub-title">Dónde está la gente</div>
+      <Segmented label="Día que se supone para la población" options={POPULATION_DAY_OPTIONS} value={p.populationDay} onChange={p.setPopulationDay} />
+      <div className="muted small">
+        De noche y los fines de semana todos en casa; un día hábil, quienes trabajan ({pct(WORKER_SHARE)}) y estudian ({pct(STUDENT_SHARE)},
+        solo en periodo de clases) pasan el día en su trabajo o estudio. La fecha real del escenario fue un viernes de vacaciones de verano. Cambia el
+        conteo de personas donde llega el fuego, no la evacuación de los hogares.
+      </div>
+      <Toggle label="Mostrar personas a esta hora" checked={p.layers.poblacion} onChange={(v) => p.setLayer('poblacion', v)} sub="Personas por celda de 60 m a la hora del reloj" />
     </Section>
   )
 }

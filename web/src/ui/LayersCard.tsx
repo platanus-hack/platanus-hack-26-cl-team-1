@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { FUEL_LABEL_ES } from '../engine/types'
 import type { FuelCode } from '../engine/types'
 import type { LayerToggles } from './MapView'
-import { FUEL_COLOURS } from './overlays'
+import { FUEL_COLOURS, POPULATION_FULL_AT } from './overlays'
 
 const ITEMS: { key: keyof LayerToggles; label: string; swatch: string }[] = [
   { key: 'fuego', label: 'Fuego', swatch: 'fire' },
@@ -14,6 +14,7 @@ const ITEMS: { key: keyof LayerToggles; label: string; swatch: string }[] = [
   { key: 'cicatriz', label: 'Cicatriz real (Sentinel-2)', swatch: 'scar' },
   { key: 'combustible', label: 'Combustible', swatch: 'fuel' },
   { key: 'bomberos', label: 'Bomberos (rutas, sitios, cortes)', swatch: 'brig' },
+  { key: 'poblacion', label: 'Personas a esta hora', swatch: 'pop' },
 ]
 
 export function LayersCard({
@@ -66,6 +67,11 @@ export function LayersCard({
                     <span className="lg line routes" /> Ruta de evacuación (grosor: hogares)
                   </>
                 )}
+              </div>
+            )}
+            {layers.poblacion && (
+              <div className="legend-row wrap">
+                <span className="lg pop-ramp" /> 1 a {POPULATION_FULL_AT}+ personas por celda de 60 m (estimación)
               </div>
             )}
             {layers.combustible && (
