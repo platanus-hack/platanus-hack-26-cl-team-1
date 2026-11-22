@@ -22,6 +22,7 @@ import { Timebar } from './ui/Timebar'
 import { LayersCard } from './ui/LayersCard'
 import { SourcesModal } from './ui/SourcesModal'
 import { Topbar } from './ui/Topbar'
+import { StartupSplash } from './ui/StartupSplash'
 
 const NEUTRAL_WEATHER: WeatherSettings = {
   mode: 'real',
@@ -183,26 +184,27 @@ export default function App() {
     }
   }, [base, choice])
 
-  if (fatal)
-    return (
+  const topbar = (onSources?: () => void) => (
+    <Topbar subtitle={subtitleFor(view?.data ?? null, timeline)} timeline={timeline} onTimeline={pickTimeline} offline={OFFLINE} onSources={onSources} />
+  )
+  const error = view?.error ?? (forecast?.status === 'error' ? forecast.message : null)
+  let content: ReactNode
+  if (fatal) {
+    content = (
       <div className="fullscreen-msg">
         <h1>Cortafuego</h1>
         <div className="alert error">No se pudieron cargar los datos: {fatal}</div>
       </div>
     )
-  if (!base)
-    return (
+  } else if (!base) {
+    content = (
       <div className="fullscreen-msg">
         <h1>Cortafuego</h1>
         <p className="muted">Cargando terreno, combustibles, edificaciones y calles…</p>
       </div>
     )
-  const topbar = (onSources?: () => void) => (
-    <Topbar subtitle={subtitleFor(view?.data ?? null, timeline)} timeline={timeline} onTimeline={pickTimeline} offline={OFFLINE} onSources={onSources} />
-  )
-  if (!view || !view.data || !choice) {
-    const error = view?.error ?? (forecast?.status === 'error' ? forecast.message : null)
-    return (
+  } else if (!view || !view.data || !choice) {
+    content = (
       <div className="app">
         {topbar()}
         {notice && <div className="banner">{notice}</div>}
@@ -225,9 +227,22 @@ export default function App() {
         </div>
       </div>
     )
+  } else {
+    // A new timeline (or a new day's forecast) remounts the explorer: a fresh scenario, clock, map and worker.
+    content = <Explorer key={`${view.data.timeline} ${view.data.grid.t0}`} data={view.data} choice={choice} topbar={topbar} notice={notice} />
   }
-  // A new timeline (or a new day's forecast) remounts the explorer: a fresh scenario, clock, map and worker.
-  return <Explorer key={`${view.data.timeline} ${view.data.grid.t0}`} data={view.data} choice={choice} topbar={topbar} notice={notice} />
+  const ready = Boolean(base && view?.data && choice)
+  return (
+    <StartupSplash
+      ready={ready}
+      failed={Boolean(fatal || (base && !ready && error))}
+      message={!base
+        ? 'Cargando terreno, vegetación, edificaciones y calles…'
+        : ready ? 'Preparando el escenario…' : 'Descargando el pronóstico del tiempo de hoy…'}
+    >
+      {content}
+    </StartupSplash>
+  )
 }
 
 function Explorer({
