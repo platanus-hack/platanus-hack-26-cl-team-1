@@ -325,7 +325,8 @@ export function MapView(props: Props) {
     setVis('links-pt', L.calles)
     setVis('bld-all', L.viviendas)
     setVis('bld-status', L.viviendas)
-    for (const id of ['brig-cuts', 'brig-routes', 'brig-sites', 'brig-stations']) setVis(id, L.bomberos)
+    // This optional overlay is not exposed in the frontend.
+    for (const id of ['brig-cuts', 'brig-routes', 'brig-sites', 'brig-stations']) setVis(id, false)
     setVis('safe', L.zonasSeguras)
     setVis('firebreaks', L.cortafuegos)
     setVis('firebreaks-casing', L.cortafuegos)

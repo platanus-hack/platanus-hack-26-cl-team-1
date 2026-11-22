@@ -11,7 +11,6 @@ import { minToDateLabel, minToEndLabel, minToHHMM, localToMin, wallClockMin } fr
 import type { BrigadesOut, EvacOut, FireOut } from '../worker/protocol'
 import type { EdgeContact } from '../engine/fire/edge'
 import { edgeStatNote } from './edgeNote'
-import { BrigadesSection } from './BrigadesSection'
 import { PlanSection } from './PlanSection'
 import { FirebreakEmberRange, type EmberRangeState } from './FirebreakEmberRange'
 import type { FirebreakWidth, Scenario, WeatherSettings } from '../worker/scenario'
@@ -189,7 +188,7 @@ export function Results(p: Props) {
           <div className="stat-value">{s && s.peopleReached !== null ? fmtInt(s.peopleReached) : '—'}</div>
           {!p.data.population && <div className="stat-sub">Aún no hay capa de población para este incendio.</div>}
           {s && p.people && (
-            <div className="stat-sub">
+            <div className="stat-sub population-note">
               {fmtInt(p.people.residents)} viven ahí (de noche o un fin de semana). A las {minToHHMM(t0, p.clock)}, {pct(p.awayNow)} de la
               población está en su trabajo o estudio.
             </div>
@@ -198,9 +197,7 @@ export function Results(p: Props) {
         </div>
       </div>
       <div className="muted small">
-        {p.scenario.brigades.enabled
-          ? 'Con bomberos simulados (sección Bomberos, con sus supuestos): las cifras absolutas siguen siendo un techo de exposición, no daños ni víctimas. Lo confiable es comparar escenarios.'
-          : 'Sin bomberos ni rescate: las cifras absolutas son un techo de exposición, no daños ni víctimas. Lo confiable es comparar escenarios.'}
+        Las cifras absolutas son un techo de exposición, no daños ni víctimas. Lo confiable es comparar escenarios.
       </div>
       <div className="base-row">
         <button type="button" className="btn small" disabled={!s || p.busy || p.simError !== null} onClick={() => s && p.setBaseline(s)}>
@@ -606,7 +603,7 @@ function OutOfSampleValidation({ event, t0 }: { event: EventId; t0: string }) {
       <p className="small">
         <strong>Prueba fuera de muestra:</strong> el modelo de fuego es el calibrado solo con el incendio de Viña del Mar 2024, sin ningún ajuste para
         este incendio. Clima real (ERA5) {v.windDirCorrectionDeg === 0 ? 'sin corrección de dirección' : `con corrección de ${fmtSigned(v.windDirCorrectionDeg)}°`},
-        focos predefinidos, sin combate del fuego.
+        focos predefinidos.
       </p>
       {v.own.at.map((a) => (
         <p key={a.timeLocal} className="small">
@@ -633,7 +630,7 @@ function VinaValidation() {
       <p className="small">
         Coincidencia con la cicatriz real (Dice, a las {VALIDATION.evalTime.slice(11)} del 3 feb):{' '}
         <strong>{Math.round(VALIDATION.dice * 100)}%</strong>. El modelo quema {VALIDATION.modelHa.toLocaleString('es-CL')} ha;
-        Sentinel-2 midió {VALIDATION.scarHa.toLocaleString('es-CL')} ha (el modelo no incluye el combate del fuego).
+        Sentinel-2 midió {VALIDATION.scarHa.toLocaleString('es-CL')} ha.
       </p>
       <p className="small">
         Detecciones satelitales del 2 feb que el fuego simulado ya alcanzó a esa hora:{' '}
@@ -646,8 +643,7 @@ function VinaValidation() {
         Edificaciones: el fuego simulado alcanza <strong>{VALIDATION.buildings.inScar.toLocaleString('es-CL')}</strong> de las{' '}
         {VALIDATION.buildings.scarTotal.toLocaleString('es-CL')} que están dentro de la cicatriz real ({Math.round(VALIDATION.buildings.recall * 100)}%). De todas
         las que alcanza ({VALIDATION.buildings.reached.toLocaleString('es-CL')}), {Math.round(VALIDATION.buildings.precision * 100)}% están dentro de la cicatriz y{' '}
-        {Math.round(VALIDATION.buildings.precisionWithin120m * 100)}% a menos de 120 m de ella: el modelo sobrestima el daño urbano porque no incluye el combate del
-        fuego.
+        {Math.round(VALIDATION.buildings.precisionWithin120m * 100)}% a menos de 120 m de ella. El modelo sobrestima la exposición urbana.
       </p>
       <p className="small">
         Ritmo del avance frente al satélite (minutos que el frente simulado va atrasado, +, o adelantado, −, respecto del frente
@@ -657,7 +653,7 @@ function VinaValidation() {
         <strong>{VALIDATION.pacing.fit.rmsAdvanceMin['las-tablas-penuelas']} min</strong> en el foco oeste y{' '}
         <strong>{VALIDATION.pacing.fit.rmsAdvanceMin['quilpue-villa-alemana-oriente']} min</strong> en el este. Hasta medianoche sube a{' '}
         {VALIDATION.pacing.fit.rmsLagMin['las-tablas-penuelas']} y {VALIDATION.pacing.fit.rmsLagMin['quilpue-villa-alemana-oriente']} min:
-        después de esa hora el fuego real dejó de avanzar y el modelo, que no incluye el combate del fuego, sigue (con estos datos se
+        después de esa hora el fuego real dejó de avanzar y el modelo sigue (con estos datos se
         ajustó el modelo). En las pasadas VIIRS y MODIS, que no se usaron para ajustar:{' '}
         {VALIDATION.pacing.test.map((x, k) => (
           <span key={`${x.time}-${x.fire}`}>
@@ -699,7 +695,7 @@ function TalcaNote() {
     <div className="alert info timeline-note">
       <b>Escenario hipotético en Talca</b> (región del Maule): no reproduce un incendio ocurrido. Usa la meteorología registrada de un día caluroso,
       seco y ventoso (8 de febrero de 2025, de 12:00 a 24:00), un punto de inicio elegido para la demostración en pastizal del valle, unos 10 km al suroeste del centro de
-      la ciudad, y el mismo modelo calibrado solo con el incendio de Viña del Mar 2024, sin validación local. Aún sin bomberos. Sirve para explorar y
+      la ciudad, y el mismo modelo calibrado solo con el incendio de Viña del Mar 2024, sin validación local. Sirve para explorar y
       planificar, no para predecir.
     </div>
   )
@@ -713,7 +709,7 @@ function TodayNote(p: Props) {
       <div className="alert info timeline-note">
         <b>Escenario hipotético de hoy en Talca</b> (región del Maule), {minToDateLabel(t0, 0)}, las 24 horas: el pronóstico del tiempo de hoy para
         este punto y <b>ningún foco</b>: ajusta el reloj y agrega los focos en el mapa («Agregar ignición»); toca un foco para quitarlo. Usa el mismo
-        modelo calibrado solo con el incendio de Viña del Mar 2024, sin validación local, y el combustible de ESA WorldCover 2021. Aún sin bomberos.
+        modelo calibrado solo con el incendio de Viña del Mar 2024, sin validación local, y el combustible de ESA WorldCover 2021.
         Sirve para explorar y planificar, no para predecir.
       </div>
     )
@@ -740,15 +736,6 @@ export function Panel(p: Props) {
         <FuegoSection {...p} />
         <CortafuegosSection {...p} />
         <PlanSection data={p.data} scenario={p.scenario} update={p.update} />
-        <BrigadesSection
-          data={p.data}
-          scenario={p.scenario}
-          update={p.update}
-          out={p.brigadesOut}
-          burnedHaEnd={p.summary?.burnedHaEnd ?? null}
-          buildingsReached={p.summary?.buildingsReached ?? null}
-          trappedHouseholds={p.summary?.trappedHouseholds ?? null}
-        />
         <EvacuacionSection {...p} />
         {!today && p.data.event.observedFire && <ValidacionSection {...p} />}
       </div>

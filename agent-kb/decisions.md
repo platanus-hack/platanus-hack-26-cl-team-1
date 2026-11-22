@@ -164,6 +164,10 @@ with a pointer to their replacement; nothing is ever deleted from §3.
   buildings reached and −62 households cut off at an 18:00 alert (`scenarios.ts`). Absolute effects rest on
   supuestos (tank, flow, radii, rescue rate): present them as comparisons between resource scenarios.
 
+- **Frontend presentation update (2026-11-22):** at the user's request, the optional firefighting section,
+  map toggle/overlays and all visible references to it are hidden. The engine, data and technical assumptions
+  remain intact and the scenario stays off by default. Exposure/scenario-comparison caveats remain visible.
+
 ### D-027 — Calibrate the pace against satellite passes; GOES-16 as a source; matorral at half of forest (2026-11-22)
 - **Context:** the validation scored the burn scar at midnight and FIRMS one-sidedly ("detections already
   reached"), which cannot see a fire that is early. A back test against satellite passes showed the western head

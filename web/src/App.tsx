@@ -95,7 +95,7 @@ const DEFAULT_LAYERS: LayerToggles = {
   firms: true,
   cicatriz: false,
   combustible: false,
-  bomberos: true,
+  bomberos: false,
   poblacion: false,
   plan: true,
 }

@@ -223,8 +223,7 @@ function PlanBody({ data, scenario, update, plan }: PlanProps & { plan: PlanFile
             la franja, la vegetación alrededor se maneja como zona urbana).
           </li>
           <li>
-            Las cifras de validación son sin bomberos ni rescate; en Resultados, también, salvo que actives Bomberos. Son hogares con la salida
-            cortada en este modelo, no muertes.
+            Las cifras representan hogares con la salida cortada en este modelo, no muertes.
           </li>
         </ul>
       </details>

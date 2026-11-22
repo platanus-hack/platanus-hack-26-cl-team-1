@@ -56,7 +56,7 @@ export function FirebreakEmberRange({ range, cellM, own }: { range: EmberRangeSt
         </>
       )}
       <div className="muted">
-        Sin bomberos. Las pavesas cruzan un cortafuego más angosto que la distancia a la que llegan. 12, 15 y 25 m por km/h son las distancias que se
+        Las pavesas cruzan un cortafuego más angosto que la distancia a la que llegan. 12, 15 y 25 m por km/h son las distancias que se
         probaron al calibrar el modelo con el incendio de Viña del Mar del 2 feb 2024; no se han comprobado en otros territorios.
       </div>
     </div>
