@@ -62,6 +62,7 @@ export function LayersCard({
                 <span className="lg dot" style={{ background: '#4ade80' }} /> Sale a tiempo
                 <span className="lg dot" style={{ background: '#fbbf24' }} /> En riesgo
                 <span className="lg dot" style={{ background: '#ef4444' }} /> Salida cortada
+                <span className="muted small">Resultado de todo el escenario, no de la hora mostrada.</span>
               </div>
             )}
             {layers.calles && (
