@@ -117,6 +117,33 @@ with a pointer to their replacement; nothing is ever deleted from §3.
   post-merge deployment is verified. D-020's Lint/Test validation and manual squash PR merge policy remain;
   automatic deployment is not automatic PR merging. No `master` branch is created or monitored.
 
+### D-024 — Population by time of day for all of Chile: two baked layers + a presence model in the browser (2026-11-22)
+- **Context:** to recreate fires anywhere in Chile at any hour, we need to know where people are: at home at
+  night and on weekends, and at work or school on weekdays. The 60 m grid only had buildings, with a fixed 2.9
+  persons per household.
+- **Decision (contract: `types.ts`):**
+  - **Data.** `pipeline/steps/population.py` bakes two layers with the same people:
+    - home: WorldPop 2024 constrained, 100 m;
+    - work: residents sent to GHSL non-residential building **volume** 2025 by an origin-constrained gravity
+      model (exp(-d / 10 km), cut at 30 km), with Argentina, Bolivia and Peru masked out.
+    - Building volume, not footprint: with footprint, Santiago's centre emptied out by day.
+  - **Files.** The national product (30", sparse, 4.1 MB) is committed in `web/public/data/national/`. The grid's
+    `population_home.bin` / `population_work.bin` are refined from it in a mass-conserving way. `make population`
+    re-bakes both; `bake.py` only refines.
+  - **Who is out, and when.** This is `src/engine/population` (`PresenceParams`, `POPULATION_DAY`), applied in the
+    browser:
+    - 50.3 % employed (INE ENE Oct-Dec 2024 / Censo 2024);
+    - 26.7 % students (Mineduc), only in term;
+    - assumed 09-18 h and 08:30-15:30 schedules with ramps;
+    - weekends at home.
+- **Consequences:**
+  - The explorer shows the people present where the fire arrives, each cell at its arrival time, and a
+    "Personas a esta hora" map layer. A day selector (real date / school weekday / weekday without classes /
+    weekend) changes only those, not the evacuation: the evacuation engine still uses 2.9 persons per building.
+  - The page downloads 2 MB more; the national file is not loaded.
+  - Known weakness: old mixed-use centres (Santiago, Concepción) are under-weighted as job centres
+    (`pipeline/population_report.py`).
+
 ## §2 Open
 
 - Verify the first CI-gated Render deployment after merging the deployment workflow (D-023).

@@ -9,8 +9,10 @@ is not a prediction and it does not judge who was responsible. Track: Simulation
 - **Read first:** this file, then [agent-kb/README.md](agent-kb/README.md) (session protocol),
   `agent-kb/backlog.md` (Now), `agent-kb/decisions.md` (D-019 is the pivot) and the newest file in
   `agent-kb/sessions/`.
-- **Models:** [web/src/engine/fire/MODEL.md](web/src/engine/fire/MODEL.md) (fire spread) and
-  [web/src/engine/evac/MODEL.md](web/src/engine/evac/MODEL.md) (evacuation).
+- **Models:** [web/src/engine/fire/MODEL.md](web/src/engine/fire/MODEL.md) (fire spread),
+  [web/src/engine/evac/MODEL.md](web/src/engine/evac/MODEL.md) (evacuation) and
+  [web/src/engine/population/MODEL.md](web/src/engine/population/MODEL.md) (where people are by time of day,
+  all of Chile).
 - **Data:** [pipeline/README.md](pipeline/README.md) (sources, licences, how the files in `web/public/data/`
   are baked).
 - **Shared contract:** [web/src/engine/types.ts](web/src/engine/types.ts): data file formats, enums and the
@@ -38,6 +40,7 @@ Needs `uv` and Node 24 + `pnpm`.
 make install   # web deps (+ pipeline deps)
 make dev       # web on :5173 → http://localhost:5173
 make data      # re-bake web/public/data from the open sources (slow: downloads)
+make population  # re-bake where people are by time of day (all of Chile + the grid)
 make test      # every test suite
 make check     # what CI runs: typecheck, tests, build
 make validate  # model vs the real burn scar (prints the number used in the pitch)

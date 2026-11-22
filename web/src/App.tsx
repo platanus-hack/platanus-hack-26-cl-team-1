@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DEFAULT_FIRE_PARAMS } from './engine/fire'
 import { DEFAULT_EVAC_PARAMS } from './engine/evac'
+import { awayShare, DEFAULT_PRESENCE_PARAMS, peopleInBurnedArea } from './engine/population'
+import { POPULATION_DAY, type PopulationDay } from './engine/types'
 import type { Dataset } from './data/load'
 import { loadRealDataset } from './data/load'
 import { makeMockDataset } from './data/mock'
-import { localToMin, minToHHMM } from './data/time'
+import { localToMin, minToHHMM, wallClockMin } from './data/time'
 import { SimClient } from './worker/client'
 import type { EvacOut, FireOut } from './worker/protocol'
 import type { FirebreakWidth, Scenario, WeatherSettings } from './worker/scenario'
@@ -66,6 +68,7 @@ const DEFAULT_LAYERS: LayerToggles = {
   firms: true,
   cicatriz: false,
   combustible: false,
+  poblacion: false,
 }
 
 const TOOL_HINT: Record<Exclude<Tool, 'none'>, string> = {
@@ -133,6 +136,9 @@ function Explorer({ data }: { data: Dataset }) {
   const [simError, setSimError] = useState<string | null>(null)
   const [timings, setTimings] = useState<Timings | null>(null)
   const [baseline, setBaseline] = useState<Summary | null>(null)
+  /** Which day the population model assumes (who is home, who is at work or school). UI-only: the worker's
+   *  fire and evacuation do not depend on it. */
+  const [populationDay, setPopulationDay] = useState<PopulationDay>(POPULATION_DAY.REAL)
 
   const update = useCallback((patch: Partial<Scenario>) => setScenario((s) => ({ ...s, ...patch })), [])
   const updateWeather = useCallback((patch: Partial<WeatherSettings>) => setScenario((s) => ({ ...s, weather: { ...s.weather, ...patch } })), [])
@@ -200,13 +206,21 @@ function Explorer({ data }: { data: Dataset }) {
   const sorted = useMemo(() => (fire ? sortedArrivals(fire.arrivalMin) : null), [fire])
   const cellHa = (data.grid.cellM * data.grid.cellM) / 10000
   const burnedHaNow = sorted ? countAtOrBefore(sorted, clock) * cellHa : 0
+  // Where people are, by time of day (src/engine/population): each burned cell counted at its arrival time.
+  const wall0 = useMemo(() => wallClockMin(t0), [t0])
+  const people = useMemo(
+    () => (fire ? peopleInBurnedArea(fire.arrivalMin, data.populationHome, data.populationWork, wall0, DEFAULT_PRESENCE_PARAMS, populationDay) : null),
+    [fire, data, wall0, populationDay],
+  )
+  const awayNow = awayShare(wall0 + Math.floor(clock), DEFAULT_PRESENCE_PARAMS, populationDay)
   const summary: Summary | null =
-    fire && evac
+    fire && evac && people
       ? {
           burnedHaEnd: fire.burnedCells * cellHa,
           buildingsReached: evac.buildingsReached,
           trappedHouseholds: Math.round(evac.expectedTrappedHouseholds),
           trappedPeople: Math.round(evac.expectedTrappedPeople),
+          peopleReached: Math.round(people.present),
         }
       : null
   const firmsShown = useMemo(() => data.firms.filter((f) => localToMin(t0, f.timeLocal) <= clock).length, [data, t0, clock])
@@ -286,6 +300,7 @@ function Explorer({ data }: { data: Dataset }) {
 
   const resetScenario = useCallback(() => {
     setScenario(defaultScenario(data))
+    setPopulationDay(POPULATION_DAY.REAL)
     setTool('none')
   }, [data])
 
@@ -318,6 +333,10 @@ function Explorer({ data }: { data: Dataset }) {
     setShowRoutes,
     linkStart,
     firmsShown,
+    people,
+    awayNow,
+    populationDay,
+    setPopulationDay,
   }
 
   return (
@@ -344,6 +363,7 @@ function Explorer({ data }: { data: Dataset }) {
             evac={evac}
             safe={safe}
             clock={clock}
+            awayNow={awayNow}
             layers={effectiveLayers}
             showRoutes={showRoutes}
             terrain3d={terrain3d}
