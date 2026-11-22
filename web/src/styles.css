@@ -15,6 +15,8 @@
   --ok: #4ade80;
   --radius: 10px;
   --panel-w: 380px;
+  /* range thumb width (bigger for touch): the time bar's alert tick is placed with it */
+  --thumb: 16px;
   color-scheme: dark;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   font-size: 14px;
@@ -211,6 +213,16 @@ input {
 }
 .btn.ghost {
   background: transparent;
+}
+.btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #1a0f08;
+  font-weight: 600;
+}
+.btn.primary:hover:not(:disabled) {
+  background: #f39a5e;
+  border-color: #f39a5e;
 }
 .btn.active,
 .btn.tool.active {
@@ -887,6 +899,11 @@ input[type='range']:focus-visible {
   color: var(--text);
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
 }
+.tool-hint-actions {
+  display: flex;
+  gap: 8px;
+  flex: none;
+}
 .map-note {
   padding: 8px 12px;
   border-radius: var(--radius);
@@ -1073,13 +1090,108 @@ input[type='range']:focus-visible {
   border-color: var(--text-2) !important;
 }
 
-/* ------------------------------------------------------------------ narrow screens: bottom sheet */
-@media (max-width: 899px) {
+/* ------------------------------------------------------------------ touch and narrow screens */
+/* Copy that differs by pointer ("Haz clic" / "Toca"). */
+.coarse-only {
+  display: none;
+}
+@media (pointer: coarse) {
+  .fine-only {
+    display: none;
+  }
+  .coarse-only {
+    display: inline;
+  }
+}
+
+/* Touch as the main pointer (phones, tablets, also in the wide layout): fingers need bigger targets. */
+@media (pointer: coarse) {
   :root {
+    --thumb: 24px;
+  }
+  input[type='range'] {
+    height: 32px;
+  }
+  input[type='range']::-webkit-slider-thumb {
+    width: 24px;
+    height: 24px;
+    margin-top: -10px;
+  }
+  input[type='range']::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+  }
+  .seg button {
+    min-height: 36px;
+  }
+  .btn.small {
+    min-height: 34px;
+    padding-inline: 11px;
+  }
+  .section > summary {
+    padding: 14px 16px;
+  }
+  .layers-head {
+    padding: 11px 12px;
+  }
+  .layer-row {
+    padding: 7px 0;
     font-size: 14px;
   }
+  .layer-row input {
+    width: 18px;
+    height: 18px;
+  }
+  .toggle {
+    padding: 3px 0;
+  }
+  .switch {
+    width: 40px;
+    height: 24px;
+    border-radius: 12px;
+  }
+  .switch::after {
+    top: 3px;
+    left: 3px;
+    width: 18px;
+    height: 18px;
+  }
+  .toggle input:checked + .switch::after {
+    transform: translateX(16px);
+  }
+  /* under 16 px iOS zooms the page when a field gets focus */
+  select,
+  .stepper {
+    font-size: 16px;
+    min-height: 34px;
+  }
+  .stepper {
+    width: 52px;
+  }
+}
+
+/* The scenario picker as a native select: phones only (see the narrow block). */
+.timeline-select {
+  display: none;
+}
+
+/* Phones (below 900 px, the same width as NARROW_QUERY in ui/useMediaQuery.ts): the map fills the screen under a
+   one-row top bar, and the results, the time bar and every control live in a sheet over the bottom of the map. */
+@media (max-width: 899px) {
   .topbar {
-    padding: 8px 16px;
+    gap: 10px;
+    padding: max(8px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 8px max(12px, env(safe-area-inset-left));
+  }
+  .brand {
+    flex: none;
+  }
+  .brand h1 {
+    font-size: 17px;
+  }
+  .brand h1::before {
+    flex-basis: 28px;
+    width: 28px;
+    height: 28px;
   }
   .brand p {
     display: none;
@@ -1090,81 +1202,263 @@ input[type='range']:focus-visible {
   .topbar .short {
     display: inline;
   }
-  .topbar {
-    flex-wrap: wrap;
-    row-gap: 6px;
-  }
   .topbar-end {
+    flex: 1 1 auto;
     min-width: 0;
-    /* four scenarios + Fuentes do not fit in one row at 375 px: Fuentes wraps under the picker */
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .timeline-pick {
+    display: none;
+  }
+  .timeline-select {
+    display: block;
+    flex: 0 1 auto;
+    min-width: 0;
     max-width: 100%;
-    flex-wrap: wrap;
-    row-gap: 6px;
+    height: 36px;
+    padding: 0 30px 0 10px;
+    border-radius: 8px;
+    font-size: 16px;
+    text-overflow: ellipsis;
+    -webkit-appearance: none;
+    appearance: none;
+    background: var(--panel-3) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5l3 3 3-3' fill='none' stroke='%238a94a6' stroke-width='1.5'/%3E%3C/svg%3E") right 9px center / 12px no-repeat;
   }
   .topbar-end > .btn {
-    padding-inline: 10px;
+    height: 36px;
+    padding: 0 10px;
   }
-  .timeline-pick button {
-    padding: 6px 6px;
-    font-size: 12px;
+  .banner {
+    padding: 6px 12px;
   }
-  .main {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr) 46dvh;
-  }
-  .panel {
-    border-left: 0;
-    border-top: 1px solid var(--line);
-    border-radius: 14px 14px 0 0;
-    overflow-y: auto;
-    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.4);
-  }
-  .panel::before {
-    content: '';
+
+  .main.narrow {
     display: block;
+    position: relative;
+    min-height: 0;
+  }
+  .main.narrow .mapwrap {
+    position: absolute;
+    inset: 0;
+  }
+
+  .sheet {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 4;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding-bottom: env(safe-area-inset-bottom);
+    background: var(--panel);
+    border-top: 1px solid var(--line);
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.45);
+    transition: height 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .sheet.dragging {
+    transition: none;
+  }
+  .sheet-top {
+    flex: none;
+    border-bottom: 1px solid var(--line);
+  }
+  .sheet-grab {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 20px max(16px, env(safe-area-inset-right)) 4px max(16px, env(safe-area-inset-left));
+    border: 0;
+    background: transparent;
+    color: var(--text);
+    text-align: left;
+    cursor: grab;
+    /* the sheet follows the finger: the page must not scroll or zoom under it */
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .sheet.dragging .sheet-grab {
+    cursor: grabbing;
+  }
+  .sheet-grab:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: -2px;
+    border-radius: 16px 16px 0 0;
+  }
+  .sheet-handle {
+    position: absolute;
+    top: 8px;
+    left: 50%;
     width: 40px;
     height: 4px;
+    margin-left: -20px;
     border-radius: 2px;
-    background: var(--line);
-    margin: 8px auto 0;
-    flex: none;
+    background: #3a475b;
   }
-  .panel-scroll {
+  .sheet-summary {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .sheet-stat {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .sheet-stat b {
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 1.15;
+    font-variant-numeric: tabular-nums;
+  }
+  .sheet-stat.strong b {
+    color: #fca5a5;
+  }
+  .sheet-stat > span {
+    font-size: 11.5px;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .sheet-busy {
+    flex: none;
+    color: var(--accent);
+  }
+  .sheet-grab .chev {
+    flex: none;
+    width: 14px;
+    height: 14px;
+  }
+  .sheet[data-snap='half'] .sheet-grab .chev,
+  .sheet[data-snap='full'] .sheet-grab .chev {
+    transform: rotate(180deg);
+  }
+
+  .timebar.docked {
+    position: static;
+    max-width: none;
+    margin: 0;
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      'play clock . speed d3'
+      'scrub scrub scrub scrub scrub';
+    align-items: center;
+    column-gap: 10px;
+    row-gap: 16px;
+    padding: 4px max(16px, env(safe-area-inset-right)) 12px max(16px, env(safe-area-inset-left));
+    background: transparent;
+    backdrop-filter: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .timebar.docked .play {
+    grid-area: play;
+    width: 44px;
+    height: 44px;
+  }
+  .timebar.docked .clock {
+    grid-area: clock;
+    min-width: 0;
+  }
+  .timebar.docked .hhmm {
+    font-size: 20px;
+  }
+  .timebar.docked .scrub {
+    grid-area: scrub;
+  }
+  .timebar.docked .speed {
+    grid-area: speed;
+    height: 36px;
+    font-size: 16px;
+  }
+  .timebar.docked .d3 {
+    grid-area: d3;
+    height: 36px;
+  }
+
+  .sheet-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--line) transparent;
+  }
+  .sheet-body .panel-scroll {
     overflow: visible;
     flex: none;
   }
-  .results {
-    padding: 10px 16px;
+  .sheet .results {
+    padding: 12px 16px;
+  }
+  /* the result that matters most comes first */
+  .sheet .stat.strong {
+    order: -1;
   }
   .stat-value {
     font-size: 19px;
   }
+
+  /* map overlays: clear of the top bar's corner controls and of the sheet */
   .layers-card {
-    width: auto;
-    max-width: calc(100% - 70px);
     top: 8px;
     left: 8px;
+    width: auto;
+    max-width: calc(100% - 64px);
+    max-height: calc(100% - var(--sheet-h, 0px) - 24px);
   }
   .map-notes {
-    width: calc(100% - 16px);
-    top: auto;
-    bottom: 96px;
-  }
-  .timebar {
+    top: 52px;
+    bottom: auto;
     left: 8px;
-    right: 8px;
-    bottom: 26px;
-    gap: 8px;
-    padding: 15px 8px 6px;
+    right: 48px;
+    width: auto;
+    transform: none;
   }
-  .hhmm {
-    font-size: 18px;
+  .tool-hint {
+    flex-wrap: wrap;
   }
-  .clock {
-    min-width: 54px;
+  .tool-hint-actions {
+    margin-left: auto;
+  }
+  .main.narrow .maplibregl-ctrl-bottom-left,
+  .main.narrow .maplibregl-ctrl-bottom-right {
+    bottom: var(--sheet-h, 0px);
+    transition: bottom 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .main.narrow:has(.sheet.dragging) .maplibregl-ctrl-bottom-left,
+  .main.narrow:has(.sheet.dragging) .maplibregl-ctrl-bottom-right {
+    transition: none;
+  }
+
+  .modal {
+    width: calc(100vw - 16px);
+    max-height: calc(100dvh - 32px);
+  }
+  .modal-body {
+    padding: 16px;
   }
   .sources div {
     grid-template-columns: 1fr;
+    gap: 0;
+  }
+}
+
+/* The narrowest phones: the logo alone names the app, the scenario picker gets the room. */
+@media (max-width: 419px) {
+  .brand h1 {
+    font-size: 0;
     gap: 0;
   }
 }

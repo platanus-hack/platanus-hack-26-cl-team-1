@@ -224,7 +224,10 @@ function RiskBlock(p: Props) {
         Hogares con la salida cortada según la hora de la alerta <span className="muted">(línea: alerta a las {minToHHMM(t0, p.scenario.alertMin)})</span>
       </div>
       <RiskChart curve={p.evac.riskByAlert} alertMin={p.scenario.alertMin} t0={t0} horizonMin={p.data.horizonMin} onPick={(alertMin) => p.update({ alertMin })} />
-      <div className="muted small">Haz clic en el gráfico para probar otra hora de alerta.</div>
+      <div className="muted small">
+        <span className="fine-only">Haz clic</span>
+        <span className="coarse-only">Toca</span> en el gráfico para probar otra hora de alerta.
+      </div>
     </div>
   )
 }

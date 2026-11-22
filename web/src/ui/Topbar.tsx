@@ -44,8 +44,21 @@ export function Topbar({
             )
           })}
         </div>
+        {/* Phones: the same choice as a native picker (four buttons do not fit next to the name). */}
+        <select
+          className="timeline-select"
+          aria-label="Escenario"
+          value={timeline}
+          onChange={(e) => onTimeline(e.target.value as TimelineId)}
+        >
+          {TIMELINE_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value} disabled={offline && o.value === TIMELINE.TODAY}>
+              {o.label}
+            </option>
+          ))}
+        </select>
         {onSources && (
-          <button type="button" className="btn ghost" onClick={onSources}>
+          <button type="button" className="btn ghost sources-btn" onClick={onSources}>
             <span className="long">Fuentes y supuestos</span>
             <span className="short">Fuentes</span>
           </button>

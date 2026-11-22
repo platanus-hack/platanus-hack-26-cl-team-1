@@ -71,6 +71,12 @@ interface Props {
   onAddLink: (u: number, v: number) => void
   onLinkStart: (node: number | null) => void
   onNote: (key: string, note: string | null) => void
+  /** Points of the firebreak being drawn, whenever it changes (the tool hint shows them and offers to save). */
+  onDraft: (points: number) => void
+  /** Incremented to save the firebreak being drawn (the "Guardar" button: touch screens have no double click or Enter). */
+  finishFirebreak: number
+  /** Pixels at the bottom of the map hidden by the phone layout's bottom sheet: the initial fit keeps the grid above it. */
+  padBottom: number
 }
 
 function fc(features: Feature[]): SetDataArg {
@@ -86,6 +92,8 @@ export function MapView(props: Props) {
   const ready = useRef(false)
   const fallback = useRef(false)
   const draft = useRef<[number, number][]>([])
+  /** Re-fits the grid to the map until the user moves it (set while the map exists). */
+  const refitRef = useRef<(() => void) | null>(null)
   const linkStart = useRef<number | null>(null)
   const canvases = useRef({
     fire: document.createElement('canvas'),
@@ -205,6 +213,7 @@ export function MapView(props: Props) {
     const feats: Feature[] = pts.map((q) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: q }, properties: {} }))
     if (pts.length >= 2) feats.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: pts }, properties: {} })
     src('draft')?.setData(fc(feats))
+    p.current.onDraft(pts.length)
   }
 
   function updateIgnitions() {
@@ -571,8 +580,12 @@ export function MapView(props: Props) {
     const offline = p.current.offline
     fallback.current = offline
     if (offline) p.current.onNote('style', 'Modo sin conexión: sin mapa base ni 3D; el relieve se calcula con los datos de elevación.')
-    // leave room for the layers card (left) and the time bar (bottom) on wide screens
-    const fitPadding = () => (window.innerWidth >= 900 ? { top: 20, bottom: 90, left: 270, right: 20 } : 10)
+    // Leave room for the layers card (left) and the time bar (bottom) on wide screens; on phones, for the layers
+    // button (top), the zoom buttons (right) and the bottom sheet over the map.
+    const fitPadding = () =>
+      window.innerWidth >= 900
+        ? { top: 20, bottom: 90, left: 270, right: 20 }
+        : { top: 52, bottom: p.current.padBottom + 12, left: 10, right: 48 }
     const map = new maplibregl.Map({
       container: el.current,
       style: offline ? FALLBACK_STYLE : BASE_STYLE_URL,
@@ -604,6 +617,7 @@ export function MapView(props: Props) {
       map.resize()
       if (!userMoved) map.fitBounds(gridBounds(data.grid), { padding: fitPadding(), duration: 0 })
     }
+    refitRef.current = refit
     const resizeObserver = new ResizeObserver(refit)
     resizeObserver.observe(el.current)
     map.on('style.load', () => {
@@ -638,6 +652,7 @@ export function MapView(props: Props) {
     return () => {
       window.clearTimeout(timer)
       resizeObserver.disconnect()
+      refitRef.current = null
       ready.current = false
       map.remove()
       mapRef.current = null
@@ -740,7 +755,7 @@ export function MapView(props: Props) {
         { layers: ['roads'] },
       )
       if (feats.length === 0) {
-        p.current.onNote('tool', 'No hay una calle bajo el clic: acerca el mapa y haz clic sobre la calle.')
+        p.current.onNote('tool', 'No hay una calle en ese punto: acerca el mapa y elige la calle.')
         return
       }
       // Pick the feature whose geometry passes closest to the click.
@@ -765,7 +780,7 @@ export function MapView(props: Props) {
       if (node < 0) return
       const q = map.project(p.current.data.roads.nodes[node] as [number, number])
       if (Math.hypot(q.x - e.point.x, q.y - e.point.y) > 30) {
-        p.current.onNote('tool', 'Haz clic más cerca de una calle (acerca el mapa si hace falta).')
+        p.current.onNote('tool', 'Elige un punto más cerca de una calle (acerca el mapa si hace falta).')
         return
       }
       p.current.onNote('tool', null)
@@ -798,6 +813,15 @@ export function MapView(props: Props) {
   useEffect(updatePlan, [props.scenario.planTiles, props.scenario.planSectors])
   useEffect(updateVisibility, [props.layers])
   useEffect(updateTerrain, [props.terrain3d])
+  // The sheet's height is known only after it lays out: fit the grid above it again (until the user moves the map).
+  useEffect(() => refitRef.current?.(), [props.padBottom])
+  // Declared before the tool effect below: "Guardar" saves the draft and leaves the tool in the same render, and
+  // leaving the tool discards whatever draft is left.
+  useEffect(() => {
+    const map = mapRef.current
+    if (map && props.finishFirebreak > 0) finishFirebreak(map)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.finishFirebreak])
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
