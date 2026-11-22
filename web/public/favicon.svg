@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000" viewBox="150 120 700 700" role="img" aria-labelledby="logo-title logo-description">
+  <title id="logo-title">Cortafuego</title>
+  <desc id="logo-description">Una llama naranja atravesada por un corte diagonal que representa un cortafuegos, sobre fondo oscuro.</desc>
+  <defs>
+    <mask id="firebreak" maskUnits="userSpaceOnUse" x="0" y="0" width="1000" height="1000">
+      <rect width="1000" height="1000" fill="#FFF"/>
+      <path d="M270 604 736 442" fill="none" stroke="#000" stroke-width="46"/>
+    </mask>
+  </defs>
+  <rect id="background" width="1000" height="1000" fill="#0C1016"/>
+  <g id="symbol" transform="translate(500 480) scale(1.1) translate(-500 -480)">
+    <path id="flame" fill="#EE8A4A" mask="url(#firebreak)" d="M528 220C536 326 688 367 688 510C688 618 606 700 498 700C390 700 312 620 312 516C312 443 352 392 408 342C401 410 428 443 460 456C444 362 474 287 528 220Z"/>
+  </g>
+</svg>

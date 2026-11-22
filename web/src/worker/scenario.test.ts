@@ -73,9 +73,14 @@ describe('buildWeatherSeries', () => {
     expect(series.t0Min).toBe(-60)
     expect(series.stepMin).toBe(60)
     expect(series.samples).toHaveLength(3)
-    // Mode "real" applies the calibrated ERA5 direction correction (engine/fire/model.ts).
+    // Mode "real" applies the source's calibrated direction correction (ERA5: engine/fire/model.ts).
     expect(series.samples[1]).toEqual({ tempC: 25, rh: 30, windKmh: 20, windFromDeg: (10 + DIR + 360) % 360 })
     expect(notes).toEqual([])
+  })
+
+  it('a forecast (correction 0) keeps the wind direction as is', () => {
+    const { series } = buildWeatherSeries(weather, grid.t0, { ...neutral, windDirOffsetDeg: -20 }, 0)
+    expect(series.samples.map((x) => x.windFromDeg)).toEqual([330, 350, 10])
   })
 
   it('applies adjustments and reports the humidity clamp', () => {

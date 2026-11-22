@@ -16,7 +16,7 @@ export function Timebar(props: {
   terrainAvailable: boolean
   /** Evacuation alert time, marked on the scrubber. */
   alertMin: number
-  /** The event's horizon, minutes since t0. */
+  /** End of the timeline (minutes since t0). */
   horizonMin: number
 }) {
   const { t0, clock } = props

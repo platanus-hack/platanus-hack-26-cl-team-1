@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import { DEFAULT_FIRE_PARAMS } from './engine/fire'
 import { DEFAULT_EVAC_PARAMS } from './engine/evac'
 import { awayShare, DEFAULT_PRESENCE_PARAMS, peopleInBurnedArea } from './engine/population'
-import { POPULATION_DAY, type PopulationDay } from './engine/types'
+import { POPULATION_DAY, TIMELINE, type PopulationDay, type TimelineId } from './engine/types'
 import type { Dataset } from './data/load'
 import { loadRealDataset } from './data/load'
-import { checkEvent, DEFAULT_EVENT, eventFromSearch } from './data/events'
-import { EventPicker } from './ui/EventPicker'
 import { makeMockDataset } from './data/mock'
-import { localToMin, minToHHMM, wallClockMin } from './data/time'
+import { fetchForecast, santiagoDate, type Forecast } from './data/forecast'
+import { EATON_2025_CHOICE, isTimelineId, TIMELINE_OPTIONS, timelineDataset, VINA_2024_CHOICE, type TimelineChoice } from './data/timeline'
+import { checkEvent, EVENTS, eventOfTimeline, type EventDef, type EventId } from './data/events'
+import { localToMin, minToDateLabel, minToHHMM, wallClockMin } from './data/time'
 import { SimClient } from './worker/client'
 import type { BrigadesOut, EvacOut, FireOut } from './worker/protocol'
 import type { FirebreakWidth, Scenario, WeatherSettings } from './worker/scenario'
@@ -20,6 +22,8 @@ import type { Summary, Timings } from './ui/Panel'
 import { Timebar } from './ui/Timebar'
 import { LayersCard } from './ui/LayersCard'
 import { SourcesModal } from './ui/SourcesModal'
+import { Topbar } from './ui/Topbar'
+import { StartupSplash } from './ui/StartupSplash'
 
 const NEUTRAL_WEATHER: WeatherSettings = {
   mode: 'real',
@@ -34,10 +38,9 @@ const NEUTRAL_WEATHER: WeatherSettings = {
 }
 
 function defaultScenario(data: Dataset): Scenario {
-  const ev = data.event
-  const raw = buildWeatherSeries(data.weather, data.grid.t0, NEUTRAL_WEATHER, ev.windDirCorrectionDeg).series
-  // Constant-mode defaults: the real conditions 3 h after t0, rounded to the sliders' steps.
-  const s = sampleAt(raw, 180)
+  const raw = buildWeatherSeries(data.weather, data.grid.t0, NEUTRAL_WEATHER, data.windDirCorrectionDeg).series
+  // Constant-mode defaults: the scenario's own conditions at 15:00 that day, rounded to the sliders' steps.
+  const s = sampleAt(raw, localToMin(data.grid.t0, `${data.grid.t0.slice(0, 10)}T15:00`))
   return {
     weather: {
       ...NEUTRAL_WEATHER,
@@ -52,11 +55,11 @@ function defaultScenario(data: Dataset): Scenario {
     presetIgnitions: data.ignitions.map((g) => g.id),
     userIgnitions: [],
     firebreaks: [],
-    alertMin: ev.evac.alertMin.value,
+    alertMin: data.defaultAlertMin,
     cueShare: DEFAULT_EVAC_PARAMS.cueShare,
     cueRadiusM: DEFAULT_EVAC_PARAMS.cueRadiusM,
     prepMedianMin: DEFAULT_EVAC_PARAMS.prepMedianMin,
-    footShare: ev.evac.footShare.value,
+    footShare: data.event.evac.footShare.value,
     closedEdges: [],
     addedLinks: [],
     brigades: data.brigades ? defaultBrigades(data.brigades, data.grid.t0) : noBrigades(),
@@ -86,53 +89,199 @@ const TOOL_HINT: Record<Exclude<Tool, 'none'>, string> = {
 let uid = 0
 const newId = (p: string) => `${p}-${Date.now().toString(36)}-${uid++}`
 
+/** ?offline=1 (or ?sin-conexion): no network map services (projector without internet). */
+const OFFLINE = ['offline', 'sin-conexion'].some((k) => new URLSearchParams(window.location.search).has(k))
+
+/** URL parameter that picks the scenario (?escenario=hoy | vina-2024), so a link opens the one shared. */
+const TIMELINE_PARAM = 'escenario'
+
+/** The app opens on the scenario that starts today. Offline (projector) mode cannot download the forecast, so it
+ *  opens on the 2024 fire unless the link asks for another one. */
+function initialTimeline(): TimelineId {
+  const v = new URLSearchParams(window.location.search).get(TIMELINE_PARAM)
+  if (isTimelineId(v)) return v
+  return OFFLINE ? TIMELINE.VINA_2024 : TIMELINE.TODAY
+}
+
+/** A ?escenario value that names no scenario: shown to the user, not silently replaced. */
+function unknownTimelineParam(): string | null {
+  const v = new URLSearchParams(window.location.search).get(TIMELINE_PARAM)
+  return v !== null && !isTimelineId(v) ? v : null
+}
+
+function setTimelineParam(t: TimelineId) {
+  const url = new URL(window.location.href)
+  url.searchParams.set(TIMELINE_PARAM, t)
+  window.history.replaceState(null, '', url)
+}
+
+const timelineLabel = (t: TimelineId) => TIMELINE_OPTIONS.find((o) => o.value === t)?.label ?? t
+
+/** "de 00:00 a 24:00": the timeline's window on the wall clock (an end at midnight reads 24:00). */
+function windowLabel(data: Dataset): string {
+  const end = minToHHMM(data.grid.t0, data.horizonMin)
+  return `de ${minToHHMM(data.grid.t0, 0)} a ${end === '00:00' ? '24:00' : end}`
+}
+
+function subtitleFor(data: Dataset | null, timeline: TimelineId): string {
+  if (timeline === TIMELINE.VINA_2024) return 'Explorador de escenarios del incendio del 2 de febrero de 2024'
+  if (timeline === TIMELINE.EATON_2025) return 'Explorador de escenarios del incendio Eaton del 7 de enero de 2025 · Altadena y Pasadena, California'
+  const day = data ? ` (${minToDateLabel(data.grid.t0, 0)}, ${windowLabel(data)})` : ''
+  return `Escenario de hoy${day} con el pronóstico del tiempo`
+}
+
+type ForecastState = { status: 'loading' } | { status: 'ok'; forecast: Forecast } | { status: 'error'; message: string }
+
 export default function App() {
-  const [data, setData] = useState<Dataset | null>(null)
+  /** Baked datasets by event, each loaded the first time a timeline needs it (src/data/events.ts). */
+  const [bases, setBases] = useState<Partial<Record<EventId, Dataset>>>({})
   const [fatal, setFatal] = useState<string | null>(null)
+  const [timeline, setTimeline] = useState<TimelineId>(initialTimeline)
+  const [badParam, setBadParam] = useState<string | null>(unknownTimelineParam)
+  /** null until the today timeline is first shown (and again after "Reintentar"). */
+  const [forecast, setForecast] = useState<ForecastState | null>(null)
+  const eventId = eventOfTimeline(timeline)
+  const base = bases[eventId] ?? null
   useEffect(() => {
+    if (bases[eventId]) return
     const forceMock = new URLSearchParams(window.location.search).has('mock')
-    let event
+    let event: EventDef
     try {
-      event = checkEvent(eventFromSearch(window.location.search))
+      event = checkEvent(EVENTS[eventId])
     } catch (e) {
       setFatal(e instanceof Error ? e.message : String(e))
       return
     }
+    let live = true
     ;(forceMock ? Promise.resolve(null) : loadRealDataset(event))
       .then((real) => {
         performance.mark('cf:data')
-        // The synthetic set stands in for Viña only (its default event); another event without data is an error.
-        if (!real && event.id !== DEFAULT_EVENT && !forceMock) throw new Error(`no están los datos del evento en /data/${event.dir} (grid.json)`)
-        setData(real ?? makeMockDataset())
+        // The synthetic set stands in for Viña's files only; another event without data is an error.
+        if (!real && !forceMock && event.id !== TIMELINE.VINA_2024) throw new Error(`no están los datos de "${event.id}" en /data/${event.dir} (grid.json)`)
+        if (live) setBases((b) => ({ ...b, [eventId]: real ?? makeMockDataset() }))
       })
-      .catch((e: unknown) => setFatal(e instanceof Error ? e.message : String(e)))
+      .catch((e: unknown) => live && setFatal(e instanceof Error ? e.message : String(e)))
+    return () => {
+      live = false
+    }
+  }, [eventId, bases])
+  // The forecast is downloaded the first time the today timeline is shown, and again if it is shown on a later
+  // date than the one downloaded (a tab left open past midnight).
+  useEffect(() => {
+    if (timeline !== TIMELINE.TODAY) return
+    const stale = forecast?.status === 'ok' && forecast.forecast.date !== santiagoDate(new Date())
+    if (forecast !== null && !stale) return
+    setForecast({ status: 'loading' })
+    fetchForecast()
+      .then((f) => setForecast({ status: 'ok', forecast: f }))
+      .catch((e: unknown) => setForecast({ status: 'error', message: e instanceof Error ? e.message : String(e) }))
+  }, [timeline, forecast])
+  const pickTimeline = useCallback((t: TimelineId) => {
+    setTimeline(t)
+    setBadParam(null)
+    setTimelineParam(t)
   }, [])
-  if (fatal)
-    return (
+  // An unknown ?escenario: the address bar shows the scenario actually open (the notice says what happened).
+  useEffect(() => {
+    if (unknownTimelineParam() !== null) setTimelineParam(timeline)
+  }, [timeline])
+  const notice = badParam
+    ? `El enlace pide el escenario «${badParam}», que no existe (opciones: ${TIMELINE_OPTIONS.map((o) => o.value).join(', ')}); se muestra «${timelineLabel(timeline)}».`
+    : null
+
+  const okForecast = forecast?.status === 'ok' ? forecast.forecast : null
+  const choice = useMemo<TimelineChoice | null>(() => {
+    if (timeline === TIMELINE.VINA_2024) return VINA_2024_CHOICE
+    if (timeline === TIMELINE.EATON_2025) return EATON_2025_CHOICE
+    return okForecast ? { id: TIMELINE.TODAY, forecast: okForecast } : null
+  }, [timeline, okForecast])
+  const view = useMemo(() => {
+    if (!base || !choice) return null
+    try {
+      return { data: timelineDataset(base, choice), error: null }
+    } catch (e) {
+      return { data: null, error: e instanceof Error ? e.message : String(e) }
+    }
+  }, [base, choice])
+
+  const topbar = (onSources?: () => void) => (
+    <Topbar subtitle={subtitleFor(view?.data ?? null, timeline)} timeline={timeline} onTimeline={pickTimeline} offline={OFFLINE} onSources={onSources} />
+  )
+  const error = view?.error ?? (forecast?.status === 'error' ? forecast.message : null)
+  let content: ReactNode
+  if (fatal) {
+    content = (
       <div className="fullscreen-msg">
         <h1>Cortafuego</h1>
         <div className="alert error">No se pudieron cargar los datos: {fatal}</div>
       </div>
     )
-  if (!data)
-    return (
+  } else if (!base) {
+    content = (
       <div className="fullscreen-msg">
         <h1>Cortafuego</h1>
         <p className="muted">Cargando terreno, combustibles, edificaciones y calles…</p>
       </div>
     )
-  return <Explorer data={data} />
+  } else if (!view || !view.data || !choice) {
+    content = (
+      <div className="app">
+        {topbar()}
+        {notice && <div className="banner">{notice}</div>}
+        <div className="timeline-msg">
+          {error ? (
+            <>
+              <div className="alert error">No se pudo preparar el escenario desde hoy: {error}</div>
+              <div className="row">
+                <button type="button" className="btn" onClick={() => setForecast(null)}>
+                  Reintentar
+                </button>
+                <button type="button" className="btn ghost" onClick={() => pickTimeline(TIMELINE.VINA_2024)}>
+                  Ver el incendio del 2 feb 2024
+                </button>
+              </div>
+            </>
+          ) : (
+            <p className="muted">Descargando el pronóstico del tiempo de hoy (Open-Meteo)…</p>
+          )}
+        </div>
+      </div>
+    )
+  } else {
+    // A new timeline (or a new day's forecast) remounts the explorer: a fresh scenario, clock, map and worker.
+    content = <Explorer key={`${view.data.timeline} ${view.data.grid.t0}`} data={view.data} choice={choice} topbar={topbar} notice={notice} />
+  }
+  const ready = Boolean(base && view?.data && choice)
+  return (
+    <StartupSplash
+      ready={ready}
+      failed={Boolean(fatal || (base && !ready && error))}
+      message={!base
+        ? 'Cargando terreno, vegetación, edificaciones y calles…'
+        : ready ? 'Preparando el escenario…' : 'Descargando el pronóstico del tiempo de hoy…'}
+    >
+      {content}
+    </StartupSplash>
+  )
 }
 
-/** ?offline=1 (or ?sin-conexion): no network map services (projector without internet). */
-const OFFLINE = ['offline', 'sin-conexion'].some((k) => new URLSearchParams(window.location.search).has(k))
-
-function Explorer({ data }: { data: Dataset }) {
+function Explorer({
+  data,
+  choice,
+  topbar,
+  notice,
+}: {
+  data: Dataset
+  choice: TimelineChoice
+  topbar: (onSources: () => void) => ReactNode
+  /** Shown in the banner row (e.g. an unknown ?escenario in the link). */
+  notice: string | null
+}) {
   const t0 = data.grid.t0
-  const event = data.event
-  const HORIZON_MIN = event.horizonMin
+  const horizon = data.horizonMin
   const [scenario, setScenario] = useState<Scenario>(() => defaultScenario(data))
-  const [clock, setClock] = useState(() => Math.min(event.horizonMin, event.evac.alertMin.value))
+  // The clock opens at the default alert time (18:00), when the fire is well under way in the 2024 replay.
+  const [clock, setClock] = useState(() => Math.min(data.defaultAlertMin, data.horizonMin))
   const [playing, setPlaying] = useState(false)
   const [speed, setSpeed] = useState(15)
   const [terrain3d, setTerrain3d] = useState(false)
@@ -171,6 +320,8 @@ function Explorer({ data }: { data: Dataset }) {
 
   // ------------------------------------------------------------ simulation worker
   const client = useRef<SimClient | null>(null)
+  const scenarioRef = useRef(scenario)
+  scenarioRef.current = scenario
   useEffect(() => {
     const c = new SimClient({
       onReady: () => performance.mark('cf:ready'),
@@ -196,13 +347,15 @@ function Explorer({ data }: { data: Dataset }) {
       onError: (m) => setSimError(m),
       onBusy: setBusy,
     })
-    c.init(data.synthetic, data.event.id)
+    c.init(data.synthetic, choice)
+    // A new worker starts with the current scenario (the debounced effect below only fires on changes).
+    c.run(scenarioRef.current)
     client.current = c
     return () => {
       c.dispose()
       client.current = null
     }
-  }, [data])
+  }, [data, choice])
 
   // Re-run on any scenario change, debounced.
   useEffect(() => {
@@ -211,14 +364,14 @@ function Explorer({ data }: { data: Dataset }) {
   }, [scenario])
 
   // ------------------------------------------------------------ weather (same functions the worker uses)
-  const rawSeries = useMemo(() => buildWeatherSeries(data.weather, t0, NEUTRAL_WEATHER, event.windDirCorrectionDeg).series, [data, t0, event])
+  const rawSeries = useMemo(() => buildWeatherSeries(data.weather, t0, NEUTRAL_WEATHER, data.windDirCorrectionDeg).series, [data, t0])
   const applied = useMemo(() => {
     try {
-      return buildWeatherSeries(data.weather, t0, scenario.weather, event.windDirCorrectionDeg)
+      return buildWeatherSeries(data.weather, t0, scenario.weather, data.windDirCorrectionDeg)
     } catch (e) {
       return { series: rawSeries, notes: [`Clima inválido: ${(e as Error).message}`] }
     }
-  }, [data, t0, scenario.weather, rawSeries, event])
+  }, [data, t0, scenario.weather, rawSeries])
 
   // ------------------------------------------------------------ results
   const sorted = useMemo(() => (fire ? sortedArrivals(fire.arrivalMin) : null), [fire])
@@ -249,7 +402,7 @@ function Explorer({ data }: { data: Dataset }) {
   useEffect(() => {
     if (!playing) return
     // play from the start again once at the end
-    if (clockRef.current >= HORIZON_MIN) {
+    if (clockRef.current >= horizon) {
       clockRef.current = 0
       setClock(0)
     }
@@ -258,9 +411,9 @@ function Explorer({ data }: { data: Dataset }) {
     const tick = (now: number) => {
       const n = clockRef.current + ((now - last) / 1000) * speed
       last = now
-      if (n >= HORIZON_MIN) {
-        clockRef.current = HORIZON_MIN
-        setClock(HORIZON_MIN)
+      if (n >= horizon) {
+        clockRef.current = horizon
+        setClock(horizon)
         setPlaying(false)
         return
       }
@@ -270,7 +423,7 @@ function Explorer({ data }: { data: Dataset }) {
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
-  }, [playing, speed, HORIZON_MIN])
+  }, [playing, speed, horizon])
 
   // ------------------------------------------------------------ tools
   useEffect(() => {
@@ -288,8 +441,14 @@ function Explorer({ data }: { data: Dataset }) {
   }, [])
   useEffect(() => onNote('tool', null), [tool, onNote])
 
-  const unavailableLayers = useMemo(
-    () => new Set<keyof LayerToggles>([...(data.population ? [] : (['poblacion'] as const)), ...(data.brigades ? [] : (['bomberos'] as const))]),
+  // Layers this scenario has no data for: FIRMS in the today timeline, population and firefighters where the
+  // event does not ship them (EventDef.layers).
+  const hiddenLayers = useMemo(
+    () => [
+      ...(data.firms.length === 0 ? (['firms'] as const) : []),
+      ...(data.population ? [] : (['poblacion'] as const)),
+      ...(data.brigades ? [] : (['bomberos'] as const)),
+    ],
     [data],
   )
   const effectiveLayers = useMemo(
@@ -364,19 +523,16 @@ function Explorer({ data }: { data: Dataset }) {
 
   return (
     <div className="app">
-      <header className="topbar">
-        <div className="brand">
-          <h1>Cortafuego</h1>
-          <p>{event.subtitle}</p>
-        </div>
-        <EventPicker current={event.id} />
-        <button type="button" className="btn ghost" onClick={() => setShowSources(true)}>
-          Fuentes y supuestos
-        </button>
-      </header>
-      {data.synthetic && (
+      {topbar(() => setShowSources(true))}
+      {(data.synthetic || notice) && (
         <div className="banner">
-          <b>Datos de prueba (sintéticos)</b> · Los datos reales aún no están disponibles; el territorio, el clima y los resultados son ficticios.
+          {data.synthetic && (
+            <>
+              <b>Datos de prueba (sintéticos)</b> · Los datos reales aún no están disponibles; el territorio, el clima y los resultados son ficticios.
+            </>
+          )}
+          {data.synthetic && notice && ' · '}
+          {notice}
         </div>
       )}
       <main className="main">
@@ -402,7 +558,7 @@ function Explorer({ data }: { data: Dataset }) {
             onLinkStart={setLinkStart}
             onNote={onNote}
           />
-          <LayersCard layers={effectiveLayers} setLayer={setLayer} showRoutes={showRoutes} unavailable={unavailableLayers} />
+          <LayersCard layers={effectiveLayers} setLayer={setLayer} showRoutes={showRoutes} hide={hiddenLayers} />
           <div className="map-notes">
             {hint && (
               <div className="tool-hint" role="status">
@@ -433,7 +589,7 @@ function Explorer({ data }: { data: Dataset }) {
             setTerrain3d={setTerrain3d}
             terrainAvailable={!OFFLINE}
             alertMin={scenario.alertMin}
-            horizonMin={HORIZON_MIN}
+            horizonMin={horizon}
           />
         </div>
         <aside className="panel" aria-label="Controles del escenario">

@@ -8,7 +8,7 @@
 // detections. Runs with the event's own wind-direction correction and, for comparison, with Viña's fitted one.
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { checkEvent, EVENTS, isEventId } from '../../data/events'
+import { checkEvent, EVENT_IDS, EVENTS, type EventId } from '../../data/events'
 import { lonLatToCell } from '../../data/grid'
 import { parseBuildings, parseElevation, parseFirms, parseFuel, parseGrid, parseIgnitions, parseScar, parseWeather } from '../../data/load'
 import { localToMin, minToLocalIso } from '../../data/time'
@@ -16,8 +16,9 @@ import { buildWeatherSeries } from '../../worker/scenario'
 import type { WeatherSettings } from '../../worker/scenario'
 import { DEFAULT_FIRE_PARAMS, ERA5_WIND_DIR_CORRECTION_DEG, simulateFire } from './index'
 
-const id = process.argv[2] ?? 'eaton-2025'
-if (!isEventId(id)) throw new Error(`validate-event: unknown event "${id}"`)
+const arg = process.argv[2] ?? 'eaton-2025'
+const id = EVENT_IDS.find((e) => e === arg) as EventId | undefined
+if (!id) throw new Error(`validate-event: unknown event "${arg}" (events: ${EVENT_IDS.join(', ')})`)
 const event = checkEvent(EVENTS[id])
 if (event.id === 'vina-2024') throw new Error('validate-event: Viña is in-sample; its score comes from calibrate.ts (pnpm validate)')
 const dir = fileURLToPath(new URL(`../../../public/data/${event.dir}`, import.meta.url))
@@ -163,7 +164,7 @@ const line = (v: typeof own) =>
       return `  ${a.timeLocal}: scar Dice ${a.scar.dice} (recall ${a.scar.recall}, precision ${a.scar.precision}; model ${a.scar.modelHa} ha vs ${a.scar.observedHa} ha)${p}; buildings in scar reached ${a.buildings.inScar}/${a.buildings.scarTotal}; FIRMS ${a.firms.reached}/${a.firms.total}`
     })
     .join('\n')
-console.log(`${event.label}: out-of-sample check, ${grid.rows} x ${grid.cols} cells, t0 ${grid.t0}`)
+console.log(`${event.id}: out-of-sample check, ${grid.rows} x ${grid.cols} cells, t0 ${grid.t0}`)
 console.log(`wind correction ${own.windDirCorrectionDeg}° (the event's own), fire ${own.elapsedMs} ms\n${line(own)}`)
 if (vinaFit) console.log(`wind correction ${vinaFit.windDirCorrectionDeg}° (Viña's fit), fire ${vinaFit.elapsedMs} ms\n${line(vinaFit)}`)
 console.log(`wrote public/data/${event.dir}validation.json`)

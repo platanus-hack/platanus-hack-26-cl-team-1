@@ -100,6 +100,15 @@ export function inSchoolTerm(month: number, day: number, p: PresenceParams): boo
   return !(x >= md(...t.winterBreak[0]) && x <= md(...t.winterBreak[1]))
 }
 
+/** The calendar facts the presence model uses for a wall-clock minute: day of week (0 = Sunday), whether it is a
+ *  weekday, and whether classes are held (weekday inside the school term). Public holidays are not modelled. */
+export function dayKind(wallMin: number, p: PresenceParams = DEFAULT_PRESENCE_PARAMS): { dow: number; weekday: boolean; school: boolean } {
+  const d = new Date(wallMin * 60000)
+  const dow = d.getUTCDay()
+  const weekday = dow !== 0 && dow !== 6
+  return { dow, weekday, school: weekday && inSchoolTerm(d.getUTCMonth() + 1, d.getUTCDate(), p) }
+}
+
 /** Share (0..1) of all residents who are at work or school at that local wall-clock time. `day` replaces the
  *  real calendar: REAL uses the date's own weekday and school term; WEEKEND is everyone home. Public holidays
  *  are not modelled (they count as the weekday they fall on). */
@@ -108,12 +117,9 @@ export function awayShare(wallMin: number, p: PresenceParams = DEFAULT_PRESENCE_
   let weekday: boolean
   let school: boolean
   switch (day) {
-    case POPULATION_DAY.REAL: {
-      const dow = d.getUTCDay()
-      weekday = dow !== 0 && dow !== 6
-      school = weekday && inSchoolTerm(d.getUTCMonth() + 1, d.getUTCDate(), p)
+    case POPULATION_DAY.REAL:
+      ;({ weekday, school } = dayKind(wallMin, p))
       break
-    }
     case POPULATION_DAY.WEEKDAY_SCHOOL:
       weekday = true
       school = true

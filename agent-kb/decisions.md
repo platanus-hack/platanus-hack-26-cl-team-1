@@ -144,15 +144,6 @@ with a pointer to their replacement; nothing is ever deleted from §3.
   - Known weakness: old mixed-use centres (Santiago, Concepción) are under-weighted as job centres
     (`pipeline/population_report.py`).
 
-### D-025 — Cortafuego logo: flame and protective masonry barrier (2026-11-22)
-- **Context:** the user requested a clean, professional, firewall-related SVG and reiterated the README's
-  submission requirement: a 1000×1000 PNG under 500 KB.
-- **Decision:** use an original orange flame above a pale staggered masonry barrier on dark slate, matching
-  the UI palette, with an outlined Cortafuego wordmark. `project-logo.svg` is the vector source;
-  `project-logo.png` is the raster submission asset already referenced by the README.
-- **Consequences:** the logo is self-contained (no linked images or runtime fonts). The PNG is exactly
-  1000×1000 and 58,882 bytes, below even a decimal 500 KB limit. The README itself is unchanged.
-
 ### D-026 — Firefighting as an optional two-pass scenario layer (2026-11-22)
 - **Context:** the team wants fire companies, trucks per type and route cuts as scenario variables. No open
   dataset lists Chile's companies with their trucks, and there is no official count for 2 Feb 2024; the fire
@@ -193,13 +184,75 @@ with a pointer to their replacement; nothing is ever deleted from §3.
   McArthur ×4 is above Project Vesta's 2–3× range; all of it is in-sample except the VIIRS/MODIS test.
   Details: `web/src/engine/fire/MODEL.md` section 6.
 
+### D-028 — The app opens on a scenario that starts today; the 2024 fire is one choice in a picker (2026-11-22)
+- **Context:** the user asked for a new scenario whose timeline starts today, with existing scenarios such as
+  Viña del Mar 2024 as options, and for the app to open on the new one by default.
+- **Decision (contract: `types.ts` gains the closed set `TIMELINE` = `hoy` | `vina-2024`):**
+  - **Today** (`src/data/timeline.ts`): the same territory, buildings, streets and population layers; the
+    window is the whole day, **00:00 to 24:00** today (America/Santiago); the weather is today's hourly
+    **Open-Meteo forecast** at the weather.json point, fetched in the browser (`src/data/forecast.ts`) and
+    checked like weather.json; the two 2024 ignition points and the 18:00 default alert at the same time of
+    day; no FIRMS; the Validación section is hidden; the 2024 scar stays as a reference layer.
+  - **Each timeline has its own window** (`Dataset.horizonMin`, `defaultAlertMin`): today is 24 h; a known
+    event keeps its validated, real duration (the 2024 replay stays 12:00 to midnight, because the model has
+    no suppression and is scored at 00:00), which may be shorter or longer than 24 h.
+  - The ERA5 −10° wind-direction correction (D-021) is **not** applied to the forecast:
+    `Dataset.windDirCorrectionDeg` carries it per timeline.
+  - The fire companies (D-026) keep their 2024 dispatch, reinforcement and Ruta 68 cut times at the same time
+    of day; the cut is labelled "como el 2 feb 2024".
+  - The 2024 timeline is the baked files as they are; this decision does not change its numbers.
+  - A top-bar picker switches; `?escenario=hoy | vina-2024` opens one directly. Switching remounts the explorer
+    (fresh scenario, map and worker); the worker gets the choice in `init` and derives the same dataset.
+  - `?offline=1` opens on 2024 (the forecast needs the network). A failed or malformed forecast shows a visible
+    error with "Reintentar" and a button to the 2024 fire; nothing falls back silently.
+- **Consequences:** cortafuego.app opens on today's conditions; the pitch should link
+  `?escenario=vina-2024` for the validated replay. Today's run uses pre-2024 fuels (inside the 2024 scar it
+  assumes the vegetation before that fire, not today's burned and regrowing cover) and a drought factor of 10
+  by default: the panel says so and frames it as a comparison, not a prediction. The day-of-week sentence is
+  worded as the presence model's assumption (approximate school calendar, no holidays).
+  Open-Meteo lists uniform hours in one UTC offset for the whole request (checked across the clock changes
+  of 2025-04-06 and 2025-09-07), so around a clock change the hours can read one hour off; accepted.
+
+### D-029 — Minimal flame-and-firebreak logo, app icons and animated startup (2026-11-22)
+_Written as "D-026" in the minimal-logo, app-icons and splash-animation session logs; renumbered because
+D-026 to D-028 were taken by #54, #53 and the today scenario._
+- **Context:** after seeing D-025's flame, masonry and wordmark, the user requested a more modern,
+  minimalistic version.
+- **Decision:** simplify the identity to an icon-only orange flame interrupted by one diagonal
+  negative-space firebreak on dark slate. Remove the brick detail and lettering. This refines the same
+  prevention concept with fewer visual elements and supersedes D-025.
+- **Consequences:** `project-logo.svg` is a self-contained 969-byte vector with no external dependencies;
+  `project-logo.png` is exactly 1000×1000 and 32,473 bytes. The submission dimensions and 500 KB limit remain
+  satisfied. The symbol was visually checked at full size and 64×64.
+- **App integration:** generate the favicon SVG/ICO, Apple touch icon, regular 192/512 px app icons and a
+  separate padded maskable icon from this master with `uv run scripts/generate-icons.py` (Pillow and
+  `rsvg-convert`). Small icons use tighter canvas framing without redrawing the mark; the header reuses the
+  favicon SVG. `web/public/site.webmanifest` declares the app identity; no service worker or offline cache
+  was added.
+- **Animated startup:** the same generator exports SVG path geometry for a one-shot splash animation: the
+  flame enters, a normalized SVG mask stroke reveals the existing diagonal firebreak, and the splash fades
+  after the cut and actual dataset/forecast readiness. The app and worker initialize underneath an inert
+  overlay. Reduced motion bypasses animation; startup errors show immediately, and a skip control avoids
+  waiting for the intro. No fake progress percentage, audio, or endlessly animated flame.
+
 ## §2 Open
 
 - Verify the first CI-gated Render deployment after merging the deployment workflow (D-023).
 
 ## §3 Superseded
 
-_Moved here by D-019 (pivot to Cortafuego): D-001, D-005, D-008 to D-018. Moved by D-020: D-006, D-007._
+_Moved here by D-019 (pivot to Cortafuego): D-001, D-005, D-008 to D-018. Moved by D-020: D-006, D-007. Moved by D-029: D-025._
+
+### D-025 — Cortafuego logo: flame and protective masonry barrier (2026-11-22)
+- **Context:** the user requested a clean, professional, firewall-related SVG and reiterated the README's
+  submission requirement: a 1000×1000 PNG under 500 KB.
+- **Decision:** use an original orange flame above a pale staggered masonry barrier on dark slate, matching
+  the UI palette, with an outlined Cortafuego wordmark. `project-logo.svg` is the vector source;
+  `project-logo.png` is the raster submission asset already referenced by the README.
+- **Consequences:** the logo is self-contained (no linked images or runtime fonts). The PNG is exactly
+  1000×1000 and 58,882 bytes, below even a decimal 500 KB limit. The README itself is unchanged.
+- **Superseded by D-029:** the user requested a more modern, minimalistic revision; the brickwork and
+  wordmark were replaced with a single flame split by a negative-space firebreak.
 
 ### D-006 — CI with one aggregate check, and two agent reviewers on every PR (2026-11-21)
 - **Context:** several people and agents push PRs in parallel overnight; nobody has time to review everything,

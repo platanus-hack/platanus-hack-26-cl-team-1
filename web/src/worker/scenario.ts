@@ -6,6 +6,7 @@ import { FUEL } from '../engine/types'
 import { lonLatToCell, lonLatToColRow } from '../data/grid'
 import { localToMin } from '../data/time'
 
+
 export type WeatherMode = 'real' | 'constante'
 
 export interface WeatherSettings {
@@ -124,9 +125,10 @@ export interface WeatherBuild {
   notes: string[]
 }
 
-/** Builds the engine's WeatherSeries from weather.json and the user's settings. `dirCorrectionDeg` is the event's
- *  fitted correction of the historical wind direction (EventDef.windDirCorrectionDeg). */
-export function buildWeatherSeries(file: WeatherFile, t0: string, w: WeatherSettings, dirCorrectionDeg: number): WeatherBuild {
+/** Builds the engine's WeatherSeries from a weather file and the user's settings. `windDirCorrectionDeg` is
+ *  Dataset.windDirCorrectionDeg: the calibrated ERA5 correction for 2024 (see engine/fire/MODEL.md), 0 for a
+ *  forecast. */
+export function buildWeatherSeries(file: WeatherFile, t0: string, w: WeatherSettings, windDirCorrectionDeg: number): WeatherBuild {
   if (w.mode === 'constante') {
     if (w.rh < RH_MIN || w.rh > RH_MAX) throw new Error(`Humedad relativa fuera de rango: ${w.rh} %`)
     return {
@@ -146,8 +148,8 @@ export function buildWeatherSeries(file: WeatherFile, t0: string, w: WeatherSett
       tempC: file.tempC[i] + w.tempOffsetC,
       rh,
       windKmh: file.windKmh[i] * w.windFactor,
-      // ERA5 direction with the event's fitted correction (see engine/fire/MODEL.md), then the user's offset.
-      windFromDeg: norm360(file.windFromDeg[i] + dirCorrectionDeg + w.windDirOffsetDeg),
+      // The source's calibrated correction (ERA5 on the scar; none for a forecast), then the user's offset.
+      windFromDeg: norm360(file.windFromDeg[i] + windDirCorrectionDeg + w.windDirOffsetDeg),
     }
   })
   const notes = clamped > 0 ? [`La humedad ajustada quedó fuera de 1–100 % en ${clamped} de ${samples.length} horas; se limitó a ese rango.`] : []

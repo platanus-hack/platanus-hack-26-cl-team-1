@@ -8,14 +8,16 @@ const PAD = { l: 34, r: 28, t: 10, b: 20 }
 const IW = W - PAD.l - PAD.r
 const IH = H - PAD.t - PAD.b
 
-/** x of time t on an axis that spans 0..h minutes since t0 (h = the event's horizon). */
-function xAt(t: number, h: number) {
-  return PAD.l + (t / h) * IW
+/** x of a time (minutes since t0) on a chart spanning 0..horizonMin. */
+function xOf(t: number, horizonMin: number) {
+  return PAD.l + (t / horizonMin) * IW
 }
 
-function timeTicks(t0: string, h: number) {
+/** A label every 3 h (every 6 h on windows longer than 12 h, so the labels do not overlap). */
+function timeTicks(t0: string, horizonMin: number) {
+  const step = horizonMin > 12 * 60 ? 360 : 180
   const ticks = []
-  for (let t = 0; t <= h; t += 180) ticks.push({ t, label: minToHHMM(t0, t) })
+  for (let t = 0; t <= horizonMin; t += step) ticks.push({ t, label: minToHHMM(t0, t) })
   return ticks
 }
 
@@ -32,7 +34,7 @@ function niceMax(v: number) {
 }
 
 export function WeatherChart({ series, t0, clock, horizonMin }: { series: WeatherSeries; t0: string; clock: number; horizonMin: number }) {
-  const xOf = (t: number) => xAt(t, horizonMin)
+  const xOfT = (t: number) => xOf(t, horizonMin)
   const pts: { t: number; wind: number; rh: number }[] = []
   for (let i = 0; i < series.samples.length; i++) {
     const t = series.t0Min + i * series.stepMin
@@ -46,14 +48,14 @@ export function WeatherChart({ series, t0, clock, horizonMin }: { series: Weathe
   const wMax = niceMax(Math.max(10, ...pts.map((q) => q.wind)))
   const yW = (v: number) => PAD.t + IH - (v / wMax) * IH
   const yH = (v: number) => PAD.t + IH - (v / 100) * IH
-  const path = (f: (q: (typeof pts)[number]) => number) => pts.map((q, i) => `${i ? 'L' : 'M'}${xOf(q.t).toFixed(1)},${f(q).toFixed(1)}`).join('')
+  const path = (f: (q: (typeof pts)[number]) => number) => pts.map((q, i) => `${i ? 'L' : 'M'}${xOfT(q.t).toFixed(1)},${f(q).toFixed(1)}`).join('')
   return (
     <svg className="chart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Viento y humedad por hora">
       {[0, 0.5, 1].map((f) => (
         <line key={f} x1={PAD.l} x2={W - PAD.r} y1={PAD.t + IH * f} y2={PAD.t + IH * f} className="grid" />
       ))}
       {timeTicks(t0, horizonMin).map((k) => (
-        <text key={k.t} x={xOf(k.t)} y={H - 5} className="tick" textAnchor="middle">
+        <text key={k.t} x={xOfT(k.t)} y={H - 5} className="tick" textAnchor="middle">
           {k.label}
         </text>
       ))}
@@ -63,7 +65,7 @@ export function WeatherChart({ series, t0, clock, horizonMin }: { series: Weathe
       <text x={W - PAD.r + 4} y={PAD.t + IH} className="tick rh">0</text>
       <path d={path((q) => yH(q.rh))} className="line rh" />
       <path d={path((q) => yW(q.wind))} className="line wind" />
-      <line x1={xOf(clock)} x2={xOf(clock)} y1={PAD.t} y2={PAD.t + IH} className="marker" />
+      <line x1={xOfT(clock)} x2={xOfT(clock)} y1={PAD.t} y2={PAD.t + IH} className="marker" />
     </svg>
   )
 }
@@ -82,12 +84,12 @@ export function RiskChart({
   /** Click on the chart: choose that alert time (minutes since t0, 5-minute steps). */
   onPick?: (alertMin: number) => void
 }) {
-  const xOf = (t: number) => xAt(t, horizonMin)
   if (curve.length === 0) return <p className="muted small">Sin curva de riesgo (el motor de evacuación no la entregó).</p>
+  const xOfT = (t: number) => xOf(t, horizonMin)
   const yMax = niceMax(Math.max(1, ...curve.map((c) => c.expectedTrappedHouseholds)))
   const y = (v: number) => PAD.t + IH - (v / yMax) * IH
-  const d = curve.map((c, i) => `${i ? 'L' : 'M'}${xOf(c.alertMin).toFixed(1)},${y(c.expectedTrappedHouseholds).toFixed(1)}`).join('')
-  const area = `${d}L${xOf(curve[curve.length - 1].alertMin).toFixed(1)},${PAD.t + IH}L${xOf(curve[0].alertMin).toFixed(1)},${PAD.t + IH}Z`
+  const d = curve.map((c, i) => `${i ? 'L' : 'M'}${xOfT(c.alertMin).toFixed(1)},${y(c.expectedTrappedHouseholds).toFixed(1)}`).join('')
+  const area = `${d}L${xOfT(curve[curve.length - 1].alertMin).toFixed(1)},${PAD.t + IH}L${xOfT(curve[0].alertMin).toFixed(1)},${PAD.t + IH}Z`
   return (
     <svg
       className={`chart${onPick ? ' pickable' : ''}`}
@@ -107,7 +109,7 @@ export function RiskChart({
         <line key={f} x1={PAD.l} x2={W - PAD.r} y1={PAD.t + IH * f} y2={PAD.t + IH * f} className="grid" />
       ))}
       {timeTicks(t0, horizonMin).map((k) => (
-        <text key={k.t} x={xOf(k.t)} y={H - 5} className="tick" textAnchor="middle">
+        <text key={k.t} x={xOfT(k.t)} y={H - 5} className="tick" textAnchor="middle">
           {k.label}
         </text>
       ))}
@@ -115,7 +117,7 @@ export function RiskChart({
       <text x={PAD.l - 4} y={PAD.t + IH} className="tick" textAnchor="end">0</text>
       <path d={area} className="area risk" />
       <path d={d} className="line risk" />
-      <line x1={xOf(alertMin)} x2={xOf(alertMin)} y1={PAD.t} y2={PAD.t + IH} className="marker alert" />
+      <line x1={xOfT(alertMin)} x2={xOfT(alertMin)} y1={PAD.t} y2={PAD.t + IH} className="marker alert" />
     </svg>
   )
 }

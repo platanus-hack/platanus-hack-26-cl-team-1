@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import type { ReactElement } from 'react'
 import type { Dataset } from '../data/load'
 import { DEFAULT_EVAC_PARAMS } from '../engine/evac'
+import { TIMELINE } from '../engine/types'
 import { minToHHMM } from '../data/time'
 
 const sourceOf = (src: string | null) => (src === null ? 'supuesto' : `fuente: ${src}`)
@@ -56,7 +57,7 @@ export function SourcesModal({ data, onClose }: { data: Dataset; onClose: () => 
           ))}
           {!weatherListed && (
             <div>
-              <dt>Clima</dt>
+              <dt>{data.timeline === TIMELINE.TODAY ? 'Pronóstico (escenario desde hoy)' : 'Clima'}</dt>
               <dd>{linkify(data.weather.source)}</dd>
             </div>
           )}
@@ -92,15 +93,23 @@ export function SourcesModal({ data, onClose }: { data: Dataset; onClose: () => 
           </li>
           <li>Zona segura: punto de la red lejos de vegetación combustible y que no se quema en el escenario.</li>
           <li>
-            Valores por defecto de este incendio: alerta a las {minToHHMM(data.grid.t0, ev.alertMin.value)} ({sourceOf(ev.alertMin.source)}); {fmtDec(ev.personsPerHousehold.value)} personas por
-            hogar ({sourceOf(ev.personsPerHousehold.source)}); {Math.round(ev.footShare.value * 100)} % de los hogares a pie ({sourceOf(ev.footShare.source)}).
+            Valores por defecto de este incendio: alerta a las {minToHHMM(data.grid.t0, data.defaultAlertMin)} ({sourceOf(ev.alertMin.source)});{' '}
+            {fmtDec(ev.personsPerHousehold.value)} personas por hogar ({sourceOf(ev.personsPerHousehold.source)}); {Math.round(ev.footShare.value * 100)} % de
+            los hogares a pie ({sourceOf(ev.footShare.source)}).
           </li>
         </ul>
 
         <h3>Limitaciones</h3>
         <ul>
           <li>Es un modelo simplificado: no reproduce el comportamiento real del fuego ni de las personas, y no reemplaza la planificación profesional.</li>
-          <li>El clima es una serie horaria en un solo punto (reanálisis ERA5), no el viento local en cada quebrada.</li>
+          <li>
+            El clima es una serie horaria en un solo punto (reanálisis ERA5 para el 2 feb 2024; pronóstico de Open-Meteo para el escenario desde hoy),
+            no el viento local en cada quebrada.
+          </li>
+          <li>
+            El escenario desde hoy es hipotético: usa el pronóstico sin la corrección de viento calibrada para 2024, los puntos de inicio de 2024 y el
+            combustible de antes de ese incendio: en el área quemada en 2024 supone la vegetación previa, no la actual (quemada y en rebrote).
+          </li>
           <li>La propagación entre viviendas se aproxima con clases de combustible urbano; no modela casas una por una.</li>
           <li>La evacuación no considera congestión, cortes por accidentes, ni la decisión de quedarse o volver.</li>
           <li>Los resultados sirven para comparar escenarios entre sí, no como cifras absolutas.</li>

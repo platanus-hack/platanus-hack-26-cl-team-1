@@ -1,7 +1,20 @@
 // Loads and validates the baked data files in web/public/data/ (formats in src/engine/types.ts).
 // Every malformed file throws a DataError naming the file; the UI shows it. No silent fallbacks: the synthetic
 // dataset is used only when grid.json is absent altogether (data not baked yet), and the UI says so.
-import type { BrigadesFile, BrigadeStation, FirmsPoint, GridMeta, IgnitionPreset, NationalPopulation, NationalPopulationMeta, Reinforcement, RoadsFile, RouteCut, WeatherFile } from '../engine/types'
+import type {
+  BrigadesFile,
+  BrigadeStation,
+  FirmsPoint,
+  GridMeta,
+  IgnitionPreset,
+  NationalPopulation,
+  NationalPopulationMeta,
+  Reinforcement,
+  RoadsFile,
+  RouteCut,
+  TimelineId,
+  WeatherFile,
+} from '../engine/types'
 import { FUEL, ROAD, UNIT_COUNT } from '../engine/types'
 import type { EventDef } from './events'
 import { lonLatToColRow } from './grid'
@@ -17,16 +30,28 @@ export interface Dataset {
   weather: WeatherFile
   ignitions: IgnitionPreset[]
   firms: FirmsPoint[]
-  /** The historical event these files belong to (src/data/events.ts). */
+  /** The baked event (territory) these files belong to (src/data/events.ts). */
   event: EventDef
   /** null when the event does not ship brigades.json (EventDef.layers); the UI says so. */
   brigades: BrigadesFile | null
   /** Residents per cell (population_home.bin) and people per cell when everyone is at work or school
-   *  (population_work.bin); src/engine/population combines them by time of day. Both null when the event
-   *  does not ship them (EventDef.layers); the UI says so. */
+   *  (population_work.bin); src/engine/population combines them by time of day. null when the event does not
+   *  ship them (EventDef.layers); the UI says so. */
   population: { home: Float32Array; work: Float32Array } | null
   /** true when this is the in-browser synthetic dataset (src/data/mock.ts). */
   synthetic: boolean
+  /** The timeline grid.t0, weather, ignitions and firms belong to: the baked event's own (2 Feb 2024 fire, Eaton
+   *  fire), or the "today" view of Viña's territory that src/data/timeline.ts derives. */
+  timeline: TimelineId
+  /** Calibrated wind-direction correction (degrees) the weather series gets: ERA5_WIND_DIR_CORRECTION_DEG for
+   *  the ERA5 reanalysis of 2 Feb 2024, 0 for a forecast (it was fitted on that day's ERA5 only). */
+  windDirCorrectionDeg: number
+  /** How long this timeline runs (minutes after grid.t0): the 2024 replay keeps its validated window (12:00 to
+   *  midnight, DEFAULT_FIRE_PARAMS.horizonMin); the today timeline covers the whole day (24 h). */
+  horizonMin: number
+  /** Default alert time (minutes after grid.t0): EventDef.evac.alertMin (Viña 18:00, also in the today timeline;
+   *  Eaton 19:25). */
+  defaultAlertMin: number
 }
 
 export class DataError extends Error {
@@ -224,8 +249,9 @@ export function parseRoads(j: unknown): RoadsFile {
   return j as unknown as RoadsFile
 }
 
-export function parseWeather(j: unknown): WeatherFile {
-  const f = 'weather.json'
+/** `file` names the source in error messages (the "today" forecast reuses this check). */
+export function parseWeather(j: unknown, file = 'weather.json'): WeatherFile {
+  const f = file
   if (!isObj(j)) throw new DataError(f, 'no es un objeto JSON')
   const times = j.times
   if (!Array.isArray(times) || times.length < 2 || !times.every((t) => typeof t === 'string'))
@@ -294,7 +320,7 @@ export const parseGoes = (j: unknown): FirmsPoint[] => parseFirePoints('goes.jso
 // Fetching
 // ---------------------------------------------------------------------------------------------------------
 
-/** URL of a data file of an event (read lazily so this module also imports under Node for tests and scripts). */
+/** URL of a data file (read lazily so this module also imports under Node for tests and scripts). */
 const dataUrl = (dir: string, file: string) => `${import.meta.env.BASE_URL}data/${dir}${file}`
 
 /** Dev servers answer unknown paths with index.html (status 200), so an HTML answer also means "missing". */
@@ -420,8 +446,8 @@ export function parseBrigades(j: unknown, g: GridMeta): BrigadesFile {
   return { stations, dispatch, reinforcements, cuts }
 }
 
-/** Loads one event's files. Returns null when its data has not been baked yet (no grid.json); throws DataError
- *  otherwise. The optional layers are fetched only when the event ships them (EventDef.layers). */
+/** Loads one baked event's files (its own timeline). Returns null when its data has not been baked yet (no
+ *  grid.json); throws DataError otherwise. Optional layers are fetched only when the event ships them. */
 export async function loadRealDataset(event: EventDef): Promise<Dataset | null> {
   const dir = event.dir
   let probe: Response
@@ -469,6 +495,10 @@ export async function loadRealDataset(event: EventDef): Promise<Dataset | null> 
         ? null
         : { home: parsePopulationLayer('population_home.bin', population[0], cells), work: parsePopulationLayer('population_work.bin', population[1], cells) },
     synthetic: false,
+    timeline: event.id,
+    windDirCorrectionDeg: event.windDirCorrectionDeg,
+    horizonMin: event.horizonMin,
+    defaultAlertMin: event.evac.alertMin.value,
   }
 }
 

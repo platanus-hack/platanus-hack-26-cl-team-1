@@ -68,7 +68,7 @@ export function BrigadesSection(p: Props) {
   if (!p.data.brigades)
     return (
       <Section title="Bomberos" defaultOpen={false}>
-        <p className="muted small">Aún no hay datos de bomberos para este incendio: esta sección está disponible solo para Viña del Mar.</p>
+        <p className="muted small">Aún no hay datos de bomberos para este incendio: por ahora esta sección está disponible solo para Viña del Mar.</p>
       </Section>
     )
   return <BrigadesBody {...p} file={p.data.brigades} />
@@ -76,7 +76,6 @@ export function BrigadesSection(p: Props) {
 
 function BrigadesBody(p: Props & { file: BrigadesFile }) {
   const file = p.file
-  const HORIZON_MIN = p.data.event.horizonMin
   const t0 = p.data.grid.t0
   const b = p.scenario.brigades
   const set = (patch: Partial<BrigadeScenario>) => p.update({ brigades: { ...b, ...patch } })
@@ -191,7 +190,7 @@ function BrigadesBody(p: Props & { file: BrigadesFile }) {
                   label="Hora de salida"
                   value={b.dispatchMin[d.cuerpo]}
                   min={0}
-                  max={HORIZON_MIN}
+                  max={p.data.horizonMin}
                   step={10}
                   display={minToHHMM(t0, b.dispatchMin[d.cuerpo])}
                   onChange={(v) => set({ dispatchMin: { ...b.dispatchMin, [d.cuerpo]: v } })}
@@ -241,7 +240,7 @@ function BrigadesBody(p: Props & { file: BrigadesFile }) {
                 label="Llegada al borde del mapa"
                 value={b.reinforcementMin[r.id]}
                 min={0}
-                max={HORIZON_MIN}
+                max={p.data.horizonMin}
                 step={10}
                 display={minToHHMM(t0, b.reinforcementMin[r.id])}
                 onChange={(v) => set({ reinforcementMin: { ...b.reinforcementMin, [r.id]: v } })}

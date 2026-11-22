@@ -6,16 +6,13 @@ import { fileURLToPath } from 'node:url'
 import { parseBrigades, parseBuildings, parseElevation, parseFuel, parseGrid, parseIgnitions, parseRoads, parseWeather } from '../../data/load'
 import { localToMin } from '../../data/time'
 import { DEFAULT_EVAC_PARAMS, prepareEvac, simulateEvac } from '../evac'
-import { DEFAULT_FIRE_PARAMS, simulateFire } from '../fire'
+import { DEFAULT_FIRE_PARAMS, ERA5_WIND_DIR_CORRECTION_DEG, simulateFire } from '../fire'
 import type { FireInput } from '../types'
 import { buildIgnitions, buildWeatherSeries, defaultBrigades, type BrigadeScenario, type Scenario } from '../../worker/scenario'
-import { EVENTS } from '../../data/events'
 
+/** The 2024 replay's validated window (12:00 to midnight). */
+const HORIZON_MIN = DEFAULT_FIRE_PARAMS.horizonMin
 import { applyRescue, planBrigades } from './index'
-
-// Viña del Mar only: this script reads the root data folder (brigades.json ships only there).
-const EVENT = EVENTS['vina-2024']
-const HORIZON_MIN = EVENT.horizonMin
 
 const dir = fileURLToPath(new URL('../../../public/data/', import.meta.url))
 const bin = (f: string) => {
@@ -43,7 +40,7 @@ const fireInput: FireInput = {
   fuel,
   firebreak: new Uint8Array(cells),
   ignitions: buildIgnitions(grid, presets, scen),
-  weather: buildWeatherSeries(weatherFile, grid.t0, neutral, EVENT.windDirCorrectionDeg).series,
+  weather: buildWeatherSeries(weatherFile, grid.t0, neutral, ERA5_WIND_DIR_CORRECTION_DEG).series,
   params: { ...DEFAULT_FIRE_PARAMS, horizonMin: HORIZON_MIN },
 }
 const evacParams = { ...DEFAULT_EVAC_PARAMS, alertMin: localToMin(grid.t0, '2024-02-02T18:00') }

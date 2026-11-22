@@ -1,8 +1,8 @@
 // Typed wrapper around the simulation worker. Runs are coalesced: while one is in flight, only the newest
 // requested scenario is kept and sent when the worker is free.
-import type { EventId } from '../data/events'
 import type { FromWorker, RunResult, ToWorker } from './protocol'
 import type { Scenario } from './scenario'
+import type { TimelineChoice } from '../data/timeline'
 
 export interface SimCallbacks {
   onReady: (loadMs: number, prepareMs: number) => void
@@ -29,10 +29,10 @@ export class SimClient {
     }
   }
 
-  /** The worker loads the dataset itself; `synthetic` and `event` must match what the UI loaded. */
-  init(synthetic: boolean, event: EventId) {
+  /** The worker loads the dataset itself; `synthetic` and `timeline` must match what the UI shows. */
+  init(synthetic: boolean, timeline: TimelineChoice) {
     this.ready = false
-    this.send({ type: 'init', synthetic, event })
+    this.send({ type: 'init', synthetic, timeline })
   }
 
   run(scenario: Scenario) {

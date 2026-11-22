@@ -98,6 +98,21 @@ export interface IgnitionPreset {
   source: string
 }
 
+/** Which timeline the explorer simulates. Closed set.
+ *  - VINA_2024: the baked files as they are (grid.t0 = 2 Feb 2024 12:00, ERA5 weather, the two ignitions,
+ *    FIRMS detections and the Sentinel-2 scar to score against), over their validated window (12:00-24:00).
+ *  - TODAY: the same territory today, 00:00 to 24:00, with today's hourly forecast for the weather.json point
+ *    (fetched in the browser, src/data/forecast.ts), the 2024 ignition points at the same time of day, and no
+ *    satellite detections. src/data/timeline.ts builds it.
+ *  - EATON_2025: the Eaton fire (Altadena / Pasadena, California, 7 Jan 2025 18:00 to 8 Jan 12:00 Pacific time),
+ *    its own baked files in public/data/eaton-2025/ (another territory: src/data/events.ts). */
+export const TIMELINE = {
+  TODAY: 'hoy',
+  VINA_2024: 'vina-2024',
+  EATON_2025: 'eaton-2025',
+} as const
+export type TimelineId = (typeof TIMELINE)[keyof typeof TIMELINE]
+
 /** firms.json: NASA FIRMS active-fire detections (VIIRS / MODIS), converted to local time. goes.json (GOES-16 ABI fire
  *  pixels every 10 min, `satellite` = "GOES-16 ABI", read only by the scoring script) uses the same shape. */
 export interface FirmsPoint {

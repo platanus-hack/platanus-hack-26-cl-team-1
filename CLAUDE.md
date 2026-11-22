@@ -6,6 +6,10 @@ temperature, drought, ignitions, firebreaks, the alert time and the evacuation r
 goes and how many households would not get out in time. It explores scenarios for prevention and planning; it
 is not a prediction and it does not judge who was responsible. Track: Simulations.
 
+The app opens on a scenario of **today, 00:00 to 24:00** (today's Open-Meteo forecast, the same territory and the
+2024 ignition points at the same time of day); the 2 Feb 2024 fire, with its validated 12:00 to midnight window, is
+the other choice in the picker (`?escenario=hoy | vina-2024`, D-028).
+
 - **Read first:** this file, then [agent-kb/README.md](agent-kb/README.md) (session protocol),
   `agent-kb/backlog.md` (Now), `agent-kb/decisions.md` (D-019 is the pivot) and the newest file in
   `agent-kb/sessions/`.
