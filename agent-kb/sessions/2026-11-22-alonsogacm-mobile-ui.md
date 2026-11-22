@@ -35,6 +35,17 @@
   - sliders: `aria-valuetext` with the shown value and `<label htmlFor>`; segmented pickers are toggle
     buttons (`aria-pressed`, no radio roles without arrow keys); tool buttons drop `aria-pressed` (their label
     already changes); the sources dialog is named; MapLibre's controls in Spanish (`locale`).
+- **Touch fixes from the touch audit (all 9 confirmed by a verifier, then checked at 360×740 with touch emulation):**
+  - Bomberos: the truck tables fit a 360 px phone (station names wrap; each table scrolls on its own if needed;
+    before, the whole sheet panned sideways); steppers at 16 px with the number keypad (the earlier coarse rule
+    lost to the later base rule); source chips ("fuente", "supuesto") open their citation on tap, and the
+    historical road cut gets one (its source was only a `title`);
+  - map taps on a house or a street use a 2.5× hit box on touch (houses are 1–2 px at the fitted zoom);
+  - hover styles only where there is hover (a tapped 3D button kept the grey hover look instead of "on");
+  - 36 px MapLibre buttons and household-popup close button, 40 px disclosure rows;
+  - Fuentes y supuestos on a phone: "Cerrar" stays pinned while the dialog scrolls, 720 px cap and safe areas;
+  - safe areas in the wide layout (landscape iPhone Pro Max is 926–956 px wide) and for the narrow overlays;
+  - startup splash on a short landscape screen no longer overlaps itself.
 - Checked in the browser pane at 375×812, 812×375, 768×1024 and 1440×900 (desktop DOM and layout as before).
 
 ## Decisions

@@ -199,9 +199,12 @@ input {
   transition: background 0.12s, border-color 0.12s;
   white-space: nowrap;
 }
-.btn:hover:not(:disabled) {
-  background: #253042;
-  border-color: #33415a;
+/* hover only where there is one: touch browsers keep :hover on the last tapped element */
+@media (hover: hover) {
+  .btn:hover:not(:disabled) {
+    background: #253042;
+    border-color: #33415a;
+  }
 }
 .btn:disabled {
   opacity: 0.45;
@@ -220,9 +223,11 @@ input {
   color: #1a0f08;
   font-weight: 600;
 }
-.btn.primary:hover:not(:disabled) {
-  background: #f39a5e;
-  border-color: #f39a5e;
+@media (hover: hover) {
+  .btn.primary:hover:not(:disabled) {
+    background: #f39a5e;
+    border-color: #f39a5e;
+  }
 }
 .btn.active,
 .btn.tool.active {
@@ -387,8 +392,10 @@ select {
 .section > summary::-webkit-details-marker {
   display: none;
 }
-.section > summary:hover {
-  color: var(--text);
+@media (hover: hover) {
+  .section > summary:hover {
+    color: var(--text);
+  }
 }
 .chev {
   width: 12px;
@@ -1099,6 +1106,14 @@ input[type='range']:focus-visible {
   border-color: var(--text-2) !important;
 }
 
+/* Wide layout on a phone or tablet with insets (landscape iPhone Pro Max is 926-956 px wide; iPad standalone):
+   keep the app clear of the notch and the home indicator. env() is 0 on desktops. */
+@media (min-width: 900px) {
+  .app {
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+}
+
 /* Laptop-height windows: the fixed results block left the controls a 170-240 px strip. The whole panel
    scrolls as one column instead, results first (tall screens keep the results fixed). */
 @media (min-width: 900px) and (max-height: 900px) {
@@ -1182,14 +1197,10 @@ input[type='range']:focus-visible {
   .toggle input:checked + .switch::after {
     transform: translateX(16px);
   }
-  /* under 16 px iOS zooms the page when a field gets focus */
-  select,
-  .stepper {
+  /* under 16 px iOS zooms the page when a field gets focus (the steppers: end of file) */
+  select {
     font-size: 16px;
     min-height: 34px;
-  }
-  .stepper {
-    width: 52px;
   }
 }
 
@@ -1436,7 +1447,7 @@ input[type='range']:focus-visible {
   /* map overlays: clear of the top bar's corner controls and of the sheet */
   .layers-card {
     top: 8px;
-    left: 8px;
+    left: max(8px, env(safe-area-inset-left));
     width: auto;
     max-width: calc(100% - 64px);
     max-height: calc(100% - var(--sheet-h, 0px) - 24px);
@@ -1444,8 +1455,8 @@ input[type='range']:focus-visible {
   .map-notes {
     top: 52px;
     bottom: auto;
-    left: 8px;
-    right: 48px;
+    left: max(8px, env(safe-area-inset-left));
+    right: calc(48px + env(safe-area-inset-right));
     width: auto;
     transform: none;
   }
@@ -1454,14 +1465,33 @@ input[type='range']:focus-visible {
     bottom: var(--sheet-h, 0px);
     transition: bottom 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
   }
+  .main.narrow .maplibregl-ctrl-top-right {
+    right: env(safe-area-inset-right);
+  }
+  .main.narrow .maplibregl-ctrl-bottom-left {
+    left: env(safe-area-inset-left);
+  }
+  .sheet-body {
+    padding-inline: env(safe-area-inset-left) env(safe-area-inset-right);
+  }
   .main.narrow:has(.sheet.dragging) .maplibregl-ctrl-bottom-left,
   .main.narrow:has(.sheet.dragging) .maplibregl-ctrl-bottom-right {
     transition: none;
   }
 
   .modal {
-    width: calc(100vw - 16px);
-    max-height: calc(100dvh - 32px);
+    width: min(720px, calc(100vw - 16px - env(safe-area-inset-left) - env(safe-area-inset-right)));
+    max-height: calc(100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  }
+  /* the dialog scrolls: keep "Cerrar" in reach (phones have no Esc) */
+  .modal-head {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    margin: -16px -16px 12px;
+    padding: 12px 16px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
   }
   .modal-body {
     padding: 16px;
@@ -1546,7 +1576,44 @@ input[type='range']:focus-visible {
   border: 1px solid var(--line);
   color: var(--muted);
   white-space: nowrap;
-  cursor: help;
+  cursor: pointer;
+}
+/* the source chip opens a note under it, across the section (it is positioned against .section-body) */
+.section-body {
+  position: relative;
+}
+.src-tag {
+  display: inline-block;
+}
+.src-tag > summary {
+  list-style: none;
+}
+.src-tag > summary::-webkit-details-marker {
+  display: none;
+}
+.src-pop {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  z-index: 5;
+  margin-top: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-3);
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+}
+.cut-row > .toggle {
+  flex: 1;
+}
+.table-scroll {
+  overflow-x: auto;
 }
 .tag.warn {
   border-color: rgba(251, 191, 36, 0.5);
@@ -1652,4 +1719,43 @@ input[type='range']:focus-visible {
   margin-top: -4px;
   padding: 4px 10px;
   border-left: 2px solid var(--line);
+}
+
+/* Touch, after every base rule it overrides (same specificity, so it must come later in the file). */
+@media (pointer: coarse) {
+  .stepper {
+    font-size: 16px;
+    min-height: 34px;
+  }
+  .brig-cuerpo > summary {
+    min-height: 40px;
+    align-items: center;
+  }
+  .brig-stranded > summary {
+    padding-block: 10px;
+  }
+  .maplibregl-ctrl-group button {
+    width: 36px;
+    height: 36px;
+  }
+  .household-popup .maplibregl-popup-close-button {
+    top: 0;
+    right: 0;
+    width: 36px;
+    height: 36px;
+    font-size: 20px;
+  }
+  .household-popup .maplibregl-popup-content {
+    padding-right: 38px;
+  }
+  .src-tag > summary.tag {
+    padding: 6px 8px;
+  }
+}
+
+/* Phones: station names wrap so the truck tables fit a 360 px screen (after the base nowrap rule). */
+@media (max-width: 899px) {
+  .brig-table td:first-child {
+    white-space: normal;
+  }
 }

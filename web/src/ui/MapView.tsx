@@ -11,6 +11,7 @@ import { HOUSEHOLD } from '../engine/types'
 import { PLAN_TILE_CELLS, tileRing } from '../engine/plan'
 import { drawFire, drawFuel, drawHillshade, drawPopulation, drawScar } from './overlays'
 import type { Feature, FeatureCollection, LineString, SetDataArg } from './geo'
+import { COARSE_QUERY } from './useMediaQuery'
 
 export type Tool = 'none' | 'ignition' | 'firebreak' | 'closeRoad' | 'link'
 
@@ -706,11 +707,13 @@ export function MapView(props: Props) {
 
   function onClick(map: MlMap, e: MapMouseEvent) {
     const { tool } = p.current
+    // A fingertip lands 7-12 px from where it aims, and houses and streets are 1-2 px wide at the fitted zoom.
+    const tol = window.matchMedia(COARSE_QUERY).matches ? 2.5 : 1
     const { lng, lat } = e.lngLat
     if (tool === 'none') {
       // Household detail
       if (!map.getLayer('bld-status')) return
-      const r = 5
+      const r = 5 * tol
       const hit = map.queryRenderedFeatures(
         [
           [e.point.x - r, e.point.y - r],
@@ -737,7 +740,7 @@ export function MapView(props: Props) {
       }
       if (best < 0) return
       const q = map.project([b[best * 3], b[best * 3 + 1]])
-      if (Math.hypot(q.x - e.point.x, q.y - e.point.y) > 10) return
+      if (Math.hypot(q.x - e.point.x, q.y - e.point.y) > 10 * tol) return
       const status = evac.householdStatus[best]
       const risk = evac.householdRisk[best]
       popup.current?.remove()
@@ -755,7 +758,7 @@ export function MapView(props: Props) {
       draft.current = [...draft.current, [lng, lat]]
       updateDraft()
     } else if (tool === 'closeRoad') {
-      const r = 8
+      const r = 8 * tol
       const feats = map.queryRenderedFeatures(
         [
           [e.point.x - r, e.point.y - r],
