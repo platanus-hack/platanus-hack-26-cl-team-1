@@ -75,7 +75,7 @@ export function LayersCard({
             )}
             {layers.plan && !hide.includes('plan') && (
               <div className="legend-row wrap">
-                <span className="lg plan-belt" /> Franja tratada (celdas de 1 km)
+                <span className="lg plan-belt" /> Celdas de 1 km donde se trata la franja
                 <span className="lg plan-sector" /> Sectores con programa de preparación
               </div>
             )}

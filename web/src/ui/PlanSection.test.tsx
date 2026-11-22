@@ -54,9 +54,15 @@ describe('nearestValidation', () => {
   const all = [v(PLAN_MEASURE.BELT, 100), v(PLAN_MEASURE.BELT, 1000), v(PLAN_MEASURE.PROGRAMME, 20000)]
 
   it('picks the closest budget of the same measure, in ratio', () => {
-    expect(nearestValidation(all, PLAN_MEASURE.BELT, 250)?.budget).toBe(100)
-    expect(nearestValidation(all, PLAN_MEASURE.BELT, 400)?.budget).toBe(1000)
-    expect(nearestValidation(all, PLAN_MEASURE.PROGRAMME, 5000)?.budget).toBe(20000)
+    expect(nearestValidation(all, PLAN_MEASURE.BELT, 130)?.budget).toBe(100)
+    expect(nearestValidation(all, PLAN_MEASURE.BELT, 800)?.budget).toBe(1000)
+    expect(nearestValidation(all, PLAN_MEASURE.PROGRAMME, 18000)?.budget).toBe(20000)
+  })
+
+  it('shows no validation for a budget far from every validated one', () => {
+    expect(nearestValidation(all, PLAN_MEASURE.BELT, 400)).toBeNull()
+    expect(nearestValidation(all, PLAN_MEASURE.BELT, 3000)).toBeNull()
+    expect(nearestValidation(all, PLAN_MEASURE.PROGRAMME, 5000)).toBeNull()
   })
 
   it('returns null with nothing in use or nothing validated', () => {
@@ -85,7 +91,7 @@ describe('PlanSection', () => {
     expect(html).toContain('Plan de preparación')
     expect(html).toContain('Plan sintético, sin validación')
     expect(html).toContain('Programa de preparación comunitaria')
-    expect(html).toContain('en vez de 10')
+    expect(html).toContain('el resto, 10 min')
     expect(html).not.toContain('Quitar plan')
   })
 

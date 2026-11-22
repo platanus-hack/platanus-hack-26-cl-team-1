@@ -278,30 +278,6 @@ D-026 to D-028 were taken by #54, #53 and the today scenario._
   exceed it: 15 ladders in the Metropolitana, 2 ladders and 3 hazmat units in Biobío), but a given compañía's estimated trucks are not an inventory. Aysén has
   36 stations against 29 compañías in the JNB count (likely brigadas). `brigades.json` is unchanged; its 29
   stations match the national file within 1.5 km (test).
-### D-032 — Plan de preparación: preparation measures ranked over an ensemble of simulated fires (2026-11-22)
-- **Context:** the team wants an optimizer for preparing before fires, not for alerting during one. The
-  investigation (session log `2026-11-22-josecannete-optimizer-investigation`) found that a plan tuned to one
-  fire does not carry over to others, so the ranking must come from many plausible fires. It also found that
-  narrow firebreaks are jumped by embers, and that alert timing and preparation time each move the count in
-  only one direction (curves are enough, no search needed).
-- **Decision (contract: `types.ts` gains `EvacProgramme` / `EvacInput.programme`, `PLAN_MEASURE`,
-  `PlanValidation`, `PlanFile`; `Scenario` gains `planTiles` / `planSectors`):**
-  - Two measures, by 1 km tile (`src/engine/plan`):
-    - the 200 m belt around inhabited land: vegetation cleared, houses stay as intermix; cost in ha;
-    - a community preparation programme: preparation median 5 min, 90 % leave on cues; cost in households.
-    Both are planning assumptions, not measured effects.
-  - `pnpm plan` (`src/engine/plan/bake.ts`, about 4.5 min) ranks both over 80 simulated fires and scores them on
-    40 held-out fires and on 2 Feb 2024. The simulated fires use 2 Feb's weather (wind ±20 %, direction ±10°),
-    start in wildland 400 m-3 km from inhabited land between 12:00 and 15:00, and get the alert 4 h after
-    ignition; none starts within 2 km of the real ignitions. The result is `public/data/plan.json`, which
-    `parsePlan` checks against the app's constants.
-  - The panel fills a budget in ranked order and shows the validation for the nearest budget, next to random
-    fills of the same size. The worker applies the belt to the fire and the programme to every evacuation run.
-- **Consequences:** the ranked belt clearly beats random tiles on held-out fires (1,000 ha: −24.8 % vs
-  −5.2 to −13.0 %) but barely changes 2 Feb (0.0 % on the real weather; −37 % only with the belt in every
-  tile). The ranked programme is close to random (20,000 households: −4.9 % vs −1.9 to −4.7 %; 2 Feb −3.2 %).
-  The UI shows these numbers as they are. Rerun `pnpm plan` whenever the data or the fire calibration change.
-  Not included: firebreak, street-link and alert optimizers (reasons in the session log).
 
 ### D-032 — A hypothetical scenario in Talca (Maule) for demos: a baked event with no observed fire (2026-11-22)
 - **Context:** the user asked for data to simulate a fire in the Maule region for a demo, and chose (asked before
@@ -321,6 +297,35 @@ D-026 to D-028 were taken by #54, #53 and the today scenario._
   is reproducible. With the defaults the model burns ~14,100 ha by midnight and reaches ~34,700 buildings; like
   Viña and Eaton it overburns (no suppression), so the numbers compare scenarios, not predict. Brigades for
   Talca could come from the national fire-station dataset later.
+
+### D-033 — Plan de preparación: preparation measures ranked over an ensemble of simulated fires (2026-11-22)
+- **Context:** the team wants an optimizer for preparing before fires, not for alerting during one. The
+  investigation (session log `2026-11-22-josecannete-optimizer-investigation`) found that a plan tuned to one
+  fire does not carry over to others, so the ranking must come from many plausible fires. It also found that
+  narrow firebreaks are jumped by embers, and that alert timing and preparation time each move the count in
+  only one direction (curves are enough, no search needed).
+- **Decision (contract: `types.ts` gains `EvacProgramme` / `EvacInput.programme`, `PLAN_MEASURE`,
+  `PlanValidation`, `PlanFile`; `Scenario` gains `planTiles` / `planSectors`):**
+  - Two measures, by 1 km tile (`src/engine/plan`):
+    - the 200 m belt around inhabited land: vegetation cleared, houses stay as intermix; cost in ha;
+    - a community preparation programme: preparation median 5 min, 90 % leave on cues; cost in households.
+    Both are planning assumptions, not measured effects.
+  - `pnpm plan` (`src/engine/plan/bake.ts`, about 4.5 min) ranks both over 80 simulated fires and scores them on
+    40 held-out fires and on 2 Feb 2024. The simulated fires use 2 Feb's weather (wind ±20 %, direction ±10°),
+    start in wildland 400 m-3 km from inhabited land between 12:00 and 15:00, and get the alert 4 h after
+    ignition; none starts within 2 km of the real ignitions. The result is `public/data/plan.json`, which
+    `parsePlan` checks against the app's constants.
+  - The panel fills a budget in ranked order and shows the validation for a budget within 1.5x of it, next to
+    random fills of the same size. The worker applies the belt to the fire and the programme to every
+    evacuation run. The programme never makes a household slower than the Evacuación settings (its members get
+    the faster preparation and the higher cue share of the two). The worker refuses a plan.json that no longer
+    matches the fuel or the buildings.
+  - Viña only (`EventDef.layers.plan`); Eaton and Talca say there is no plan yet.
+- **Consequences:** the ranked belt clearly beats random tiles on held-out fires (1,000 ha: −24.8 % vs
+  −5.2 to −13.0 %) but barely changes 2 Feb (0.0 % on the real weather; −37 % only with the belt in every
+  tile). The ranked programme is close to random (20,000 households: −4.9 % vs −1.9 to −4.7 %; 2 Feb −3.2 %).
+  The UI shows these numbers as they are. Rerun `pnpm plan` whenever the data or the fire calibration change.
+  Not included: firebreak, street-link and alert optimizers (reasons in the session log).
 
 ## §2 Open
 

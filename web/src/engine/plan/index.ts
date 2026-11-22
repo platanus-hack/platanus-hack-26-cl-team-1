@@ -179,13 +179,38 @@ export function applyBelt(
   return { fuel: outFuel, firebreak: outFb, skippedIgnitionCells: skipped }
 }
 
-/** The programme for the households of the given sectors (EvacInput.programme), or undefined if none. */
-export function programmeFor(belt: Belt, sectors: readonly number[]): EvacProgramme | undefined {
+/** The programme for the households of the given sectors (EvacInput.programme), or undefined if none.
+ *  `current` is the behaviour everyone else has (the Evacuación settings): the programme never makes a
+ *  household slower or less responsive than that, so its members get the faster preparation and the higher
+ *  cue share of the two (a modelling choice; with the defaults, 10 min and 0.65, it is PLAN_PROGRAMME). */
+export function programmeFor(
+  belt: Belt,
+  sectors: readonly number[],
+  current: { prepMedianMin: number; cueShare: number } = { prepMedianMin: Infinity, cueShare: 0 },
+): EvacProgramme | undefined {
   if (sectors.length === 0) return undefined
   const set = new Set(sectors)
   const member = new Uint8Array(belt.sectorOfBuilding.length)
   for (let b = 0; b < member.length; b++) if (set.has(belt.sectorOfBuilding[b])) member[b] = 1
-  return { member, prepMedianMin: PLAN_PROGRAMME.prepMedianMin, cueShare: PLAN_PROGRAMME.cueShare }
+  return {
+    member,
+    prepMedianMin: Math.min(PLAN_PROGRAMME.prepMedianMin, current.prepMedianMin),
+    cueShare: Math.max(PLAN_PROGRAMME.cueShare, current.cueShare),
+  }
+}
+
+/** Checks plan.json against the belt and households built from the current data (a rebake of fuel or buildings
+ *  without `pnpm plan` would otherwise show wrong hectares and enrol other households). Throws in Spanish. */
+export function checkPlanAgainstData(belt: Belt, plan: { tiles: { tile: number; ha: number }[]; sectors: { sector: number; households: number }[] }): void {
+  const stale = (what: string) => {
+    throw new Error(`plan.json no coincide con los datos (${what}): vuelve a generar el plan (pnpm plan)`)
+  }
+  for (const t of plan.tiles) {
+    if (!belt.cellsByTile.has(t.tile)) stale(`la celda ${t.tile} no tiene franja`)
+    if (Math.abs(tileHa(belt, t.tile) - t.ha) > 0.01) stale(`la celda ${t.tile} tiene ${tileHa(belt, t.tile).toFixed(2)} ha, el plan dice ${t.ha}`)
+  }
+  const hh = sectorHouseholds(belt)
+  for (const s of plan.sectors) if ((hh.get(s.sector) ?? 0) !== s.households) stale(`el sector ${s.sector} tiene ${hh.get(s.sector) ?? 0} hogares, el plan dice ${s.households}`)
 }
 
 /** Households (buildings) per sector. */

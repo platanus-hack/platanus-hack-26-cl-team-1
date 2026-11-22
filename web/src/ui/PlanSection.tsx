@@ -8,9 +8,9 @@ import { PLAN_MEASURE, type PlanFile, type PlanMeasure, type PlanValidation } fr
 import type { Scenario } from '../worker/scenario'
 import { fmtInt, Section, Slider } from './controls'
 
-/** Hectare budgets offered for the belt (the slider always ends at the whole belt). */
+/** Hectare budgets offered for the belt (the slider always ends at every tile the plan ranks). */
 export const BELT_BUDGETS_HA = [0, 100, 300, 1000, 3000]
-/** Household budgets offered for the programme (the slider always ends at every household the plan ranks). */
+/** Household budgets offered for the programme (the slider always ends at every sector the plan ranks). */
 export const PROGRAMME_BUDGETS = [0, 5000, 20000, 50000]
 
 export interface BudgetStep<T> {
@@ -52,7 +52,11 @@ export function stepIndex<T>(steps: readonly BudgetStep<T>[], chosen: readonly T
   return steps.findIndex((s) => sameSet(s.items, chosen))
 }
 
-/** The validated budget of a measure closest (in ratio) to the one in use; null with nothing in use or none validated. */
+/** Validated budgets within this ratio of the one in use are shown (labelled when not exact); farther ones are not. */
+export const VALIDATION_MAX_RATIO = 1.5
+
+/** The validated budget of a measure closest (in ratio) to the one in use, if within VALIDATION_MAX_RATIO; null
+ *  with nothing in use, none validated, or none close enough. */
 export function nearestValidation(v: readonly PlanValidation[], measure: PlanMeasure, used: number): PlanValidation | null {
   if (!(used > 0)) return null
   let best: PlanValidation | null = null
@@ -65,7 +69,7 @@ export function nearestValidation(v: readonly PlanValidation[], measure: PlanMea
       best = x
     }
   }
-  return best
+  return bd <= Math.log(VALIDATION_MAX_RATIO) ? best : null
 }
 
 /** A reduction in percent as a signed change: 12.3 -> "−12", 4.25 -> "−4,3", -1 -> "+1" (the plan made it worse). */
@@ -82,7 +86,14 @@ function Validation({ plan, measure, used, unit }: { plan: PlanFile; measure: Pl
   if (used <= 0) return null
   if (plan.validation.length === 0) return <div className="plan-val muted small">Plan sintético, sin validación.</div>
   const v = nearestValidation(plan.validation, measure, used)
-  if (!v) return <div className="plan-val muted small">El plan no trae validación para esta medida.</div>
+  if (!v) {
+    const budgets = plan.validation.filter((x) => x.measure === measure).map((x) => fmtInt(x.budget))
+    return (
+      <div className="plan-val muted small">
+        Sin validación para este presupuesto{budgets.length > 0 ? ` (validados: ${budgets.join(', ')} ${unit})` : ''}.
+      </div>
+    )
+  }
   const r = v.randomUnseenPct
   return (
     <div className="plan-val small">
@@ -91,7 +102,7 @@ function Validation({ plan, measure, used, unit }: { plan: PlanFile; measure: Pl
         {Math.abs(Math.log(v.budget / used)) > 0.1 ? ' (el presupuesto validado más cercano)' : ''}:
       </div>
       <div>
-        En incendios simulados que el plan no vio: <b>{fmtCut(v.unseenPct)} %</b>{' '}
+        En incendios simulados con el clima del 2 feb 2024 que el plan no vio: <b>{fmtCut(v.unseenPct)} %</b>{' '}
         <span className="muted">
           (al azar: {fmtCut(r[0])} a {fmtCut(r[2])} %)
         </span>
@@ -135,8 +146,8 @@ function PlanBody({ data, scenario, update, plan }: PlanProps & { plan: PlanFile
   const totalHh = progSteps[progSteps.length - 1].used
   const any = scenario.planTiles.length > 0 || scenario.planSectors.length > 0
 
-  const beltLabel = (s: BudgetStep<number>) => (s.all ? `toda (${fmtInt(s.used)} ha)` : s.budget === 0 ? 'ninguna' : `${fmtInt(s.budget)} ha`)
-  const progLabel = (s: BudgetStep<number>) => (s.all ? `todos (${fmtInt(s.used)} hogares)` : s.budget === 0 ? 'ninguno' : `${fmtInt(s.budget)} hogares`)
+  const beltLabel = (s: BudgetStep<number>) => (s.all ? `todas las celdas del plan (${fmtInt(s.used)} ha)` : s.budget === 0 ? 'ninguna' : `${fmtInt(s.budget)} ha`)
+  const progLabel = (s: BudgetStep<number>) => (s.all ? `todos los sectores del plan (${fmtInt(s.used)} hogares)` : s.budget === 0 ? 'ninguno' : `${fmtInt(s.budget)} hogares`)
 
   return (
     <Section title="Plan de preparación">
@@ -157,10 +168,10 @@ function PlanBody({ data, scenario, update, plan }: PlanProps & { plan: PlanFile
         hint={
           usedHa > 0 ? (
             <>
-              Se tratan <b>{fmtInt(usedHa)} ha</b> en {fmtInt(scenario.planTiles.length)} celdas de {tileKm} km, de {fmtInt(totalHa)} ha de franja posible.
+              Se tratan <b>{fmtInt(usedHa)} ha</b> en {fmtInt(scenario.planTiles.length)} celdas de {tileKm} km, de {fmtInt(totalHa)} ha en las celdas que el plan ordena (las que tuvieron efecto en los incendios de entrenamiento).
             </>
           ) : (
-            `Sin franja. Hay ${fmtInt(totalHa)} ha de franja posible, en celdas de ${tileKm} km ordenadas por el plan.`
+            `Sin franja. El plan ordena ${fmtInt(totalHa)} ha de franja, en celdas de ${tileKm} km.`
           )
         }
       />
@@ -178,7 +189,7 @@ function PlanBody({ data, scenario, update, plan }: PlanProps & { plan: PlanFile
         hint={
           usedHh > 0 ? (
             <>
-              <b>{fmtInt(usedHh)} hogares</b> en {fmtInt(scenario.planSectors.length)} sectores de {tileKm} km, de {fmtInt(totalHh)}.
+              <b>{fmtInt(usedHh)} hogares</b> en {fmtInt(scenario.planSectors.length)} sectores de {tileKm} km, de {fmtInt(totalHh)} en los sectores que el plan ordena.
             </>
           ) : (
             `Sin programa. Los sectores de ${tileKm} km se suman en el orden del plan.`
@@ -202,17 +213,18 @@ function PlanBody({ data, scenario, update, plan }: PlanProps & { plan: PlanFile
         </summary>
         <ul className="small brig-params">
           <li>
-            Programa: los hogares de los sectores elegidos tardan {fmtInt(plan.programme.prepMedianMin)} min en prepararse (mediana) en vez de{' '}
-            {fmtInt(scenario.prepMedianMin)}, y el {Math.round(plan.programme.cueShare * 100)} % sale al ver el fuego, brasas o a sus vecinos
-            evacuar, en vez del {Math.round(scenario.cueShare * 100)} % (valores de la sección Evacuación, que siguen valiendo para el resto). Son
-            supuestos para planificar, no efectos medidos.
+            Programa: los hogares de los sectores elegidos tardan {fmtInt(Math.min(plan.programme.prepMedianMin, scenario.prepMedianMin))} min en
+            prepararse (mediana; el resto, {fmtInt(scenario.prepMedianMin)} min) y el {Math.round(Math.max(plan.programme.cueShare, scenario.cueShare) * 100)} % sale al
+            ver el fuego, brasas o a sus vecinos evacuar (el resto, {Math.round(scenario.cueShare * 100)} %). El programa nunca deja a un hogar más lento
+            que lo fijado en Evacuación. Son supuestos para planificar, no efectos medidos.
           </li>
           <li>
             Franja: se elimina la vegetación en {plan.beltWidthM} m alrededor de las zonas con viviendas; las casas se quedan (donde hay casas dentro de
             la franja, la vegetación alrededor se maneja como zona urbana).
           </li>
           <li>
-            Las cifras son exposición en este modelo, sin combate del fuego salvo que actives Bomberos: hogares con la salida cortada, no muertes.
+            Las cifras de validación son sin bomberos ni rescate; en Resultados, también, salvo que actives Bomberos. Son hogares con la salida
+            cortada en este modelo, no muertes.
           </li>
         </ul>
       </details>

@@ -5,7 +5,7 @@
 import { simulateFire, DEFAULT_FIRE_PARAMS } from '../engine/fire'
 import { prepareEvac, simulateEvac, DEFAULT_EVAC_PARAMS } from '../engine/evac'
 import { applyRescue, planBrigades, type BrigadePlan } from '../engine/brigade'
-import { applyBelt, buildBelt, programmeFor, type Belt } from '../engine/plan'
+import { applyBelt, buildBelt, checkPlanAgainstData, programmeFor, type Belt } from '../engine/plan'
 import type { EvacParams, EvacPrepared, FireInput, FireResult } from '../engine/types'
 import type { BrigadesOut, FromWorker, RunResult, ToWorker } from './protocol'
 import { localToMin } from '../data/time'
@@ -47,6 +47,7 @@ async function init(synthetic: boolean, timeline: TimelineChoice) {
   prepared = prepareEvac(d.grid, d.fuel, d.roads, d.buildings, { safeDistanceM: DEFAULT_EVAC_PARAMS.safeDistanceM })
   wildDist = wildlandDistanceM(d.grid, d.fuel)
   belt = buildBelt(d.grid, d.fuel, d.buildings)
+  if (d.plan) checkPlanAgainstData(belt, d.plan)
   lastFireKey = ''
   lastFire = null
   lastDefKey = ''
@@ -78,7 +79,11 @@ ctx.onmessage = (ev: MessageEvent<ToWorker>) => {
         fuel = a.fuel
         firebreak = a.firebreak
         if (a.skippedIgnitionCells > 0)
-          planNotes.push(`${a.skippedIgnitionCells === 1 ? 'Un foco cae' : `${a.skippedIgnitionCells} focos caen`} en la franja tratada; esa celda se dejó sin tratar para que el fuego pueda empezar.`)
+          planNotes.push(
+            a.skippedIgnitionCells === 1
+              ? 'Un foco cae en la franja tratada; esa celda se dejó sin tratar para que el fuego pueda empezar.'
+              : `${a.skippedIgnitionCells} focos caen en la franja tratada; esas celdas se dejaron sin tratar para que el fuego pueda empezar.`,
+          )
       }
       lastFireInput = {
         grid: data.grid,
@@ -109,7 +114,7 @@ ctx.onmessage = (ev: MessageEvent<ToWorker>) => {
     }
     const edits = { closedEdges: s.closedEdges, addedLinks: s.addedLinks }
     // Plan de preparación: households of the chosen sectors are in the community programme.
-    const programme = programmeFor(belt, s.planSectors)
+    const programme = programmeFor(belt, s.planSectors, { prepMedianMin: s.prepMedianMin, cueShare: s.cueShare })
     // Firefighters (MODEL.md of engine/brigade): plan on the fire without them, then rerun the fire defended.
     const bKey = brigadeKey(s)
     let fire = lastFire

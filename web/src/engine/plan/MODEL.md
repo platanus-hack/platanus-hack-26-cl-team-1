@@ -27,7 +27,10 @@ reason about, not measured effects of a real programme or treatment.
   by sector (the same 1.02 km tiling, each building in the tile of its cell). Households in the programme
   prepare in a median of 5 min instead of 10 (`PLAN_PROGRAMME.prepMedianMin`), and 90 % of them instead of
   65 % leave on environmental cues (seeing the fire, embers or neighbours leaving; `cueShare`). Everything else
-  (alert time, cue radius, share on foot, routes) is unchanged. Households do not interact in the evacuation
+  (alert time, cue radius, share on foot, routes) is unchanged. In the app the programme never makes a household
+  slower than the Evacuación settings: members get the faster preparation and the higher cue share of the two
+  (`programmeFor`'s `current` argument; at the defaults, 10 min and 0.65, it is exactly the values above, which is
+  what the bake uses). Households do not interact in the evacuation
   engine (no congestion), so the risk of a household depends only on its own membership; the bake checks this
   against the engine.
 

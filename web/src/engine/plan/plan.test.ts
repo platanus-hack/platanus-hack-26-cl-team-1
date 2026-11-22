@@ -7,6 +7,7 @@ import {
   PLAN_PROGRAMME,
   applyBelt,
   buildBelt,
+  checkPlanAgainstData,
   fillBudget,
   programmeFor,
   sectorHouseholds,
@@ -239,6 +240,27 @@ describe('programme and budget helpers', () => {
     expect([...programmeFor(belt, [1, 5])!.member]).toEqual([1, 1, 1, 1, 0])
     // A sector with no buildings enrols nobody (but is still a programme).
     expect([...programmeFor(belt, [0])!.member]).toEqual([0, 0, 0, 0, 0])
+  })
+
+  it('programmeFor never makes a household slower or less responsive than the current settings', () => {
+    const defaults = programmeFor(belt, [5], { prepMedianMin: 10, cueShare: 0.65 })!
+    expect(defaults.prepMedianMin).toBe(PLAN_PROGRAMME.prepMedianMin)
+    expect(defaults.cueShare).toBe(PLAN_PROGRAMME.cueShare)
+    const faster = programmeFor(belt, [5], { prepMedianMin: 3, cueShare: 1 })!
+    expect(faster.prepMedianMin).toBe(3)
+    expect(faster.cueShare).toBe(1)
+  })
+
+  it('checkPlanAgainstData accepts a plan built from the same belt and refuses a stale one', () => {
+    const hh = sectorHouseholds(belt)
+    const t = [...belt.cellsByTile.keys()][0]
+    const s = [...hh.keys()][0]
+    const ok = { tiles: [{ tile: t, ha: tileHa(belt, t) }], sectors: [{ sector: s, households: hh.get(s)! }] }
+    expect(() => checkPlanAgainstData(belt, ok)).not.toThrow()
+    expect(() => checkPlanAgainstData(belt, { ...ok, tiles: [{ tile: t, ha: tileHa(belt, t) + 1 }] })).toThrow(/pnpm plan/)
+    expect(() => checkPlanAgainstData(belt, { ...ok, sectors: [{ sector: s, households: hh.get(s)! + 1 }] })).toThrow(/pnpm plan/)
+    const noBelt = [...Array(belt.tilesPerRow * 4).keys()].find((x) => !belt.cellsByTile.has(x))!
+    expect(() => checkPlanAgainstData(belt, { ...ok, tiles: [{ tile: noBelt, ha: 1 }] })).toThrow(/no tiene franja/)
   })
 
   it('fillBudget takes ranked items while they fit, skipping the ones that would overflow', () => {

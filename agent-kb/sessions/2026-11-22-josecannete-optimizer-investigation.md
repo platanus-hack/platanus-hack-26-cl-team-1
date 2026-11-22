@@ -43,7 +43,7 @@
   - A plan tuned to 2 Feb saves 0 % on other fires (partly by construction).
   - Scripts: `proactive.ts`, `proactive2.ts`; check logs `zz-verify-proactive-*.log`.
 
-- **Built (option A, 03:15-04:00):** the Plan de preparación in the app (D-032). `src/engine/plan` (belt, tiles,
+- **Built (option A, 03:15-04:00):** the Plan de preparación in the app (D-033). `src/engine/plan` (belt, tiles,
   programme), `bake.ts` + `public/data/plan.json` (120 fires, about 4.5 min), a programme group in
   `simulateEvac` (exact member-wise mix, tested), the worker applying both, and a panel section with a map
   layer. Built with three parallel agents (bake, tests, UI) on a contract written first.
@@ -53,7 +53,7 @@
   - The research numbers above (`.context` scripts) predate D-027 and are superseded by these.
 
 ## Decisions
-- D-032: Plan de preparación (contract: `EvacProgramme`, `PlanFile`, `Scenario.planTiles` / `planSectors`).
+- D-033: Plan de preparación (contract: `EvacProgramme`, `PlanFile`, `Scenario.planTiles` / `planSectors`).
 
 ## Open / blocked
 - No number from this investigation is pitch-ready until its script is in the repo ("measure what you claim").
