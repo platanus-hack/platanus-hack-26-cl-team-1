@@ -1,15 +1,14 @@
 import type { Dataset } from '../data/load'
 import VALIDATION from '../../public/data/validation.json'
 import type { PopulationDay, WeatherSeries } from '../engine/types'
-import { POPULATION_DAY } from '../engine/types'
-import { STUDENT_SHARE, WORKER_SHARE, type BurnedAreaPeople } from '../engine/population'
-import { ERA5_WIND_DIR_CORRECTION_DEG } from '../engine/fire/model'
+import { POPULATION_DAY, TIMELINE } from '../engine/types'
+import { dayKind, STUDENT_SHARE, WORKER_SHARE, type BurnedAreaPeople } from '../engine/population'
 import { LAG_CAP_MIN } from '../engine/fire/pacing'
-import { minToHHMM, localToMin } from '../data/time'
+import { minToDateLabel, minToHHMM, localToMin, wallClockMin } from '../data/time'
 import type { BrigadesOut, EvacOut, FireOut } from '../worker/protocol'
 import { BrigadesSection } from './BrigadesSection'
 import type { FirebreakWidth, Scenario, WeatherSettings } from '../worker/scenario'
-import { FIREBREAK_WIDTHS, HORIZON_MIN, sampleAt } from '../worker/scenario'
+import { FIREBREAK_WIDTHS, sampleAt } from '../worker/scenario'
 import { Compass, compassLabel, fmtInt, fmtSigned, Section, Segmented, Slider, Toggle } from './controls'
 import { RiskChart, WeatherChart } from './charts'
 import type { LayerToggles, Tool } from './MapView'
@@ -70,13 +69,23 @@ interface Props {
 }
 
 const POPULATION_DAY_OPTIONS: { value: PopulationDay; label: string }[] = [
-  { value: POPULATION_DAY.REAL, label: 'Fecha real' },
+  { value: POPULATION_DAY.REAL, label: 'Fecha del escenario' },
   { value: POPULATION_DAY.WEEKDAY_SCHOOL, label: 'Hábil con clases' },
   { value: POPULATION_DAY.WEEKDAY_NO_SCHOOL, label: 'Hábil sin clases' },
   { value: POPULATION_DAY.WEEKEND, label: 'Fin de semana' },
 ]
 
 const pct = (x: number) => `${Math.round(x * 100)} %`
+
+const DOW_ES = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']
+
+/** How the presence model's own calendar treats the scenario's date, e.g. "El modelo trata el viernes 2 feb 2024
+ *  como día hábil sin clases (...)". It is the model's assumption: holidays are not modelled. */
+function scenarioDayText(t0: string): string {
+  const k = dayKind(wallClockMin(t0))
+  const what = !k.weekday ? 'fin de semana, con todos en casa' : k.school ? 'día hábil con clases' : 'día hábil sin clases'
+  return `El modelo trata el ${DOW_ES[k.dow]} ${minToDateLabel(t0, 0)} como ${what} (calendario escolar aproximado, sin feriados).`
+}
 
 function ToolButton({ tool, current, setTool, label }: { tool: Tool; current: Tool; setTool: (t: Tool) => void; label: string }) {
   const on = current === tool
@@ -143,7 +152,7 @@ export function Results(p: Props) {
           </div>
         </div>
         <div className="stat">
-          <div className="stat-label">Al final ({minToHHMM(t0, HORIZON_MIN)})</div>
+          <div className="stat-label">Al final ({minToHHMM(t0, p.data.horizonMin)})</div>
           <div className="stat-value">
             {s ? fmtInt(s.burnedHaEnd) : '—'}
             <small> ha</small>
@@ -188,7 +197,12 @@ export function Results(p: Props) {
           </button>
         )}
         {!b && <span className="muted small">Sin escenario base</span>}
-        <button type="button" className="btn small ghost push-right" onClick={p.resetScenario} title="Vuelve al clima real, los focos predefinidos y sin cambios">
+        <button
+          type="button"
+          className="btn small ghost push-right"
+          onClick={p.resetScenario}
+          title="Vuelve al clima del escenario, los focos predefinidos y sin cambios"
+        >
           Restablecer
         </button>
       </div>
@@ -204,7 +218,7 @@ function RiskBlock(p: Props) {
       <div className="chart-title">
         Hogares con la salida cortada según la hora de la alerta <span className="muted">(línea: alerta a las {minToHHMM(t0, p.scenario.alertMin)})</span>
       </div>
-      <RiskChart curve={p.evac.riskByAlert} alertMin={p.scenario.alertMin} t0={t0} onPick={(alertMin) => p.update({ alertMin })} />
+      <RiskChart curve={p.evac.riskByAlert} alertMin={p.scenario.alertMin} t0={t0} horizonMin={p.data.horizonMin} onPick={(alertMin) => p.update({ alertMin })} />
       <div className="muted small">Haz clic en el gráfico para probar otra hora de alerta.</div>
     </div>
   )
@@ -214,12 +228,14 @@ function ClimaSection(p: Props) {
   const w = p.scenario.weather
   const t0 = p.data.grid.t0
   const real = w.mode === 'real'
+  const today = p.data.timeline === TIMELINE.TODAY
   const raw = sampleAt(p.rawSeries, p.clock)
   const used = sampleAt(p.appliedSeries, p.clock)
   const hhmm = minToHHMM(t0, p.clock)
+  const corr = p.data.windDirCorrectionDeg
   const hint = (rawV: string, usedV: string) => (
     <>
-      Real a las {hhmm}: <b>{rawV}</b> → usado: <b>{usedV}</b>
+      {today ? 'Pronóstico' : 'Real'} a las {hhmm}: <b>{rawV}</b> → usado: <b>{usedV}</b>
     </>
   )
   return (
@@ -229,7 +245,7 @@ function ClimaSection(p: Props) {
         value={w.mode}
         onChange={(mode) => p.updateWeather({ mode })}
         options={[
-          { value: 'real', label: 'Clima real del 2 feb 2024 (ERA5)' },
+          { value: 'real', label: today ? `Pronóstico del ${minToDateLabel(t0, 0)} (Open-Meteo)` : 'Clima real del 2 feb 2024 (ERA5)' },
           { value: 'constante', label: 'Clima constante' },
         ]}
       />
@@ -255,7 +271,9 @@ function ClimaSection(p: Props) {
             onChange={(v) => p.updateWeather({ windDirOffsetDeg: v })}
             extra={<Compass fromDeg={used.windFromDeg} />}
             hint={hint(
-              `${compassLabel(raw.windFromDeg)} (${raw.windFromDeg.toFixed(0)}°, ERA5 con corrección calibrada de ${fmtSigned(ERA5_WIND_DIR_CORRECTION_DEG)}°)`,
+              corr !== 0
+                ? `${compassLabel(raw.windFromDeg)} (${raw.windFromDeg.toFixed(0)}°, ERA5 con corrección calibrada de ${fmtSigned(corr)}°)`
+                : `${compassLabel(raw.windFromDeg)} (${raw.windFromDeg.toFixed(0)}°, sin corrección)`,
               `${compassLabel(used.windFromDeg)} (${used.windFromDeg.toFixed(0)}°)`,
             )}
           />
@@ -305,7 +323,11 @@ function ClimaSection(p: Props) {
         step={0.5}
         display={p.scenario.droughtFactor.toFixed(1)}
         onChange={(v) => p.update({ droughtFactor: v })}
-        hint="0 = combustible húmedo, 10 = vegetación seca de fin de verano (índice de McArthur)."
+        hint={
+          today
+            ? '0 = combustible húmedo, 10 = vegetación seca de fin de verano (índice de McArthur). Parte en 10, como en febrero de 2024: ajústalo a la temporada.'
+            : '0 = combustible húmedo, 10 = vegetación seca de fin de verano (índice de McArthur).'
+        }
       />
       {p.weatherNotes.map((n) => (
         <div key={n} className="alert warn">
@@ -315,7 +337,7 @@ function ClimaSection(p: Props) {
       <div className="chart-title">
         <span className="key wind" /> Viento (km/h) <span className="key rh" /> Humedad (%) <span className="muted">usados por el modelo</span>
       </div>
-      <WeatherChart series={p.appliedSeries} t0={t0} clock={p.clock} />
+      <WeatherChart series={p.appliedSeries} t0={t0} clock={p.clock} horizonMin={p.data.horizonMin} />
       <div className="muted small">Fuente: {p.data.weather.source}</div>
     </Section>
   )
@@ -429,7 +451,7 @@ function EvacuacionSection(p: Props) {
         label="Hora de la alerta"
         value={s.alertMin}
         min={0}
-        max={HORIZON_MIN}
+        max={p.data.horizonMin}
         step={5}
         display={minToHHMM(t0, s.alertMin)}
         onChange={(v) => p.update({ alertMin: v })}
@@ -496,8 +518,8 @@ function EvacuacionSection(p: Props) {
       <Segmented label="Día que se supone para la población" options={POPULATION_DAY_OPTIONS} value={p.populationDay} onChange={p.setPopulationDay} />
       <div className="muted small">
         De noche y los fines de semana todos en casa; un día hábil, quienes trabajan ({pct(WORKER_SHARE)}) y estudian ({pct(STUDENT_SHARE)},
-        solo en periodo de clases) pasan el día en su trabajo o estudio. La fecha real del escenario fue un viernes de vacaciones de verano. Cambia el
-        conteo de personas donde llega el fuego, no la evacuación de los hogares.
+        solo en periodo de clases) pasan el día en su trabajo o estudio. {scenarioDayText(p.data.grid.t0)} Cambia el conteo de personas donde llega
+        el fuego, no la evacuación de los hogares.
       </div>
       <Toggle label="Mostrar personas a esta hora" checked={p.layers.poblacion} onChange={(v) => p.setLayer('poblacion', v)} sub="Personas por celda de 60 m a la hora del reloj" />
     </Section>
@@ -573,11 +595,25 @@ function ValidacionSection(p: Props) {
   )
 }
 
+/** What the today timeline assumes, above everything else it changes. */
+function TodayNote(p: Props) {
+  const t0 = p.data.grid.t0
+  return (
+    <div className="alert info timeline-note">
+      <b>Escenario hipotético de hoy</b>, {minToDateLabel(t0, 0)}, las 24 horas: el pronóstico del tiempo de hoy para este punto (sin la corrección
+      de viento calibrada para 2024), los mismos puntos de inicio del 2 feb 2024 a la misma hora del día y el combustible de antes de ese incendio:
+      en el área quemada en 2024 supone la vegetación previa, no la actual. Sirve para comparar, no para predecir.
+    </div>
+  )
+}
+
 export function Panel(p: Props) {
+  const historical = p.data.timeline === TIMELINE.VINA_2024
   return (
     <>
       <Results {...p} />
       <div className="panel-scroll">
+        {!historical && <TodayNote {...p} />}
         <RiskBlock {...p} />
         <ClimaSection {...p} />
         <FuegoSection {...p} />
@@ -592,7 +628,7 @@ export function Panel(p: Props) {
           trappedHouseholds={p.summary?.trappedHouseholds ?? null}
         />
         <EvacuacionSection {...p} />
-        <ValidacionSection {...p} />
+        {historical && <ValidacionSection {...p} />}
       </div>
     </>
   )

@@ -1,7 +1,10 @@
 // Synthetic dataset in the SAME formats as the baked files, used only until web/public/data/ exists (or with
 // ?mock=1). The UI shows "Datos de prueba (sintéticos)" whenever it is in use. Nothing here is real data.
 import type { BrigadesFile, FirmsPoint, GridMeta, IgnitionPreset, RoadClass, RoadsFile, WeatherFile } from '../engine/types'
-import { FUEL, ROAD } from '../engine/types'
+import { FUEL, ROAD, TIMELINE } from '../engine/types'
+import { ERA5_WIND_DIR_CORRECTION_DEG } from '../engine/fire/model'
+import { DEFAULT_FIRE_PARAMS } from '../engine/fire'
+import { DEFAULT_EVAC_PARAMS } from '../engine/evac'
 import type { Dataset } from './load'
 
 function mulberry32(seed: number) {
@@ -200,5 +203,24 @@ export function makeMockDataset(): Dataset {
     ],
     cuts: [],
   }
-  return { grid, elevation, fuel, scar, buildings, roads, weather, ignitions, firms, populationHome, populationWork, brigades, synthetic: true }
+  return {
+    grid,
+    elevation,
+    fuel,
+    scar,
+    buildings,
+    roads,
+    weather,
+    ignitions,
+    firms,
+    populationHome,
+    populationWork,
+    brigades,
+    synthetic: true,
+    // the synthetic set stands in for the 2024 files (same t0, same kind of weather series)
+    timeline: TIMELINE.VINA_2024,
+    windDirCorrectionDeg: ERA5_WIND_DIR_CORRECTION_DEG,
+    horizonMin: DEFAULT_FIRE_PARAMS.horizonMin,
+    defaultAlertMin: DEFAULT_EVAC_PARAMS.alertMin,
+  }
 }

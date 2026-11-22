@@ -11,7 +11,8 @@ import { localToMin } from '../data/time'
 import type { Dataset } from '../data/load'
 import { loadRealDataset } from '../data/load'
 import { makeMockDataset } from '../data/mock'
-import { brigadeKey, buildIgnitions, buildWeatherSeries, fireKey, HORIZON_MIN, rasteriseFirebreaks, safeNodes, wildlandDistanceM } from './scenario'
+import { timelineDataset, type TimelineChoice } from '../data/timeline'
+import { brigadeKey, buildIgnitions, buildWeatherSeries, fireKey, rasteriseFirebreaks, safeNodes, wildlandDistanceM } from './scenario'
 
 const ctx = self as unknown as DedicatedWorkerGlobalScope
 
@@ -30,11 +31,11 @@ function post(msg: FromWorker, transfer: Transferable[] = []) {
   ctx.postMessage(msg, transfer)
 }
 
-async function init(synthetic: boolean) {
+async function init(synthetic: boolean, timeline: TimelineChoice) {
   const t = performance.now()
   const d: Dataset | null = synthetic ? makeMockDataset() : await loadRealDataset()
   if (!d) throw new Error('El simulador no encontró los datos reales en /data/ (grid.json)')
-  data = d
+  data = timelineDataset(d, timeline)
   const loadMs = performance.now() - t
   prepared = prepareEvac(d.grid, d.fuel, d.roads, d.buildings, { safeDistanceM: DEFAULT_EVAC_PARAMS.safeDistanceM })
   wildDist = wildlandDistanceM(d.grid, d.fuel)
@@ -49,14 +50,14 @@ async function init(synthetic: boolean) {
 ctx.onmessage = (ev: MessageEvent<ToWorker>) => {
   const msg = ev.data
   if (msg.type === 'init') {
-    init(msg.synthetic).catch((e: unknown) => post({ type: 'error', id: null, message: e instanceof Error ? e.message : String(e) }))
+    init(msg.synthetic, msg.timeline).catch((e: unknown) => post({ type: 'error', id: null, message: e instanceof Error ? e.message : String(e) }))
     return
   }
   try {
     if (!data || !prepared || !wildDist) throw new Error('El simulador aún no tiene datos')
     const t = performance.now()
     const s = msg.scenario
-    const wb = buildWeatherSeries(data.weather, data.grid.t0, s.weather)
+    const wb = buildWeatherSeries(data.weather, data.grid.t0, s.weather, data.windDirCorrectionDeg)
     const key = fireKey(s)
     if (key !== lastFireKey || !lastFire) {
       lastFireInput = {
@@ -71,7 +72,7 @@ ctx.onmessage = (ev: MessageEvent<ToWorker>) => {
           droughtFactor: s.droughtFactor,
           spotting: s.spotting,
           spotMetresPerKmh: s.spotMetresPerKmh,
-          horizonMin: HORIZON_MIN,
+          horizonMin: data.horizonMin,
         },
       }
       lastFire = simulateFire(lastFireInput)
@@ -105,7 +106,7 @@ ctx.onmessage = (ev: MessageEvent<ToWorker>) => {
           toMin: (local) => localToMin(data!.grid.t0, local),
           safetyMarginMin: DEFAULT_EVAC_PARAMS.safetyMarginMin,
           carKmhByClass: DEFAULT_EVAC_PARAMS.carKmhByClass,
-          horizonMin: HORIZON_MIN,
+          horizonMin: data.horizonMin,
         })
         const planMs = performance.now() - tp
         lastDef = { fire: simulateFire({ ...lastFireInput!, defense: plan.defense }), plan, planMs }
@@ -114,7 +115,7 @@ ctx.onmessage = (ev: MessageEvent<ToWorker>) => {
       fire = lastDef.fire
       const base = simulateEvac({ prepared, arrivalMin: lastFire.arrivalMin, params: evacParams, edits })
       const defended = simulateEvac({ prepared, arrivalMin: fire.arrivalMin, params: evacParams, edits })
-      const rescue = applyRescue(prepared, defended.householdRisk, defended.householdStatus, lastDef.plan.units, HORIZON_MIN, defended.expectedTrappedHouseholds)
+      const rescue = applyRescue(prepared, defended.householdRisk, defended.householdStatus, lastDef.plan.units, data.horizonMin, defended.expectedTrappedHouseholds)
       evac = {
         ...defended,
         householdRisk: rescue.householdRisk,

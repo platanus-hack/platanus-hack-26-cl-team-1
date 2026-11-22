@@ -1,7 +1,6 @@
 // Small inline SVG charts for the panel.
 import type { WeatherSeries } from '../engine/types'
 import { minToHHMM } from '../data/time'
-import { HORIZON_MIN } from '../worker/scenario'
 
 const W = 320
 const H = 120
@@ -9,13 +8,16 @@ const PAD = { l: 34, r: 28, t: 10, b: 20 }
 const IW = W - PAD.l - PAD.r
 const IH = H - PAD.t - PAD.b
 
-function xOf(t: number) {
-  return PAD.l + (t / HORIZON_MIN) * IW
+/** x of a time (minutes since t0) on a chart spanning 0..horizonMin. */
+function xOf(t: number, horizonMin: number) {
+  return PAD.l + (t / horizonMin) * IW
 }
 
-function timeTicks(t0: string) {
+/** A label every 3 h (every 6 h on windows longer than 12 h, so the labels do not overlap). */
+function timeTicks(t0: string, horizonMin: number) {
+  const step = horizonMin > 12 * 60 ? 360 : 180
   const ticks = []
-  for (let t = 0; t <= HORIZON_MIN; t += 180) ticks.push({ t, label: minToHHMM(t0, t) })
+  for (let t = 0; t <= horizonMin; t += step) ticks.push({ t, label: minToHHMM(t0, t) })
   return ticks
 }
 
@@ -31,28 +33,29 @@ function niceMax(v: number) {
   return 10 * p
 }
 
-export function WeatherChart({ series, t0, clock }: { series: WeatherSeries; t0: string; clock: number }) {
+export function WeatherChart({ series, t0, clock, horizonMin }: { series: WeatherSeries; t0: string; clock: number; horizonMin: number }) {
+  const xOfT = (t: number) => xOf(t, horizonMin)
   const pts: { t: number; wind: number; rh: number }[] = []
   for (let i = 0; i < series.samples.length; i++) {
     const t = series.t0Min + i * series.stepMin
-    if (t < 0 || t > HORIZON_MIN) continue
+    if (t < 0 || t > horizonMin) continue
     pts.push({ t, wind: series.samples[i].windKmh, rh: series.samples[i].rh })
   }
   if (series.samples.length === 1) {
     const s = series.samples[0]
-    pts.push({ t: 0, wind: s.windKmh, rh: s.rh }, { t: HORIZON_MIN, wind: s.windKmh, rh: s.rh })
+    pts.push({ t: 0, wind: s.windKmh, rh: s.rh }, { t: horizonMin, wind: s.windKmh, rh: s.rh })
   }
   const wMax = niceMax(Math.max(10, ...pts.map((q) => q.wind)))
   const yW = (v: number) => PAD.t + IH - (v / wMax) * IH
   const yH = (v: number) => PAD.t + IH - (v / 100) * IH
-  const path = (f: (q: (typeof pts)[number]) => number) => pts.map((q, i) => `${i ? 'L' : 'M'}${xOf(q.t).toFixed(1)},${f(q).toFixed(1)}`).join('')
+  const path = (f: (q: (typeof pts)[number]) => number) => pts.map((q, i) => `${i ? 'L' : 'M'}${xOfT(q.t).toFixed(1)},${f(q).toFixed(1)}`).join('')
   return (
     <svg className="chart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Viento y humedad por hora">
       {[0, 0.5, 1].map((f) => (
         <line key={f} x1={PAD.l} x2={W - PAD.r} y1={PAD.t + IH * f} y2={PAD.t + IH * f} className="grid" />
       ))}
-      {timeTicks(t0).map((k) => (
-        <text key={k.t} x={xOf(k.t)} y={H - 5} className="tick" textAnchor="middle">
+      {timeTicks(t0, horizonMin).map((k) => (
+        <text key={k.t} x={xOfT(k.t)} y={H - 5} className="tick" textAnchor="middle">
           {k.label}
         </text>
       ))}
@@ -62,7 +65,7 @@ export function WeatherChart({ series, t0, clock }: { series: WeatherSeries; t0:
       <text x={W - PAD.r + 4} y={PAD.t + IH} className="tick rh">0</text>
       <path d={path((q) => yH(q.rh))} className="line rh" />
       <path d={path((q) => yW(q.wind))} className="line wind" />
-      <line x1={xOf(clock)} x2={xOf(clock)} y1={PAD.t} y2={PAD.t + IH} className="marker" />
+      <line x1={xOfT(clock)} x2={xOfT(clock)} y1={PAD.t} y2={PAD.t + IH} className="marker" />
     </svg>
   )
 }
@@ -71,19 +74,22 @@ export function RiskChart({
   curve,
   alertMin,
   t0,
+  horizonMin,
   onPick,
 }: {
   curve: { alertMin: number; expectedTrappedHouseholds: number }[]
   alertMin: number
   t0: string
+  horizonMin: number
   /** Click on the chart: choose that alert time (minutes since t0, 5-minute steps). */
   onPick?: (alertMin: number) => void
 }) {
   if (curve.length === 0) return <p className="muted small">Sin curva de riesgo (el motor de evacuación no la entregó).</p>
+  const xOfT = (t: number) => xOf(t, horizonMin)
   const yMax = niceMax(Math.max(1, ...curve.map((c) => c.expectedTrappedHouseholds)))
   const y = (v: number) => PAD.t + IH - (v / yMax) * IH
-  const d = curve.map((c, i) => `${i ? 'L' : 'M'}${xOf(c.alertMin).toFixed(1)},${y(c.expectedTrappedHouseholds).toFixed(1)}`).join('')
-  const area = `${d}L${xOf(curve[curve.length - 1].alertMin).toFixed(1)},${PAD.t + IH}L${xOf(curve[0].alertMin).toFixed(1)},${PAD.t + IH}Z`
+  const d = curve.map((c, i) => `${i ? 'L' : 'M'}${xOfT(c.alertMin).toFixed(1)},${y(c.expectedTrappedHouseholds).toFixed(1)}`).join('')
+  const area = `${d}L${xOfT(curve[curve.length - 1].alertMin).toFixed(1)},${PAD.t + IH}L${xOfT(curve[0].alertMin).toFixed(1)},${PAD.t + IH}Z`
   return (
     <svg
       className={`chart${onPick ? ' pickable' : ''}`}
@@ -94,16 +100,16 @@ export function RiskChart({
         if (!onPick) return
         const r = e.currentTarget.getBoundingClientRect()
         const x = ((e.clientX - r.left) / r.width) * W
-        const t = ((x - PAD.l) / IW) * HORIZON_MIN
+        const t = ((x - PAD.l) / IW) * horizonMin
         // a click left or right of the plot area picks its first or last time
-        onPick(Math.round(Math.min(HORIZON_MIN, Math.max(0, t)) / 5) * 5)
+        onPick(Math.round(Math.min(horizonMin, Math.max(0, t)) / 5) * 5)
       }}
     >
       {[0, 0.5, 1].map((f) => (
         <line key={f} x1={PAD.l} x2={W - PAD.r} y1={PAD.t + IH * f} y2={PAD.t + IH * f} className="grid" />
       ))}
-      {timeTicks(t0).map((k) => (
-        <text key={k.t} x={xOf(k.t)} y={H - 5} className="tick" textAnchor="middle">
+      {timeTicks(t0, horizonMin).map((k) => (
+        <text key={k.t} x={xOfT(k.t)} y={H - 5} className="tick" textAnchor="middle">
           {k.label}
         </text>
       ))}
@@ -111,7 +117,7 @@ export function RiskChart({
       <text x={PAD.l - 4} y={PAD.t + IH} className="tick" textAnchor="end">0</text>
       <path d={area} className="area risk" />
       <path d={d} className="line risk" />
-      <line x1={xOf(alertMin)} x2={xOf(alertMin)} y1={PAD.t} y2={PAD.t + IH} className="marker alert" />
+      <line x1={xOfT(alertMin)} x2={xOfT(alertMin)} y1={PAD.t} y2={PAD.t + IH} className="marker alert" />
     </svg>
   )
 }

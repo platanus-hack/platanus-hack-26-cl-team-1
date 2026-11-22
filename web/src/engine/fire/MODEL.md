@@ -338,6 +338,10 @@ On the real dataset a run takes 20–130 ms.
 
 - The weather is a single point (ERA5), with no terrain-channelled winds and no gusts. The −10° direction
   correction (section 6) is a fitted stand-in for channelling, not an observation.
+- The "starts today" scenario (`src/data/timeline.ts`) runs 00:00 to 24:00 today (`horizonMin` 24 h; the 2024
+  replay keeps its validated 12 h) and feeds the engine today's Open-Meteo forecast at the same point
+  **without** that correction: it was fitted on 2 Feb 2024's ERA5 and says nothing about a forecast model.
+  Fuels are still the pre-2024 layer (no regrowth in the scar) and the drought factor starts at 10.
 - Spotting is deterministic: there is no ember probability and no long-range spotting beyond D_max.
 - Structures are modelled as a grass fraction, in two classes (intermix / consolidated). There is no
   building-to-building ignition model.

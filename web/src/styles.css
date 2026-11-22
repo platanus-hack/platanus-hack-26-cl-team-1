@@ -104,6 +104,43 @@ input {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.topbar-end {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.timeline-pick button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+.topbar .short {
+  display: none;
+}
+.timeline-pick button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+/* forecast loading / error, below the top bar */
+.timeline-msg {
+  grid-row: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 16px;
+  text-align: center;
+}
+.timeline-msg .alert {
+  max-width: 640px;
+}
+.timeline-msg .row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
 .banner {
   grid-row: 2;
   padding: 6px 18px;
@@ -574,6 +611,15 @@ input[type='range']:focus-visible {
   border: 1px solid rgba(251, 191, 36, 0.4);
   color: #fde68a;
 }
+.alert.info {
+  background: rgba(96, 165, 250, 0.08);
+  border: 1px solid rgba(96, 165, 250, 0.35);
+  color: var(--text-2);
+}
+.timeline-note {
+  margin-bottom: 12px;
+  line-height: 1.45;
+}
 
 /* ------------------------------------------------------------------ charts */
 .chart {
@@ -1036,6 +1082,26 @@ input[type='range']:focus-visible {
   }
   .brand p {
     display: none;
+  }
+  .topbar .long {
+    display: none;
+  }
+  .topbar .short {
+    display: inline;
+  }
+  .topbar {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+  .topbar-end {
+    min-width: 0;
+  }
+  .topbar-end > .btn {
+    padding-inline: 10px;
+  }
+  .timeline-pick button {
+    padding: 6px 6px;
+    font-size: 12px;
   }
   .main {
     grid-template-columns: minmax(0, 1fr);

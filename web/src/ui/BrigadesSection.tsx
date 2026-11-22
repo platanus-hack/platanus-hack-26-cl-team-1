@@ -7,7 +7,7 @@ import type { UnitStatus } from '../engine/brigade'
 import { UNIT_COUNT, UNIT_LABEL_ES, UNIT_SHORT_ES, type UnitType } from '../engine/types'
 import type { BrigadesOut } from '../worker/protocol'
 import type { BrigadeScenario, Scenario } from '../worker/scenario'
-import { defaultBrigades, HORIZON_MIN, MAX_UNITS, scaleUnits } from '../worker/scenario'
+import { defaultBrigades, MAX_UNITS, scaleUnits } from '../worker/scenario'
 import { fmtInt, fmtSigned, Section, Slider, Toggle } from './controls'
 
 interface Props {
@@ -180,7 +180,7 @@ export function BrigadesSection(p: Props) {
                   label="Hora de salida"
                   value={b.dispatchMin[d.cuerpo]}
                   min={0}
-                  max={HORIZON_MIN}
+                  max={p.data.horizonMin}
                   step={10}
                   display={minToHHMM(t0, b.dispatchMin[d.cuerpo])}
                   onChange={(v) => set({ dispatchMin: { ...b.dispatchMin, [d.cuerpo]: v } })}
@@ -230,7 +230,7 @@ export function BrigadesSection(p: Props) {
                 label="Llegada al borde del mapa"
                 value={b.reinforcementMin[r.id]}
                 min={0}
-                max={HORIZON_MIN}
+                max={p.data.horizonMin}
                 step={10}
                 display={minToHHMM(t0, b.reinforcementMin[r.id])}
                 onChange={(v) => set({ reinforcementMin: { ...b.reinforcementMin, [r.id]: v } })}
