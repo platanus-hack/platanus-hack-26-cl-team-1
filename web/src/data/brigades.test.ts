@@ -6,6 +6,17 @@ const grid = parseGrid(JSON.parse(readFileSync(new URL('../../public/data/grid.j
 const shipped = JSON.parse(readFileSync(new URL('../../public/data/brigades.json', import.meta.url), 'utf8'))
 const clone = () => JSON.parse(JSON.stringify(shipped))
 
+describe('Eaton brigades.json', () => {
+  it('parses against the Eaton grid: 17 stations inside it, every department dispatched, no cuts or mutual aid', () => {
+    const g = parseGrid(JSON.parse(readFileSync(new URL('../../public/data/eaton-2025/grid.json', import.meta.url), 'utf8')))
+    const b = parseBrigades(JSON.parse(readFileSync(new URL('../../public/data/eaton-2025/brigades.json', import.meta.url), 'utf8')), g)
+    expect(b.stations).toHaveLength(17)
+    expect(b.dispatch.map((d) => d.cuerpo).sort()).toEqual(['Arcadia FD', 'LA County Fire', 'Monrovia FD', 'Pasadena FD', 'Sierra Madre FD'])
+    expect(b.reinforcements).toEqual([])
+    expect(b.cuts).toEqual([])
+  })
+})
+
 describe('parseBrigades', () => {
   it('accepts the shipped file', () => {
     const b = parseBrigades(shipped, grid)

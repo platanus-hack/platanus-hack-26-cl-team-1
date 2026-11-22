@@ -85,7 +85,7 @@ export const EVENTS: Record<EventId, EventDef> = {
     dir: 'eaton-2025/',
     horizonMin: 18 * 60, // 18:00 on 7 Jan to 12:00 on 8 Jan (Pacific time): the first night and morning
     windDirCorrectionDeg: 0,
-    layers: { brigades: false, population: true },
+    layers: { brigades: true, population: true },
     observedFire: true,
     evac: {
       // 19:25: the first evacuation orders (east of Lake Avenue). West of Lake the first order came at 03:25.

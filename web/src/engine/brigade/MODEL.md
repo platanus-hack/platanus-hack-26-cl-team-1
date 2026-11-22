@@ -19,6 +19,20 @@ or marked **supuesto**; the UI lists them.
   (supuesto), reaching the map edge at 21:00 (supuesto) by Ruta 68 or, 45 min later (supuesto), by Ruta 60.
 - **Historical cut:** Ruta 68 from 17:00 (La Tercera), never reopened within the run (reopening time unknown).
 
+## Eaton fire (`web/public/data/eaton-2025/brigades.json`, curated by hand)
+
+17 stations inside the Eaton grid, positions from LA County's official fire-station layer (LMS). Trucks:
+Pasadena FD as its 2025 Standards of Cover lists them (figure 2, plus Water Tender 34 and Patrol 38 from
+figure 98); LA County Fire stations 11, 12, 66 and 82 from the counts in that report's figure 4 (LA County Fire
+publishes no type per truck: its "other" unit is counted as a brush patrol, a supposition from unofficial
+sources); Sierra Madre, Arcadia and Monrovia, which publish no list, one engine each (supuesto). Mapping: engine
+-> Bomba, brush patrol -> Forestal, water tender -> Aljibe, ladder truck -> Escala/rescate; rescue ambulances and
+USAR are not counted. Every department leaves at 18:18, the fire's start time per CAL FIRE (supuesto: no dispatch
+times were found). No mutual aid, no road cuts. LA County 19, LAFD 42 and Glendale 23 lie just west of the grid
+and are left out. Tank sizes and the rest of `FIREFIGHT_MODEL` are the Chilean values. In the browser (default
+scenario): 25 trucks, all working, 140 cells defended; burned area 14,942 -> 14,917 ha, buildings reached
+119,849 -> 119,277, households cut off unchanged (1,670).
+
 ## All of Chile (`web/public/data/national/bomberos_cl.json`, for scenarios built from scratch)
 
 The 1,256 compañías of Chile with their trucks (`NationalStationsFile` in `types.ts`; method in

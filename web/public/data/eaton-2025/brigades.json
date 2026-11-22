@@ -1,0 +1,289 @@
+{
+ "note": "Curated by hand for Cortafuego (see pipeline/README.md, 'brigades.json'). units = [Bomba, Forestal, Aljibe, Escala/rescate]; unitsSource/source/arrivalSource null = supuesto. Eaton fire: stations inside the grid from LA County LMS; engine -> Bomba, brush patrol -> Forestal, water tender -> Aljibe, ladder truck -> Escala/rescate; rescue ambulances and USAR are not counted. LA County 19, LAFD 42 and Glendale 23 lie just west of the grid and are left out. No mutual aid and no road cuts are modelled.",
+ "stations": [
+  {
+   "id": "lacofd-11",
+   "cuerpo": "LA County Fire",
+   "company": "Estación 11",
+   "lon": -118.13285,
+   "lat": 34.18859,
+   "units": [
+    1,
+    1,
+    0,
+    0
+   ],
+   "unitsSource": "Pasadena Fire Department, Standards of Cover 2025, figura 4 (recursos de ayuda mutua y automática), https://www.cityofpasadena.net/fire/wp-content/uploads/sites/25/Standards-of-Coverage-Report-2025.pdf: conteos por estación de LA County Fire, que no publica el tipo de cada carro: 1 bomba y 1 otra; la unidad «otra» se cuenta como forestal (patrulla), supuesto según fuentes no oficiales.",
+   "locationSource": "Condado de Los Ángeles, capa oficial de estaciones de bomberos (LMS), https://public.gis.lacounty.gov/public/rest/services/LACounty_Dynamic/LMS_Data_Public/MapServer/137"
+  },
+  {
+   "id": "lacofd-12",
+   "cuerpo": "LA County Fire",
+   "company": "Estación 12",
+   "lon": -118.15845,
+   "lat": 34.19295,
+   "units": [
+    1,
+    0,
+    0,
+    0
+   ],
+   "unitsSource": "Pasadena Fire Department, Standards of Cover 2025, figura 4 (recursos de ayuda mutua y automática), https://www.cityofpasadena.net/fire/wp-content/uploads/sites/25/Standards-of-Coverage-Report-2025.pdf: conteos por estación de LA County Fire, que no publica el tipo de cada carro: 1 bomba.",
+   "locationSource": "Condado de Los Ángeles, capa oficial de estaciones de bomberos (LMS), https://public.gis.lacounty.gov/public/rest/services/LACounty_Dynamic/LMS_Data_Public/MapServer/137"
+  },
+  {
+   "id": "lacofd-66",
+   "cuerpo": "LA County Fire",
+   "company": "Estación 66",
+   "lon": -118.09381,
+   "lat": 34.17439,
+   "units": [
+    1,
+    1,
+    0,
+    0
+   ],
+   "unitsSource": "Pasadena Fire Department, Standards of Cover 2025, figura 4 (recursos de ayuda mutua y automática), https://www.cityofpasadena.net/fire/wp-content/uploads/sites/25/Standards-of-Coverage-Report-2025.pdf: conteos por estación de LA County Fire, que no publica el tipo de cada carro: 1 bomba y 1 otra; la unidad «otra» se cuenta como forestal (patrulla), supuesto según fuentes no oficiales.",
+   "locationSource": "Condado de Los Ángeles, capa oficial de estaciones de bomberos (LMS), https://public.gis.lacounty.gov/public/rest/services/LACounty_Dynamic/LMS_Data_Public/MapServer/137"
+  },
+  {
+   "id": "lacofd-82",
+   "cuerpo": "LA County Fire",
+   "company": "Estación 82",
+   "lon": -118.18636,
+   "lat": 34.19752,
+   "units": [
+    1,
+    1,
+    0,
+    1
+   ],
+   "unitsSource": "Pasadena Fire Department, Standards of Cover 2025, figura 4 (recursos de ayuda mutua y automática), https://www.cityofpasadena.net/fire/wp-content/uploads/sites/25/Standards-of-Coverage-Report-2025.pdf: conteos por estación de LA County Fire, que no publica el tipo de cada carro: 1 bomba, 1 escala y 1 otra; la unidad «otra» se cuenta como forestal (patrulla), supuesto según fuentes no oficiales.",
+   "locationSource": "Condado de Los Ángeles, capa oficial de estaciones de bomberos (LMS), https://public.gis.lacounty.gov/public/rest/services/LACounty_Dynamic/LMS_Data_Public/MapServer/137. La capa de límites de LA County Fire da otra dirección para esta estación; se usa la de LMS (352 W Foothill Blvd)."
+  },
+  {
+   "id": "pfd-31",
+   "cuerpo": "Pasadena FD",
+   "company": "Estación 31",
+   "lon": -118.15075,
+   "lat": 34.14315,
+   "units": [
+    1,
+    0,
+    0,
+    1
+   ],
+   "unitsSource": "Pasadena Fire Department, Standards of Cover 2025, figura 2 (carros y dotación por estación), https://www.cityofpasadena.net/fire/wp-content/uploads/sites/25/Standards-of-Coverage-Report-2025.pdf: Engine 31 y Truck 31 (escala mecánica de 100 pies, figura 96).",
+   "locationSource": "Condado de Los Ángeles, capa oficial de estaciones de bomberos (LMS), https://public.gis.lacounty.gov/public/rest/services/LACounty_Dynamic/LMS_Data_Public/MapServer/137"
+  },
+  {
+   "id": "pfd-32",
+   "cuerpo": "Pasadena FD",
+   "company": "Estación 32",
+   "lon": -118.10031,
+   "lat": 34.15413,
+   "units": [
+    1,
+    0,
+    0,
+    1
+   ],
+   "unitsSource": "Pasadena Fire Department, Standards of Cover 2025, figura 2 (carros y dotación por estación), https://www.cityofpasadena.net/fire/wp-content/uploads/sites/25/Standards-of-Coverage-Report-2025.pdf: Engine 32 y Truck 32 (escala de 107 pies, figura 96). USAR 32 no se cuenta.",
+   "locationSource": "Condado de Los Ángeles, capa oficial de estaciones de bomberos (LMS), https://public.gis.lacounty.gov/public/rest/services/LACounty_Dynamic/LMS_Data_Public/MapServer/137"
+  },
+  {
+   "id": "pfd-33",
+   "cuerpo": "Pasadena FD",
+   "company": "Estación 33",
+   "lon": -118.13282,
+   "lat": 34.15484,
+   "units": [
+    1,
+    0,
+    0,
+    0
+   ],
+   "unitsSource": "Pasadena Fire Department, Standards of Cover 2025, figura 2 (carros y dotación por estación), https://www.cityofpasadena.net/fire/wp-content/uploads/sites/25/Standards-of-Coverage-Report-2025.pdf: Engine 33.",
+   "locationSource": "Condado de Los Ángeles, capa oficial de estaciones de bomberos (LMS), https://public.gis.lacounty.gov/public/rest/services/LACounty_Dynamic/LMS_Data_Public/MapServer/137"
+  },
+  {
+   "id": "pfd-34",
+   "cuerpo": "Pasadena FD",
+   "company": "Estación 34",
+   "lon": -118.12228,
+   "lat": 34.14128,
+   "units": [
+    1,
+    0,
+    1,
+    0
+   ],
+   "unitsSource": "Pasadena Fire Department, Standards of Cover 2025, figura 2 (carros y dotación por estación), https://www.cityofpasadena.net/fire/wp-content/uploads/sites/25/Standards-of-Coverage-Report-2025.pdf: Engine 34; Water Tender 34 según la figura 98.",
+   "locationSource": "Condado de Los Ángeles, capa oficial de estaciones de bomberos (LMS), https://public.gis.lacounty.gov/public/rest/services/LACounty_Dynamic/LMS_Data_Public/MapServer/137"
+  },
+  {
+   "id": "pfd-36",
+   "cuerpo": "Pasadena FD",
+   "company": "Estación 36",
+   "lon": -118.15033,
+   "lat": 34.16542,
+   "units": [
+    1,
+    0,
+    0,
+    0
+   ],
+   "unitsSource": "Pasadena Fire Department, Standards of Cover 2025, figura 2 (carros y dotación por estación), https://www.cityofpasadena.net/fire/wp-content/uploads/sites/25/Standards-of-Coverage-Report-2025.pdf: Engine 36.",
+   "locationSource": "Condado de Los Ángeles, capa oficial de estaciones de bomberos (LMS), https://public.gis.lacounty.gov/public/rest/services/LACounty_Dynamic/LMS_Data_Public/MapServer/137"
+  },
+  {
+   "id": "pfd-37",
+   "cuerpo": "Pasadena FD",
+   "company": "Estación 37",
+   "lon": -118.07931,
+   "lat": 34.14982,
+   "units": [
+    1,
+    0,
+    0,
+    0
+   ],
+   "unitsSource": "Pasadena Fire Department, Standards of Cover 2025, figura 2 (carros y dotación por estación), https://www.cityofpasadena.net/fire/wp-content/uploads/sites/25/Standards-of-Coverage-Report-2025.pdf: Engine 37.",
+   "locationSource": "Condado de Los Ángeles, capa oficial de estaciones de bomberos (LMS), https://public.gis.lacounty.gov/public/rest/services/LACounty_Dynamic/LMS_Data_Public/MapServer/137"
+  },
+  {
+   "id": "pfd-38",
+   "cuerpo": "Pasadena FD",
+   "company": "Estación 38",
+   "lon": -118.17611,
+   "lat": 34.16678,
+   "units": [
+    1,
+    1,
+    0,
+    0
+   ],
+   "unitsSource": "Pasadena Fire Department, Standards of Cover 2025, figura 2 (carros y dotación por estación), https://www.cityofpasadena.net/fire/wp-content/uploads/sites/25/Standards-of-Coverage-Report-2025.pdf: Engine 38; Patrol 38 (patrulla forestal) según la figura 98.",
+   "locationSource": "Condado de Los Ángeles, capa oficial de estaciones de bomberos (LMS), https://public.gis.lacounty.gov/public/rest/services/LACounty_Dynamic/LMS_Data_Public/MapServer/137"
+  },
+  {
+   "id": "pfd-39",
+   "cuerpo": "Pasadena FD",
+   "company": "Estación 39",
+   "lon": -118.17919,
+   "lat": 34.14036,
+   "units": [
+    1,
+    0,
+    0,
+    0
+   ],
+   "unitsSource": "Pasadena Fire Department, Standards of Cover 2025, figura 2 (carros y dotación por estación), https://www.cityofpasadena.net/fire/wp-content/uploads/sites/25/Standards-of-Coverage-Report-2025.pdf: Engine 39.",
+   "locationSource": "Condado de Los Ángeles, capa oficial de estaciones de bomberos (LMS), https://public.gis.lacounty.gov/public/rest/services/LACounty_Dynamic/LMS_Data_Public/MapServer/137"
+  },
+  {
+   "id": "smd-1",
+   "cuerpo": "Sierra Madre FD",
+   "company": "Estación",
+   "lon": -118.05844,
+   "lat": 34.16159,
+   "units": [
+    1,
+    0,
+    0,
+    0
+   ],
+   "unitsSource": null,
+   "locationSource": "Condado de Los Ángeles, capa oficial de estaciones de bomberos (LMS), https://public.gis.lacounty.gov/public/rest/services/LACounty_Dynamic/LMS_Data_Public/MapServer/137"
+  },
+  {
+   "id": "arc-105",
+   "cuerpo": "Arcadia FD",
+   "company": "Estación 105",
+   "lon": -118.03089,
+   "lat": 34.13186,
+   "units": [
+    1,
+    0,
+    0,
+    0
+   ],
+   "unitsSource": null,
+   "locationSource": "Condado de Los Ángeles, capa oficial de estaciones de bomberos (LMS), https://public.gis.lacounty.gov/public/rest/services/LACounty_Dynamic/LMS_Data_Public/MapServer/137"
+  },
+  {
+   "id": "arc-106",
+   "cuerpo": "Arcadia FD",
+   "company": "Estación 106",
+   "lon": -118.05402,
+   "lat": 34.13252,
+   "units": [
+    1,
+    0,
+    0,
+    0
+   ],
+   "unitsSource": null,
+   "locationSource": "Condado de Los Ángeles, capa oficial de estaciones de bomberos (LMS), https://public.gis.lacounty.gov/public/rest/services/LACounty_Dynamic/LMS_Data_Public/MapServer/137"
+  },
+  {
+   "id": "arc-107",
+   "cuerpo": "Arcadia FD",
+   "company": "Estación 107",
+   "lon": -118.03499,
+   "lat": 34.15759,
+   "units": [
+    1,
+    0,
+    0,
+    0
+   ],
+   "unitsSource": null,
+   "locationSource": "Condado de Los Ángeles, capa oficial de estaciones de bomberos (LMS), https://public.gis.lacounty.gov/public/rest/services/LACounty_Dynamic/LMS_Data_Public/MapServer/137"
+  },
+  {
+   "id": "mon-101",
+   "cuerpo": "Monrovia FD",
+   "company": "Estación 101",
+   "lon": -117.99965,
+   "lat": 34.14724,
+   "units": [
+    1,
+    0,
+    0,
+    0
+   ],
+   "unitsSource": null,
+   "locationSource": "Condado de Los Ángeles, capa oficial de estaciones de bomberos (LMS), https://public.gis.lacounty.gov/public/rest/services/LACounty_Dynamic/LMS_Data_Public/MapServer/137"
+  }
+ ],
+ "dispatch": [
+  {
+   "cuerpo": "LA County Fire",
+   "dispatchLocal": "2025-01-07T18:18",
+   "source": null
+  },
+  {
+   "cuerpo": "Pasadena FD",
+   "dispatchLocal": "2025-01-07T18:18",
+   "source": null
+  },
+  {
+   "cuerpo": "Sierra Madre FD",
+   "dispatchLocal": "2025-01-07T18:18",
+   "source": null
+  },
+  {
+   "cuerpo": "Arcadia FD",
+   "dispatchLocal": "2025-01-07T18:18",
+   "source": null
+  },
+  {
+   "cuerpo": "Monrovia FD",
+   "dispatchLocal": "2025-01-07T18:18",
+   "source": null
+  }
+ ],
+ "reinforcements": [],
+ "cuts": []
+}
