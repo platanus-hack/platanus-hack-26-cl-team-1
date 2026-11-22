@@ -61,6 +61,10 @@ export interface Scenario {
   addedLinks: { u: number; v: number }[]
   /** Firefighters (off by default: the calibrated model has no suppression). */
   brigades: BrigadeScenario
+  /** Preparation plan (src/engine/plan): plan tiles where the 200 m belt around inhabited land is cleared, and
+   *  sectors whose households are in the community preparation programme. Empty = no plan. */
+  planTiles: number[]
+  planSectors: number[]
 }
 
 export interface BrigadeScenario extends BrigadeSettings {
@@ -109,7 +113,7 @@ export function brigadeKey(s: Scenario): string | null {
 
 /** The part of the scenario the fire depends on (the worker reruns the fire only when this changes). */
 export function fireKey(s: Scenario): string {
-  return JSON.stringify([s.weather, s.droughtFactor, s.spotting, s.spotMetresPerKmh, s.presetIgnitions, s.userIgnitions, s.firebreaks])
+  return JSON.stringify([s.weather, s.droughtFactor, s.spotting, s.spotMetresPerKmh, s.presetIgnitions, s.userIgnitions, s.firebreaks, s.planTiles])
 }
 
 // ---------------------------------------------------------------------------------------------------------

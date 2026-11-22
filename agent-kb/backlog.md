@@ -24,6 +24,8 @@ Owner in brackets once someone takes an item. Project: Cortafuego (D-019). The O
     one hypothetical ignition at 14:00). [Anaís + agent]
 
 ## Next
+- [ ] Plan de preparación (D-032), next: ignitions sampled from fire records, several weather days, a
+  street-link optimizer (exact incremental evaluator in the 2026-11-22 optimizer session log), a geofenced alert mode.
 - [ ] Western stall of 14:05–16:25 (satellite) not reproduced: needs a cause the data shows (initial attack?
   local wind?); see `web/src/engine/fire/MODEL.md` section 6.
 - [ ] Pace back test polish (review of PR #53): GOES half-pixel 1.0 km vs a ~2.5–3 km pixel, look fires up by
@@ -37,8 +39,6 @@ Owner in brackets once someone takes an item. Project: Cortafuego (D-019). The O
   instead of a fixed 2.9 per household; offices and schools as origins on weekdays.
 - [ ] Better job proxy for old mixed-use centres (business POIs, the origin-destination surveys, SII employment by
   comuna); public holidays and February vacations in the presence model.
-- [ ] Measures optimizer (investigated 2026-11-22, see the session log): geofenced alert mode, then a links
-  optimizer and fuel tiles over a weather ensemble. Scripts live outside the repo until a PR adds them.
 - [ ] Congestion on evacuation routes (today free flow).
 - [ ] Ensemble (perturbed wind and spotting) for a burn-probability map and a range on the counts.
 - [ ] **Fit on both fires** (Viña + Eaton, D-030): out of sample the Viña calibration overburns Eaton ~2.6×; tune

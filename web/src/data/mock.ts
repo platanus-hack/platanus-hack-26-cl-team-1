@@ -7,6 +7,7 @@ import { DEFAULT_FIRE_PARAMS } from '../engine/fire'
 import { DEFAULT_EVAC_PARAMS } from '../engine/evac'
 import type { Dataset } from './load'
 import { EVENTS } from './events'
+import { PLAN_BELT_WIDTH_M, PLAN_PROGRAMME, PLAN_TILE_CELLS, buildBelt, sectorHouseholds, tileHa } from '../engine/plan'
 
 function mulberry32(seed: number) {
   let a = seed >>> 0
@@ -204,6 +205,18 @@ export function makeMockDataset(): Dataset {
     ],
     cuts: [],
   }
+  // Synthetic plan: tiles and sectors in size order, no validation (nothing here is measured).
+  const belt = buildBelt(grid, fuel, buildings)
+  const plan = {
+    method: 'Plan sintético (datos de prueba): celdas ordenadas por tamaño, sin validación.',
+    tileCells: PLAN_TILE_CELLS,
+    beltWidthM: PLAN_BELT_WIDTH_M,
+    programme: { ...PLAN_PROGRAMME },
+    ensemble: { fires: 0, trainFires: 0, testFires: 0, alertLagMin: 240, ignitionBandM: [400, 3000] as [number, number], excludeNearRealM: 2000 },
+    tiles: [...belt.cellsByTile.keys()].map((t) => ({ tile: t, ha: tileHa(belt, t), savedPerFire: 0 })).sort((a, b) => b.ha - a.ha),
+    sectors: [...sectorHouseholds(belt).entries()].map(([s, h]) => ({ sector: s, households: h, savedPerFire: 0 })).sort((a, b) => b.households - a.households),
+    validation: [],
+  }
   return {
     grid,
     elevation,
@@ -217,6 +230,7 @@ export function makeMockDataset(): Dataset {
     event: EVENTS[TIMELINE.VINA_2024],
     population: { home: populationHome, work: populationWork },
     brigades,
+    plan,
     synthetic: true,
     // the synthetic set stands in for the 2024 files (same t0, same kind of weather series)
     timeline: TIMELINE.VINA_2024,

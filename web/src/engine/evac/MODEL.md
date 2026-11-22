@@ -78,6 +78,12 @@ the people in it died.
   cut by the fire still counts against the car.
 - **Flow.** Each threatened household sends its mode shares along that mode's next-hop chain to safety;
   accumulated per edge in one pass in increasing-`L` order.
+- **Preparation programme (optional, `EvacInput.programme`).** The households of a programme (a 0/1 mask
+  per building, the Plan de preparación in `src/engine/plan`) use the programme's preparation median and cue
+  share instead of `params.prepMedianMin` / `params.cueShare`; everything else is shared. Households do not
+  interact (no congestion) and the latest-departure labels and cue times do not depend on these two
+  parameters, so this is exactly the member-wise mix of two full runs (checked in the tests). `riskByAlert` is
+  the sum of the two groups' curves, each computed with the other group's deadlines set to Infinity.
 - **riskByAlert.** Same fire and same cue behaviour, alert at 0, 10, ... up to the last arrival rounded
   up to the hour. `D` does not depend on the alert, so this bins `D` (0.1 min) and correlates with a
   tabulated CDF. Cue responders are split by their cue time, binned the same way: those not cued yet at

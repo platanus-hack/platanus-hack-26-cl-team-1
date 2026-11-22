@@ -43,9 +43,17 @@
   - A plan tuned to 2 Feb saves 0 % on other fires (partly by construction).
   - Scripts: `proactive.ts`, `proactive2.ts`; check logs `zz-verify-proactive-*.log`.
 
+- **Built (option A, 03:15-04:00):** the Plan de preparación in the app (D-032). `src/engine/plan` (belt, tiles,
+  programme), `bake.ts` + `public/data/plan.json` (120 fires, about 4.5 min), a programme group in
+  `simulateEvac` (exact member-wise mix, tested), the worker applying both, and a panel section with a map
+  layer. Built with three parallel agents (bake, tests, UI) on a contract written first.
+  - Measured on the recalibrated fire (D-027): belt 1,000 ha −24.8 % on 40 held-out fires (random −5.2 to
+    −13.0 %), but 0.0 % on 2 Feb with the real weather. Programme 20,000 households −4.9 % on held-out fires
+    (random −1.9 to −4.7 %), −3.2 % on 2 Feb. Every tile / every sector: −37 % / −44 % on 2 Feb.
+  - The research numbers above (`.context` scripts) predate D-027 and are superseded by these.
+
 ## Decisions
-- None recorded. Proposal (not decided): if the app gets an optimizer, it optimises over a weather ensemble,
-  shows the minimum next to the mean, and covers links and fuel tiles only; alerts get curves instead.
+- D-032: Plan de preparación (contract: `EvacProgramme`, `PlanFile`, `Scenario.planTiles` / `planSectors`).
 
 ## Open / blocked
 - No number from this investigation is pitch-ready until its script is in the repo ("measure what you claim").
@@ -54,8 +62,10 @@
   (28 cells, 1 building). Fixed to inhabited land: 2,497 → 1,313 on the real weather.
 
 ## Next
-- Planning optimizer in the app: bake the ensemble ranking offline (`plan.json`), then budget sliders in ha and
-  households that highlight the tiles and sectors and apply them to the current scenario.
+- The plan's ranking does not anticipate 2 Feb. Things to try: sample ignitions and times from CONAF fire
+  records instead of uniformly, vary the alert lag, use several weather days, rank tiles with interactions
+  (greedy over an ensemble large enough not to overfit).
+- Not checked in a browser in this session (no browser tool): open the panel and map once on the deploy.
 - Cheapest in-app win: an alert mode "por cercanía del fuego" (geofenced) mapped to `cueShare 1,
   cueRadiusM R`, which is exact for full reach.
 - Links optimizer in the worker: port `links-core.ts` into `src/engine/evac` with a test against simulateEvac.

@@ -12,6 +12,7 @@ import {
   parseBuildings,
   parseNationalPopulation,
   parsePopulationLayer,
+  parsePlan,
 } from './load'
 import { makeMockDataset } from './mock'
 import { localToMin, minToDateLabel, minToHHMM } from './time'
@@ -164,5 +165,68 @@ describe('population files', () => {
     const work = parsePopulationLayer('population_work.bin', read('population_work.bin'), cells)
     expect(home.reduce((x, y) => x + y, 0)).toBeGreaterThan(5e5)
     expect(work.reduce((x, y) => x + y, 0)).toBeGreaterThan(5e5)
+  })
+})
+
+describe('plan.json', () => {
+  // 40 x 40 cells: 3 x 3 = 9 plan tiles of 17 cells (ids 0..8).
+  const g = parseGrid({ ...gridJson, rows: 40, cols: 40 })
+  const valid = () => ({
+    method: 'Prueba',
+    tileCells: 17,
+    beltWidthM: 200,
+    programme: { prepMedianMin: 5, cueShare: 0.9 },
+    ensemble: { fires: 10, trainFires: 7, testFires: 3, alertLagMin: 240, ignitionBandM: [400, 3000], excludeNearRealM: 2000 },
+    tiles: [
+      { tile: 0, ha: 12.5, savedPerFire: 0.3 },
+      { tile: 8, ha: 3, savedPerFire: 0.1 },
+    ],
+    sectors: [{ sector: 4, households: 120, savedPerFire: 0.02 }],
+    validation: [
+      { measure: 'franja', budget: 100, unseenPct: 12, randomUnseenPct: [3, 4, 6], feb2Pct: 2, feb2MeanPct: 3 },
+      { measure: 'programa', budget: 5000, unseenPct: 20, randomUnseenPct: [5, 6, 7], feb2Pct: 18, feb2MeanPct: 17 },
+    ],
+  })
+
+  it('accepts a valid plan, and empty lists', () => {
+    expect(parsePlan(valid(), g)).toEqual(valid())
+    expect(parsePlan({ ...valid(), tiles: [], sectors: [], validation: [] }, g).tiles).toEqual([])
+  })
+
+  it('the synthetic plan passes its own checks', () => {
+    const d = makeMockDataset()
+    expect(parsePlan(d.plan, d.grid)).toEqual(d.plan)
+    expect(d.plan!.tiles.length).toBeGreaterThan(0)
+    expect(d.plan!.sectors.length).toBeGreaterThan(0)
+  })
+
+  it('rejects a plan baked with other constants', () => {
+    expect(() => parsePlan({ ...valid(), tileCells: 16 }, g)).toThrow(/tileCells/)
+    expect(() => parsePlan({ ...valid(), beltWidthM: 100 }, g)).toThrow(/beltWidthM/)
+    expect(() => parsePlan({ ...valid(), programme: { prepMedianMin: 5, cueShare: 0.8 } }, g)).toThrow(/PLAN_PROGRAMME/)
+    expect(() => parsePlan({ ...valid(), programme: { prepMedianMin: 4, cueShare: 0.9 } }, g)).toThrow(/PLAN_PROGRAMME/)
+    expect(() => parsePlan({ ...valid(), programme: undefined }, g)).toThrow(/programme/)
+    expect(() => parsePlan({ ...valid(), tileCells: 16 }, g)).toThrow(DataError)
+    expect(() => parsePlan({ ...valid(), tileCells: 16 }, g)).toThrow(/plan\.json/)
+  })
+
+  it('rejects malformed tiles, sectors and measures', () => {
+    const v = valid()
+    const tiles = (t: unknown[]) => ({ ...v, tiles: t })
+    const sectors = (s: unknown[]) => ({ ...v, sectors: s })
+    expect(() => parsePlan(tiles([v.tiles[0], { ...v.tiles[1], tile: 0 }]), g)).toThrow(/repetida/)
+    expect(() => parsePlan(tiles([{ ...v.tiles[0], tile: 9 }]), g)).toThrow(/fuera de las 9/)
+    expect(() => parsePlan(tiles([{ ...v.tiles[0], tile: -1 }]), g)).toThrow(/fuera/)
+    expect(() => parsePlan(tiles([{ ...v.tiles[0], tile: 1.5 }]), g)).toThrow(/fuera/)
+    expect(() => parsePlan(tiles([{ ...v.tiles[0], ha: 0 }]), g)).toThrow(/"ha"/)
+    expect(() => parsePlan(tiles([{ tile: 0, ha: 1 }]), g)).toThrow(/savedPerFire/)
+    expect(() => parsePlan(sectors([v.sectors[0], v.sectors[0]]), g)).toThrow(/repetido/)
+    expect(() => parsePlan(sectors([{ ...v.sectors[0], sector: 9 }]), g)).toThrow(/fuera/)
+    expect(() => parsePlan(sectors([{ ...v.sectors[0], households: 0 }]), g)).toThrow(/households/)
+    expect(() => parsePlan({ ...v, validation: [{ ...v.validation[0], measure: 'cortafuego' }] }, g)).toThrow(/medida desconocida/)
+    expect(() => parsePlan({ ...v, validation: [{ ...v.validation[0], randomUnseenPct: [1, 2] }] }, g)).toThrow(/randomUnseenPct/)
+    expect(() => parsePlan({ ...v, ensemble: { ...v.ensemble, ignitionBandM: [400] } }, g)).toThrow(/ignitionBandM/)
+    expect(() => parsePlan({ ...v, method: '' }, g)).toThrow(/method/)
+    expect(() => parsePlan([], g)).toThrow(DataError)
   })
 })

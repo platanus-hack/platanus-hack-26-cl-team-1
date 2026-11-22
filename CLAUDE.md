@@ -33,6 +33,8 @@ the other choice in the picker (`?escenario=hoy | vina-2024`, D-028).
   - `src/engine/fire/`: fire spread (McArthur Mk5 forest / CSIRO grassland rate of spread, slope and wind
     as one vector, elliptical spread, minimum-travel-time propagation, ember spotting).
   - `src/engine/evac/`: evacuation (latest-departure search on the street graph, lognormal preparation time).
+  - `src/engine/plan/`: Plan de preparación (fuel belt by tile, community programme by sector), ranked over an
+    ensemble of simulated fires by `pnpm plan` into `public/data/plan.json`.
   - `src/worker/`: runs both engines in a Web Worker. `src/ui/`, `src/data/`: the app.
   - `scripts/`: Node scripts that reuse the engines (validation against the Sentinel-2 scar).
 

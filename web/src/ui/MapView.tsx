@@ -8,6 +8,7 @@ import { localToMin } from '../data/time'
 import type { BrigadesOut, EvacOut, FireOut } from '../worker/protocol'
 import type { Scenario } from '../worker/scenario'
 import { HOUSEHOLD } from '../engine/types'
+import { PLAN_TILE_CELLS, tileRing } from '../engine/plan'
 import { drawFire, drawFuel, drawHillshade, drawPopulation, drawScar } from './overlays'
 import type { Feature, FeatureCollection, LineString, SetDataArg } from './geo'
 
@@ -31,6 +32,8 @@ export interface LayerToggles {
   combustible: boolean
   bomberos: boolean
   poblacion: boolean
+  /** Plan de preparación: treated belt tiles and programme sectors. */
+  plan: boolean
 }
 
 export const BASE_STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty'
@@ -251,6 +254,15 @@ export function MapView(props: Props) {
     )
   }
 
+  /** Plan de preparación: one polygon per chosen belt tile and per programme sector (tileRing). */
+  function updatePlan() {
+    if (!ready.current) return
+    const { data, scenario } = p.current
+    const poly = (t: number): Feature => ({ type: 'Feature', geometry: { type: 'Polygon', coordinates: [tileRing(data.grid, PLAN_TILE_CELLS, t)] }, properties: {} })
+    src('plan-tiles')?.setData(fc(scenario.planTiles.map(poly)))
+    src('plan-sectors')?.setData(fc(scenario.planSectors.map(poly)))
+  }
+
   function setVis(id: string, on: boolean) {
     const map = mapRef.current
     if (map?.getLayer(id)) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none')
@@ -273,6 +285,7 @@ export function MapView(props: Props) {
     setVis('firebreaks', L.cortafuegos)
     setVis('firebreaks-casing', L.cortafuegos)
     setVis('firms', L.firms)
+    for (const id of ['plan-tiles-fill', 'plan-tiles-line', 'plan-sectors-line']) setVis(id, L.plan)
   }
 
   function updateTerrain() {
@@ -299,6 +312,7 @@ export function MapView(props: Props) {
     updateDraft()
     updateIgnitions()
     updateBrigades()
+    updatePlan()
     updateVisibility()
     updateTerrain()
   }
@@ -349,8 +363,18 @@ export function MapView(props: Props) {
     map.addLayer({ id: 'scar', type: 'raster', source: 'scar', paint: { 'raster-resampling': 'nearest', 'raster-fade-duration': 0 } }, firstSymbol)
 
     const empty = fc([])
-    for (const id of ['roads', 'links', 'bld-all', 'bld-status', 'safe', 'firebreaks', 'draft', 'ignitions', 'firms', 'brig-cuts', 'brig-routes', 'brig-sites', 'brig-stations'])
+    for (const id of ['roads', 'links', 'bld-all', 'bld-status', 'safe', 'firebreaks', 'draft', 'ignitions', 'firms', 'brig-cuts', 'brig-routes', 'brig-sites', 'brig-stations', 'plan-tiles', 'plan-sectors'])
       map.addSource(id, { type: 'geojson', data: empty })
+
+    // Plan de preparación: the tile tint goes under the fire, the outlines under the streets.
+    map.addLayer({ id: 'plan-tiles-fill', type: 'fill', source: 'plan-tiles', paint: { 'fill-color': '#a3e635', 'fill-opacity': 0.12 } }, 'fire')
+    map.addLayer({ id: 'plan-tiles-line', type: 'line', source: 'plan-tiles', paint: { 'line-color': '#a3e635', 'line-width': 1.2, 'line-opacity': 0.8 } })
+    map.addLayer({
+      id: 'plan-sectors-line',
+      type: 'line',
+      source: 'plan-sectors',
+      paint: { 'line-color': '#c4b5fd', 'line-width': 1.6, 'line-opacity': 0.9, 'line-dasharray': [2, 1.5] },
+    })
 
     // MapLibre's tile workers may evaluate a layer before they receive the global state (null for a moment);
     // to-number keeps that first pass quiet, and the state change that follows re-evaluates every tile.
@@ -771,6 +795,7 @@ export function MapView(props: Props) {
   useEffect(updateIgnitions, [props.scenario.presetIgnitions, props.scenario.userIgnitions])
   useEffect(updateLinks, [props.scenario.addedLinks])
   useEffect(updateBrigades, [props.brigades, props.scenario.brigades.enabled])
+  useEffect(updatePlan, [props.scenario.planTiles, props.scenario.planSectors])
   useEffect(updateVisibility, [props.layers])
   useEffect(updateTerrain, [props.terrain3d])
   useEffect(() => {
